@@ -1,0 +1,382 @@
+{
+  "items": [
+    {
+      "id": "49e26512-9bb0-4b2a-9b9b-5d81eb4b79f2",
+      "name": "Eärendil",
+      "gender": "male",
+      "birth": {
+        "era": "First Age",
+        "year": 503
+      },
+      "death": null,
+      "houses": [
+        "Hador"
+      ],
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=E%C3%A4rendil"
+        }
+      ],
+      "portraitUrl": "https://tolkiengateway.net/w/images/e/e8/Jenny_Dolfen_-_Earendil_the_Mariner.jpg",
+      "portraitSourceLabel": "Tolkien Gateway image by Jenny Dolfen",
+      "portraitSourceUrl": "https://tolkiengateway.net/wiki/E%C3%A4rendil#/media/File:Jenny_Dolfen_-_Earendil_the_Mariner.jpg",
+      "metadata": {
+        "description": null
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440001",
+      "name": "Arathorn II",
+      "gender": "male",
+      "birth": {
+        "era": "Third Age",
+        "year": 2873
+      },
+      "death": {
+        "era": "Third Age",
+        "year": 2931
+      },
+      "houses": [
+        "Dunedain"
+      ],
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Arathorn%20II"
+        }
+      ],
+      "metadata": {
+        "description": "Chieftain of the Dunedain"
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440002",
+      "name": "Gilraen",
+      "gender": "female",
+      "birth": {
+        "era": "Third Age",
+        "year": 2907
+      },
+      "death": {
+        "era": "Third Age",
+        "year": 3007
+      },
+      "houses": [
+        "Dunedain"
+      ],
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Gilraen"
+        }
+      ],
+      "metadata": {
+        "description": "Mother of Aragorn"
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440003",
+      "name": "Aragorn II",
+      "gender": "male",
+      "birth": {
+        "era": "Third Age",
+        "year": 2931
+      },
+      "death": {
+        "era": "Fourth Age",
+        "year": 120
+      },
+      "houses": [
+        "Dunedain"
+      ],
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Aragorn%20II"
+        },
+        {
+          "label": "The One Wiki to Rule Them All",
+          "url": "https://lotr.fandom.com/wiki/Aragorn_II"
+        }
+      ],
+      "portraitUrl": "https://en.wikipedia.org/wiki/Special:Redirect/file/File:Aragorn300ppx.png",
+      "portraitSourceLabel": "Wikipedia article image",
+      "portraitSourceUrl": "https://en.wikipedia.org/wiki/Aragorn",
+      "metadata": {
+        "description": "King Elessar"
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440004",
+      "name": "Arwen",
+      "gender": "female",
+      "species": "Half-elven",
+      "birth": {
+        "era": "Third Age",
+        "year": 241
+      },
+      "death": {
+        "era": "Fourth Age",
+        "year": 121
+      },
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Arwen"
+        }
+      ],
+      "metadata": {
+        "description": "Daughter of Elrond"
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440005",
+      "name": "Eldarion",
+      "gender": "male",
+      "birth": {
+        "era": "Fourth Age",
+        "year": 1
+      },
+      "death": null,
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Eldarion"
+        }
+      ],
+      "metadata": {
+        "description": "Heir of Aragorn and Arwen"
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440006",
+      "name": "Elrond",
+      "gender": "male",
+      "species": "Half-elven",
+      "birth": {
+        "era": "First Age",
+        "year": 532
+      },
+      "death": null,
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Elrond"
+        },
+        {
+          "label": "Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/Elrond"
+        }
+      ],
+      "portraitUrl": "https://en.wikipedia.org/wiki/Special:Redirect/file/File:Elrond11.jpg",
+      "portraitSourceLabel": "Wikipedia article image",
+      "portraitSourceUrl": "https://en.wikipedia.org/wiki/Elrond",
+      "metadata": {
+        "description": "Loremaster of Rivendell"
+      }
+    },
+    {
+      "id": "8cf5f5c9-3d67-4311-8d85-a9a9ff76ef11",
+      "name": "Elros",
+      "gender": "male",
+      "species": "Half-elven",
+      "birth": {
+        "era": "First Age",
+        "year": 532
+      },
+      "death": null,
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Elros"
+        }
+      ],
+      "metadata": {
+        "description": "Brother of Elrond"
+      }
+    },
+    {
+      "id": "1f2c5d4e-8a71-4e6d-9f3a-2c1b7a540001",
+      "name": "Thingol",
+      "gender": "male",
+      "birth": null,
+      "death": null,
+      "houses": [
+        "Thingol"
+      ],
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Thingol"
+        }
+      ],
+      "metadata": {
+        "description": "King of Doriath"
+      }
+    },
+    {
+      "id": "2a6b7c8d-91e2-4f35-8c61-0e2d4b650002",
+      "name": "Melian",
+      "gender": "female",
+      "species": "Maia",
+      "birth": null,
+      "death": null,
+      "houses": [
+        "Thingol"
+      ],
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Melian"
+        }
+      ],
+      "metadata": {
+        "description": "Queen of Doriath"
+      }
+    },
+    {
+      "id": "3b7c8d9e-a1f2-4e46-9d72-1f3e5c760003",
+      "name": "Tuor",
+      "gender": "male",
+      "birth": null,
+      "death": null,
+      "houses": [
+        "Hador"
+      ],
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Tuor"
+        }
+      ],
+      "metadata": {
+        "description": "Father of Eärendil"
+      }
+    },
+    {
+      "id": "4c8d9eaf-b2f3-4f57-ae83-2a4f6d870004",
+      "name": "Idril",
+      "gender": "female",
+      "birth": null,
+      "death": null,
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Idril"
+        }
+      ],
+      "metadata": {
+        "description": "Mother of Eärendil"
+      }
+    },
+    {
+      "id": "69ad37d4-e81e-4027-9867-46321eb8895f",
+      "name": "Elwing",
+      "gender": "female",
+      "birth": {
+        "era": "First Age",
+        "year": 503
+      },
+      "death": null,
+      "houses": [
+        "Thingol"
+      ],
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Elwing"
+        }
+      ],
+      "metadata": {
+        "description": null
+      }
+    },
+    {
+      "id": "791e0599-9da2-4082-be6d-6c88c3075838",
+      "name": "Nimloth",
+      "gender": "female",
+      "birth": {
+        "era": "First Age",
+        "year": 506
+      },
+      "death": null,
+      "houses": [
+        "Thingol"
+      ],
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Nimloth"
+        }
+      ],
+      "metadata": {
+        "description": null
+      }
+    },
+    {
+      "id": "a5def383-7ae8-4a1e-bff9-615e9c80e6e7",
+      "name": "Beren",
+      "gender": "male",
+      "birth": {
+        "era": "First Age",
+        "year": 432
+      },
+      "death": null,
+      "houses": [
+        "House of Beor"
+      ],
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Beren"
+        }
+      ],
+      "metadata": {
+        "description": null
+      }
+    },
+    {
+      "id": "e8116f81-e20a-4d76-babe-71a29fad8dc8",
+      "name": "Luthien",
+      "gender": "female",
+      "birth": {
+        "era": "First Age",
+        "year": 1200
+      },
+      "death": null,
+      "houses": [
+        "Thingol"
+      ],
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Luthien"
+        }
+      ],
+      "metadata": {
+        "description": null
+      }
+    },
+    {
+      "id": "fa716466-ebfb-4c49-942c-06390baa5503",
+      "name": "Dior",
+      "gender": "male",
+      "species": "Half-elven",
+      "birth": {
+        "era": "First Age",
+        "year": 470
+      },
+      "death": null,
+      "sourceLinks": [
+        {
+          "label": "Tolkien Gateway",
+          "url": "https://tolkiengateway.net/wiki/Special:Search?search=Dior"
+        }
+      ],
+      "metadata": {
+        "description": null
+      }
+    }
+  ]
+}

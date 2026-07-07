@@ -1,0 +1,271 @@
+{
+  "items": [
+    {
+      "id": "0fd327c3-9f1b-4190-928e-c19f7cd003b2",
+      "type": "biological_parent",
+      "from": "a5def383-7ae8-4a1e-bff9-615e9c80e6e7",
+      "to": "fa716466-ebfb-4c49-942c-06390baa5503",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 470
+        }
+      }
+    },
+    {
+      "id": "10350fbc-fe67-4a50-b7bb-ed57f4ebecaf",
+      "type": "marriage",
+      "from": "fa716466-ebfb-4c49-942c-06390baa5503",
+      "to": "791e0599-9da2-4082-be6d-6c88c3075838",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 497
+        }
+      }
+    },
+    {
+      "id": "115e8f73-896a-4a24-8c73-1597fa6d242a",
+      "type": "biological_parent",
+      "from": "791e0599-9da2-4082-be6d-6c88c3075838",
+      "to": "69ad37d4-e81e-4027-9867-46321eb8895f",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 503
+        }
+      }
+    },
+    {
+      "id": "25281f6b-a97a-47fe-9c2e-fd454f1c4692",
+      "type": "biological_parent",
+      "from": "e8116f81-e20a-4d76-babe-71a29fad8dc8",
+      "to": "fa716466-ebfb-4c49-942c-06390baa5503",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 470
+        }
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655441001",
+      "type": "biological_parent",
+      "from": "550e8400-e29b-41d4-a716-446655440001",
+      "to": "550e8400-e29b-41d4-a716-446655440003",
+      "attributes": {
+        "date": null
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655441002",
+      "type": "biological_parent",
+      "from": "550e8400-e29b-41d4-a716-446655440002",
+      "to": "550e8400-e29b-41d4-a716-446655440003",
+      "attributes": {
+        "date": null
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655441003",
+      "type": "biological_parent",
+      "from": "550e8400-e29b-41d4-a716-446655440006",
+      "to": "550e8400-e29b-41d4-a716-446655440004",
+      "attributes": {
+        "date": null
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655441004",
+      "type": "biological_parent",
+      "from": "550e8400-e29b-41d4-a716-446655440003",
+      "to": "550e8400-e29b-41d4-a716-446655440005",
+      "attributes": {
+        "date": {
+          "era": "Fourth Age",
+          "year": 1
+        }
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655441005",
+      "type": "biological_parent",
+      "from": "550e8400-e29b-41d4-a716-446655440004",
+      "to": "550e8400-e29b-41d4-a716-446655440005",
+      "attributes": {
+        "date": {
+          "era": "Fourth Age",
+          "year": 1
+        }
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655441006",
+      "type": "marriage",
+      "from": "550e8400-e29b-41d4-a716-446655440003",
+      "to": "550e8400-e29b-41d4-a716-446655440004",
+      "attributes": {
+        "date": {
+          "era": "Third Age",
+          "year": 3019
+        }
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655441007",
+      "type": "mentor",
+      "from": "550e8400-e29b-41d4-a716-446655440006",
+      "to": "550e8400-e29b-41d4-a716-446655440003",
+      "attributes": {
+        "date": null
+      }
+    },
+    {
+      "id": "5f4896c9-0a93-4587-bce5-bfe1cfd1477f",
+      "type": "biological_parent",
+      "from": "49e26512-9bb0-4b2a-9b9b-5d81eb4b79f2",
+      "to": "550e8400-e29b-41d4-a716-446655440006",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 532
+        }
+      }
+    },
+    {
+      "id": "6e1c76f1-f2d4-4ab3-a974-9bd955ab11fb",
+      "type": "biological_parent",
+      "from": "69ad37d4-e81e-4027-9867-46321eb8895f",
+      "to": "550e8400-e29b-41d4-a716-446655440006",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 532
+        }
+      }
+    },
+    {
+      "id": "7a6c7cf7-cd0d-4c22-8b86-354969c79d17",
+      "type": "biological_parent",
+      "from": "49e26512-9bb0-4b2a-9b9b-5d81eb4b79f2",
+      "to": "8cf5f5c9-3d67-4311-8d85-a9a9ff76ef11",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 532
+        }
+      }
+    },
+    {
+      "id": "81d8e8cb-6b24-45c1-b8cb-1f67c4f75001",
+      "type": "biological_parent",
+      "from": "1f2c5d4e-8a71-4e6d-9f3a-2c1b7a540001",
+      "to": "e8116f81-e20a-4d76-babe-71a29fad8dc8",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 1200
+        }
+      }
+    },
+    {
+      "id": "82e9f9dc-7c35-46d2-c9dc-2a78d5f86002",
+      "type": "biological_parent",
+      "from": "2a6b7c8d-91e2-4f35-8c61-0e2d4b650002",
+      "to": "e8116f81-e20a-4d76-babe-71a29fad8dc8",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 1200
+        }
+      }
+    },
+    {
+      "id": "83fa0aed-8d46-47e3-daed-3b89e6f97003",
+      "type": "marriage",
+      "from": "1f2c5d4e-8a71-4e6d-9f3a-2c1b7a540001",
+      "to": "2a6b7c8d-91e2-4f35-8c61-0e2d4b650002",
+      "attributes": {
+        "date": null
+      }
+    },
+    {
+      "id": "8f8c7ea5-75c4-4179-b6d2-d3c5d44e4f4f",
+      "type": "biological_parent",
+      "from": "69ad37d4-e81e-4027-9867-46321eb8895f",
+      "to": "8cf5f5c9-3d67-4311-8d85-a9a9ff76ef11",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 532
+        }
+      }
+    },
+    {
+      "id": "84ab1bfe-9e57-48f4-ebfe-4c9af70a8004",
+      "type": "biological_parent",
+      "from": "3b7c8d9e-a1f2-4e46-9d72-1f3e5c760003",
+      "to": "49e26512-9bb0-4b2a-9b9b-5d81eb4b79f2",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 503
+        }
+      }
+    },
+    {
+      "id": "85bc2c0f-af68-49g5-fc0f-5d0bg81b9005",
+      "type": "biological_parent",
+      "from": "4c8d9eaf-b2f3-4f57-ae83-2a4f6d870004",
+      "to": "49e26512-9bb0-4b2a-9b9b-5d81eb4b79f2",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 503
+        }
+      }
+    },
+    {
+      "id": "86cd3d10-b079-4a16-8d10-6e1c092c0006",
+      "type": "marriage",
+      "from": "3b7c8d9e-a1f2-4e46-9d72-1f3e5c760003",
+      "to": "4c8d9eaf-b2f3-4f57-ae83-2a4f6d870004",
+      "attributes": {
+        "date": null
+      }
+    },
+    {
+      "id": "a4a3aee0-9fe5-48af-b3da-8693942e4f97",
+      "type": "biological_parent",
+      "from": "fa716466-ebfb-4c49-942c-06390baa5503",
+      "to": "69ad37d4-e81e-4027-9867-46321eb8895f",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 503
+        }
+      }
+    },
+    {
+      "id": "c5857601-af4a-4677-b858-a4633f5b2666",
+      "type": "marriage",
+      "from": "a5def383-7ae8-4a1e-bff9-615e9c80e6e7",
+      "to": "e8116f81-e20a-4d76-babe-71a29fad8dc8",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 466
+        }
+      }
+    },
+    {
+      "id": "d9f0e6b7-15bd-40a2-8ee7-3c393f215939",
+      "type": "marriage",
+      "from": "49e26512-9bb0-4b2a-9b9b-5d81eb4b79f2",
+      "to": "69ad37d4-e81e-4027-9867-46321eb8895f",
+      "attributes": {
+        "date": null
+      }
+    }
+  ]
+}

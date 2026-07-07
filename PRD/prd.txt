@@ -1,0 +1,243 @@
+PRD — Graph-based Family & Social History Explorer
+1. Product Vision
+
+Build a client-side, GitHub-hosted graph explorer for genealogical and social relationships.
+
+The system is not a traditional family tree tool, but a:
+
+Interactive, zoomable knowledge graph for biological, social, and historical relationships
+
+Primary focus:
+
+biological lineage visualization (tree structure)
+social relationships as overlays
+event-based historical timeline (future feature)
+2. Core Principles
+2.1 Data-first, Git-native
+All data is stored as JSON files in a Git repository
+Git acts as the version history (no database)
+2.2 State-based model
+Only current state is stored
+No event-sourcing required in MVP
+2.3 Graph, not tree
+Internally a directed graph
+Tree layout is a view, not the data model
+2.4 Layout separation
+Biological relationships define layout structure
+Social relationships are visual overlays only
+2.5 Client-side only
+Fully browser-based rendering
+No backend required for MVP
+3. System Architecture
+JSON Files (Git Repo)
+        ↓
+Schema Validation (CI optional)
+        ↓
+Graph Builder (in-memory)
+        ↓
+ELK.js Layout Engine (biological graph only)
+        ↓
+SVG Renderer
+        ↓
+Overlay Layer (social + events)
+4. Data Model
+4.1 Person
+
+Stored in: data/persons/{id}.json
+
+{
+  "id": "uuid",
+  "name": "Aragorn",
+  "birthYear": 2931,
+  "deathYear": 120,
+  "houses": ["Dunedain"],
+  "metadata": {
+    "description": "optional free text"
+  }
+}
+
+Notes:
+
+IDs are UUIDs (generated via New-Guid or equivalent)
+No parent references stored in Person
+All relationships are external
+4.2 Relation
+
+Stored in: data/relations/{id}.json
+
+{
+  "id": "uuid",
+  "type": "marriage | biological_parent | mentor | step_parent | adoption | member_of | custom",
+  "from": "person-uuid",
+  "to": "person-uuid",
+  "attributes": {
+    "year": 3019
+  }
+}
+
+Rules:
+
+Directed edges (from → to)
+Multiple relations between same nodes allowed
+Biological parent relations define layout
+4.3 Event (future-ready, optional MVP usage)
+
+Stored in: data/events/{id}.json
+
+{
+  "id": "uuid",
+  "type": "birth | death | marriage | coronation | battle | custom",
+  "year": 3019,
+  "participants": [
+    "person-uuid"
+  ],
+  "metadata": {}
+}
+
+Notes:
+
+Not required for layout
+Used for future timeline view
+Can be derived from Person + Relation in MVP
+5. Graph Semantics
+5.1 Edge Types
+Layout-critical (biological only)
+biological_parent
+
+Used for:
+
+generation calculation
+vertical positioning
+tree structure
+Visual-only (overlay)
+marriage
+mentor
+step_parent
+adoption
+member_of
+custom types allowed
+6. View Model
+6.1 Default View
+Full graph overview (zoomed out)
+Big picture by default
+6.2 Interaction Modes
+Mode	Description
+Big Picture	Entire graph visible
+Focus Person	Centered on one node
+Ancestors	Upward lineage
+Descendants	Downward lineage
+Full Graph	Experimental full expansion
+7. Interaction Design
+7.1 Node Interaction
+Click → select person
+Hover → quick preview
+Shift + Click → multi-selection (path analysis)
+7.2 Multi-selection (Shift + Click)
+
+If two nodes selected:
+
+compute:
+shortest path OR
+lowest common ancestor
+highlight connecting lineage
+fade out unrelated nodes
+7.3 Keyboard Controls
+Key	Action
+Click	select
+Shift + Click	multi-select
+ESC	clear selection
+Ctrl + K	search
+8. Rendering Rules
+8.1 Layout Engine (ELK.js)
+ONLY biological edges are used for layout
+ensures stable generation hierarchy
+8.2 Overlay Layer
+all non-biological relations rendered after layout
+does NOT affect positioning
+8.3 Visual Hierarchy
+biological edges: solid, primary color
+social edges: dashed, secondary color, low opacity
+9. Timeline / Events (Future Feature)
+9.1 Concept
+
+A horizontal time axis visualizing:
+
+births
+deaths
+marriages
+historical events
+9.2 Data Source
+derived from:
+Person.birthYear/deathYear
+Relation.attributes.year
+Event.year
+9.3 Rendering
+independent of graph layout
+purely analytical view
+10. Houses / Groups (Design Option)
+Option A (recommended MVP)
+stored as string array in Person
+"houses": ["Dunedain"]
+Option B (future extension)
+
+Separate entity:
+
+{
+  "id": "uuid",
+  "name": "House Beor"
+}
+
+Relation:
+
+{
+  "type": "member_of"
+}
+11. ID Strategy
+All IDs are UUIDs
+Generated via New-Guid
+Never derived from names
+Immutable once created
+12. Data Integrity Rules
+All references must resolve to valid IDs
+No dangling relations allowed
+Validation via CI (future optional step)
+Maintainer resolves duplicates manually in MVP
+13. Technology Stack
+Frontend
+React (or equivalent SPA framework)
+SVG rendering layer
+ELK.js for graph layout
+Data
+JSON files in Git repository
+Hosting
+GitHub Pages
+Optional tooling
+PowerShell DSL for data generation
+New-Person
+New-Relation
+14. Performance Strategy
+Fully client-side rendering
+Graph built in memory at runtime
+Suitable for small to medium datasets (10k–50k nodes target)
+15. Non-Goals (MVP)
+No database
+No backend services
+No real-time collaboration
+No automatic deduplication
+No event-sourcing system
+No server-side rendering
+16. Future Extensions
+Timeline UI (events on X-axis)
+GEDCOM import/export
+Deduplication assistant
+Collaborative merge tooling
+Confidence scoring on relationships
+Geographic visualization
+17. Product Summary
+
+This system is a:
+
+Git-based, client-side, graph visualization engine for genealogical and social networks, optimized for readability, extensibility, and community contribution.
+
+Wenn du willst, kann ich dir als nächsten Schritt noch ein 
+konkretes Repo-Scaffold (Ordner + Beispiel JSON + ELK Input + React Skeleton) bauen, damit Copilot wirklich sofort “loscodieren” kann.

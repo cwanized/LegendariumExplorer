@@ -1,0 +1,139 @@
+# Current State
+
+## Repository Status
+
+First MVP is implemented and build-validated.
+
+The repository now contains the agreed top-level scaffold:
+
+- app
+- datasets
+- PSModule
+- docs
+- scripts
+- PRD
+- PROMPT
+
+## Authoritative Documents
+
+- PRD/PRD-reviewed3.md: architecture source of truth
+- PRD/PRD-reviewed4.md: implementation-start addendum
+- PRD/setup3.md: repository setup and dataset-role rules
+- PROMPT/prompt.md: implementation behavior contract
+
+## Decisions Locked
+
+- Identity is UUID-only.
+- Canonical time format is `{ era, year } | null`.
+- Biological graph validation is deterministic and fault tolerant.
+- Over-parent handling ignores all biological_parent edges for the child.
+- Cycle handling removes the highest lexicographic UUID edge and repeats until acyclic.
+- Testing scenarios use a nested `expected` object.
+- Each testing scenario declares `contract: true|false`.
+- Marriage remains outside ELK layout input and is rendered either as an inline pair between canonical nodes or, when needed, as a deterministic spouse alias projection.
+- Canonical Person metadata now includes optional `gender` and `species` fields.
+- Canonical Person metadata now also supports ordered `sourceLinks` plus optional `portraitUrl`, `portraitSourceLabel`, and `portraitSourceUrl` fields.
+- Dataset roles are now separated into `datasets/testing`, `datasets/demo`, and `datasets/prod`.
+
+## MVP Status
+
+Implemented:
+
+1. App bootstrap in app with Vite, React, and TypeScript.
+2. Canonical shared graph model in app/src/graph.ts.
+3. Deterministic validation for missing references, self-parent edges, over-parent cases, and cycles.
+4. Testing dataset seed with one contract scenario and one exploratory scenario, plus a separate valid demo showcase dataset and an empty prod dataset root.
+5. First render path using ELK.js with deterministic fallback layout.
+6. Warnings panel, search, click selection, shift-click two-person selection, and lowest common ancestor analysis.
+7. Pan, zoom, reset view, and contract status surface in the UI.
+8. PSModule manifest and module core for deterministic testing validation, dataset import, and dataset export helpers.
+9. PSModule create commands for adding persons, marriages, and children into a persisted dataset.
+10. App dataset switch between testing fixtures, valid demo showcase data, and the published prod dataset.
+11. Demo showcase cleanup for the Earendil/Elwing branch by merging duplicate Elwing records into one canonical node.
+12. Architecture docs now define spouse-side branch projection with one canonical continuation expanded by default and the opposite side collapsible by context.
+13. Revised spouse rendering in the app: marriages already co-located on one generation band now stay as inline canonical pairs, while only cross-context marriages fall back to `Open line` companion alias cards.
+14. Layout width tuning in the app: ELK horizontal node spacing, disconnected-component spacing, and fallback row spacing were increased so separate house starts and inline spouse pairs receive more horizontal room.
+15. Inline marriage detection was corrected to use the actual gap between node boxes instead of raw X-coordinate distance, so wider house spacing no longer misclassifies Beren/Luthien, Dior/Nimloth, or Aragorn/Arwen as alias-projection cases.
+16. PSModule now includes `New-LegendariumScenarioManifestSkeleton` to generate a deterministic scenario-manifest starter from the current dataset and `Test-LegendariumScenarioManifest` to verify that manifest person and relation references still exist.
+17. The GUI now renders a top-right gender badge on every person card (`♂`, `♀`, or `?`), a detailed legend below the graph, and deterministic house-start anchor chips above the biological roots for each tagged house.
+18. Demo and testing person fixtures now carry explicit `gender` values for the known Tolkien characters, so the new badge surface renders `♂` and `♀` instead of the fallback `?` for those entries.
+19. House-start anchors now share one common top-row Y position across the graph instead of following the local height of each branch, so every house label starts from the same upper band.
+20. The Tolkien fixtures now include Elros and connect both Elrond and Elros as children of Eärendil and Elwing; Elrond is no longer tagged with the `Half-elven` house and instead carries `Half-elven` as species metadata.
+21. Biological child edges now render per parent-set as one shared connector: parent curves converge into a single junction, sibling groups share one horizontal bar, and only then fan out vertically to the children.
+22. Demo and testing fixtures no longer treat `Half-elven` or `Reunited Kingdom` as houses for Arwen, Dior, and Eldarion, reducing misleading dashed house guides in the GUI.
+23. Single-child nodes with two biological parents are now post-aligned to the parent midpoint, so the child box itself sits centered under the shared parent connector instead of only the connector doing so.
+24. After single-child centering, same-generation marriages are post-aligned as inline pairs again, preserving a clean spouse gap and preventing fallback spouse-alias chips from reappearing.
+25. The demo-only Elrond -> Eldarion `adoption` overlay was removed because it was fachlich incorrect and produced a misleading dashed social line in the showcase graph.
+26. Person cards now expose a bottom-right source info trigger that opens a hover/click popover with authored source links, optional portrait metadata, and a best-effort preview of the primary source.
+27. Source preview now follows the agreed MVP rule: only `sourceLinks[0]` is fetched for preview, the request times out quickly, and the UI falls back to the authored link list without blocking graph rendering.
+28. The demo showcase people now carry explicit example `sourceLinks`, so the source popover behavior is visible and testable without synthetic UI-only fixtures.
+29. Root `README.md` and `PSModule/README.md` now exist and document the current app, dataset roles, validation model, and exported PowerShell commands in English.
+30. `Add-LegendariumPerson` and `Add-LegendariumChild` now accept structured `sourceLinks` plus optional portrait fields, so authored source and portrait metadata can be persisted without manual JSON editing.
+31. The demo showcase now includes a small curated portrait subset for Aragorn and Elrond, each with explicit portrait provenance metadata.
+32. The seeded demo portrait URLs were verified to resolve as image responses (`image/png` and `image/jpeg`), so the popover image slot is backed by real remote image assets instead of placeholder HTML links.
+33. Eärendil now also carries an explicit Tolkien Gateway portrait in the demo dataset, using the direct image asset plus the media-view page as visible provenance.
+34. The source popover now renders in a dedicated overlay layer at the end of the SVG, so it stays above person cards instead of being occluded by later node draws.
+35. Demo and testing datasets now extend the Tolkien branch upward with Thingol and Melian as parents of Lúthien, and Tuor and Idril as parents of Eärendil, including marriage overlays for both parent pairs.
+
+## Validation Status
+
+- app build passes via npm run build in app/
+- touched TypeScript and JSON files report no current diagnostics
+- PSModule import plus Invoke-TestingValidation passes the contract scenario
+- PSModule legacy `Invoke-DemoValidation` and `Export-DemoDataset` remain as compatibility wrappers around testing fixtures
+- app build output now includes datasets under dist/datasets/testing, dist/datasets/demo, and dist/datasets/prod
+- testing validation still passes after preserving the mixed regression fixture set under datasets/testing
+- browser retest on the fresh 5176 dev server confirms dataset switching works across all three roles: testing shows warnings plus contract pass, demo shows the clean 12-person showcase with zero warnings, and prod starts empty
+- app build passes after introducing spouse projection rendering and optional `gender`/`species` person metadata support
+- browser retest on the fresh 5174 dev server confirms Beren/Luthien and Dior/Nimloth no longer render duplicate companion cards, while cross-context pairs such as Earendil/Elwing still retain alias projection where needed
+- browser retest after widening the layout confirms a larger horizontal gap for inline pairs such as Beren/Luthien and more separation between disconnected house starts
+- browser retest on the fresh 5175 dev server confirms only Earendil/Elwing still render as alias projection; Beren/Luthien, Dior/Nimloth, and Aragorn/Arwen now remain inline-only after the inline-gap fix
+- PSModule manifest helpers validate cleanly against datasets/testing: `Test-LegendariumScenarioManifest` reports zero missing references and `New-LegendariumScenarioManifestSkeleton -Contract` emits one deterministic scenario skeleton with status `warning` and 6 ignored relations matching the current testing fixtures
+- app build passes after adding the gender badges, house-start anchors, and the richer graph legend
+- browser retest after dataset refresh confirms the demo graph now exposes 12 gender badges with only `♂` and `♀`, no fallback `?`, because the known demo people now include explicit `gender` metadata
+- app build passes after aligning all house anchors to a shared top row and extending the Tolkien branch with Elros plus the Eärendil/Elwing parent edges to Elrond and Elros
+- browser retest on the shared 5176 page confirms all current house labels render on the same top-row baseline and that both `Elrond` and `Elros` are present in the refreshed demo graph
+- app build passes after switching biological lineage rendering from per-relation straight lines to grouped parent-set child connectors
+- browser retest on the shared 5176 page confirms the active house labels are now limited to `Thingol`, `House of Beor`, `Hador`, and `Dunedain`, while Arwen, Dior, Elrond, and Elros expose `Half-elven` only as species metadata instead of as house anchors
+- app build passes after centering single-child nodes such as Dior under the midpoint of their biological parents
+- app build passes after the follow-up inline-marriage realignment; browser retest on the shared 5176 page shows zero spouse chips and a centered Dior with Nimloth, Elwing with Eärendil, and Arwen with Aragorn restored as inline-only pairs
+- app build passes after removing the incorrect demo adoption edge from Elrond to Eldarion, and the refreshed demo graph no longer shows that dashed overlay line
+- app build passes after adding source-link metadata support, the person source popover, and the best-effort primary-source preview endpoint
+- PowerShell roundtrip validation now confirms that authoring commands persist `sourceLinks`, `portraitUrl`, `portraitSourceLabel`, and `portraitSourceUrl` into a temporary prod dataset without touching the repository dataset roots
+
+## Immediate Next Slice
+
+The next implementation slice should cover:
+
+1. Add automated tests for validation determinism, contract scenario evaluation, manifest helpers, and source-link schema persistence.
+2. Improve chunk size and bundle strategy around the graph stack.
+3. Decide whether app and PSModule should share one exported validation core.
+4. Decide whether prod authoring should remain direct or whether a separate unpublished working dataset tier is needed later.
+5. Decide whether prod should gain its own optional scenario manifest once published fixtures stabilize.
+6. Refine the inline-pair versus alias-projection rule for harder cases such as multiple marriages on the same generation band.
+7. Expand the curated demo portrait subset only after explicitly reviewing any further external image sources.
+8. Refine spouse projection for more complex cases such as multiple marriages and branch ownership beyond the current single-pair MVP heuristic.
+
+## Pending Todos
+
+1. Remove redundant birth-date storage between Person.birth and biological_parent relation attributes.date.
+2. Choose one canonical source for child birth timing so future edits do not require keeping duplicate values in sync.
+3. Update Add-LegendariumChild so it writes the canonical birth value only once instead of mirroring it into both the person and the parent relations.
+4. Implement deterministic expand/collapse for spouse-side continuation so the same descendant subtree is not fully duplicated under both spouse contexts.
+5. Resolve the existing browser console issue around passive wheel listeners during graph zoom.
+6. Keep the embedded PowerShell seeded dataset aligned with the on-disk demo/testing fixtures when person metadata evolves.
+
+## Notes
+
+- Prefer warning-plus-continue behavior over hard failures.
+- Do not introduce heuristic data repair.
+- Keep validation outputs deterministically sorted.
+- Vite now serves `datasets/testing`, `datasets/demo`, and `datasets/prod` through /datasets/* and copies all three into the production build.
+- datasets/prod starts as an empty but valid published-dataset placeholder with empty index files and an empty scenario manifest.
+- datasets/testing preserves the previous mixed regression fixture set, while datasets/demo contains only the current valid visual showcase branch set.
+- The Earendil/Elwing demo showcase branch now uses one Elwing id for both marriage and biological lineage; the previous duplicate Elwing node was removed from the valid showcase dataset.
+- PRD and prompt now distinguish between inline canonical pairs and branch-local spouse alias projection while keeping biological_parent edges as the sole layout input.
+- The current app behavior prefers inline canonical pairs whenever both spouses are already visible on the same generation band; only cross-context marriages use companion alias cards with deterministic branch ownership.
+- Inline-versus-alias classification now uses the real box gap on the same generation band, not the raw left-edge delta, which keeps the rule stable when ELK spacing changes.
+- The current ELK tuning also spaces disconnected components and same-band nodes more aggressively, which reduces cramped inline spouse pairs without reintroducing duplicate pair projections.
+- Source preview is intentionally best-effort through the local Vite server path; when no preview is available quickly, the UI still shows the authored links and keeps the graph interactive.

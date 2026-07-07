@@ -1,0 +1,1581 @@
+import { startTransition, useDeferredValue, useEffect, useRef, useState } from 'react'
+import './App.css'
+import {
+  evaluateScenario,
+  findLowestCommonAncestor,
+  getGraphBounds,
+  layoutGraph,
+  loadDataset,
+  validateDataset,
+} from './graph'
+import type {
+  CameraView,
+  ContractEvaluation,
+  DatasetName,
+  GraphMvpState,
+  LayoutResult,
+  Person,
+  PositionedNode,
+  Relation,
+  SourceLink,
+  UUID,
+  ValidationResult,
+} from './graph'
+
+type SpouseProjectionNode = {
+  relationId: UUID
+  ownerId: UUID
+  companionId: UUID
+  sharedChildren: UUID[]
+  x: number
+  y: number
+  width: number
+  height: number
+  side: 'left' | 'right'
+}
+
+type ProjectionRect = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+type SpouseProjectionState = {
+  hiddenChildEdgeKeys: Set<string>
+  projectedMarriageIds: Set<UUID>
+  nodes: SpouseProjectionNode[]
+}
+
+type HouseAnchor = {
+  house: string
+  memberIds: UUID[]
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+type BiologicalChildGroup = {
+  key: string
+  parentIds: UUID[]
+  childIds: UUID[]
+  relationIds: UUID[]
+  junctionX: number
+  junctionY: number
+  siblingY: number
+  parentNodes: PositionedNode[]
+  childNodes: PositionedNode[]
+}
+
+type SourcePopoverState = {
+  personId: UUID
+  pinned: boolean
+}
+
+type SourcePreviewPayload = {
+  title: string
+  description: string | null
+  sourceHost: string
+  sourceUrl: string
+}
+
+type SourcePreviewState = {
+  status: 'loading' | 'ready' | 'fallback'
+  preview?: SourcePreviewPayload
+}
+
+function App() {
+  const [datasetName, setDatasetName] = useState<DatasetName>('demo')
+  const [graphState, setGraphState] = useState<GraphMvpState | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<UUID[]>([])
+  const [spouseOwnerOverrides, setSpouseOwnerOverrides] = useState<Record<string, UUID>>({})
+  const [searchQuery, setSearchQuery] = useState('')
+  const [camera, setCamera] = useState<CameraView | null>(null)
+  const [sourcePopover, setSourcePopover] = useState<SourcePopoverState | null>(null)
+  const [sourcePreviewByPerson, setSourcePreviewByPerson] = useState<Record<string, SourcePreviewState>>({})
+  const deferredQuery = useDeferredValue(searchQuery)
+  const canvasRef = useRef<SVGSVGElement | null>(null)
+  const sourcePopoverHideTimeoutRef = useRef<number | null>(null)
+  const dragRef = useRef<{
+    pointerId: number
+    clientX: number
+    clientY: number
+    camera: CameraView
+  } | null>(null)
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function initialize() {
+      setIsLoading(true)
+      setErrorMessage(null)
+      setSelectedIds([])
+      setSpouseOwnerOverrides({})
+      setSourcePopover(null)
+      setSourcePreviewByPerson({})
+
+      try {
+        const dataset = await loadDataset(datasetName)
+        const validation = validateDataset(dataset)
+        const rawLayout = await layoutGraph(validation.persons, validation.validBiologicalRelations)
+        const singleChildCenterTargets = getSingleChildCenterTargets(rawLayout, validation.validBiologicalRelations)
+        const childAlignedLayout = alignSingleChildNodes(rawLayout, singleChildCenterTargets)
+        const layout = alignMarriagePairs(
+          childAlignedLayout,
+          validation.validOverlayRelations,
+          new Set(singleChildCenterTargets.keys()),
+        )
+        const contractScenario = dataset.manifest.scenarios.find((scenario) => scenario.contract) ?? null
+        const contractEvaluation = contractScenario
+          ? evaluateScenario(contractScenario, validation)
+          : null
+        const bounds = getGraphBounds(layout.nodes)
+
+        if (!isMounted) {
+          return
+        }
+
+        setGraphState({
+          dataset,
+          validation,
+          layout,
+          contractScenario,
+          contractEvaluation,
+        })
+        setCamera(expandCameraBounds(bounds, [], buildHouseAnchors(validation, layout)))
+        setSearchQuery('')
+        setIsLoading(false)
+
+        validation.warnings.forEach((warning) => {
+          console.warn(`[${warning.code}] ${warning.message}`)
+        })
+      } catch (error) {
+        if (!isMounted) {
+          return
+        }
+
+        const message = error instanceof Error ? error.message : 'Unknown application error'
+        setGraphState(null)
+        setCamera(null)
+        setErrorMessage(message)
+        setIsLoading(false)
+      }
+    }
+
+    void initialize()
+
+    return () => {
+      isMounted = false
+      if (sourcePopoverHideTimeoutRef.current !== null) {
+        window.clearTimeout(sourcePopoverHideTimeoutRef.current)
+      }
+    }
+  }, [datasetName])
+
+  if (errorMessage) {
+    return (
+      <main className="app-shell error-shell">
+        <section className="panel">
+          <p className="eyebrow">Legendarium Explorer</p>
+          <h1>Unable to boot the {datasetName} dataset</h1>
+          <p>{errorMessage}</p>
+        </section>
+      </main>
+    )
+  }
+
+  if (isLoading || !graphState || !camera) {
+    return (
+      <main className="app-shell loading-shell">
+        <section className="panel">
+          <p className="eyebrow">Legendarium Explorer</p>
+          <h1>Preparing deterministic {datasetName} graph</h1>
+          <p>Loading data, validating biological structure, and computing the initial layout.</p>
+        </section>
+      </main>
+    )
+  }
+
+  const { validation, layout, contractScenario, contractEvaluation } = graphState
+  const contractBadgeClass = contractEvaluation ? (contractEvaluation.passed ? 'pass' : 'warn') : 'neutral'
+  const contractBadgeLabel = contractEvaluation ? (contractEvaluation.passed ? 'pass' : 'warning') : 'n/a'
+  const spouseProjection = buildSpouseProjectionState(
+    validation,
+    layout,
+    selectedIds,
+    spouseOwnerOverrides,
+  )
+  const houseAnchors = buildHouseAnchors(validation, layout)
+  const renderedBiologicalRelations = validation.validBiologicalRelations.filter(
+    (relation) =>
+      !spouseProjection.hiddenChildEdgeKeys.has(`${relation.from}|${relation.to}`),
+  )
+  const renderedOverlayRelations = validation.validOverlayRelations.filter(
+    (relation) =>
+      !spouseProjection.projectedMarriageIds.has(relation.id),
+  )
+  const biologicalChildGroups = buildBiologicalChildGroups(renderedBiologicalRelations, layout)
+  const selectedAnalysis =
+    selectedIds.length === 2
+      ? findLowestCommonAncestor(selectedIds[0], selectedIds[1], validation)
+      : null
+  const searchValue = deferredQuery.trim().toLocaleLowerCase()
+  const filteredPeople = validation.persons.filter((person) =>
+    searchValue.length === 0 ? true : person.name.toLocaleLowerCase().includes(searchValue),
+  )
+  const fadeUnrelated = selectedAnalysis !== null
+  const selectedSet = new Set(selectedIds)
+  const highlightedNodeIds = selectedAnalysis?.nodeIds ?? new Set<UUID>()
+  const highlightedEdgeIds = selectedAnalysis?.edgeIds ?? new Set<UUID>()
+  const datasetCaptionByName: Record<DatasetName, string> = {
+    testing: 'Testing fixtures',
+    demo: 'Demo showcase',
+    prod: 'Published dataset',
+  }
+  const openSourcePerson = sourcePopover ? validation.personById.get(sourcePopover.personId) ?? null : null
+  const openSourceNode = openSourcePerson ? layout.nodes.get(openSourcePerson.id) ?? null : null
+  const openSourceLinks = openSourcePerson ? getSourceLinks(openSourcePerson) : []
+  const openPrimarySource = openSourceLinks[0] ?? null
+  const openSourcePreviewState = openSourcePerson ? sourcePreviewByPerson[openSourcePerson.id] : undefined
+
+  function resetView() {
+    setCamera(expandCameraBounds(getGraphBounds(layout.nodes), spouseProjection.nodes, houseAnchors))
+  }
+
+  function focusPerson(personId: UUID) {
+    const node = layout.nodes.get(personId)
+
+    if (!node) {
+      return
+    }
+
+    startTransition(() => {
+      setSelectedIds([personId])
+    })
+
+    setCamera((current) => {
+      if (!current) {
+        return current
+      }
+
+      return {
+        width: current.width,
+        height: current.height,
+        x: node.x + node.width / 2 - current.width / 2,
+        y: node.y + node.height / 2 - current.height / 2,
+      }
+    })
+  }
+
+  function updateSelection(personId: UUID, extendSelection: boolean) {
+    startTransition(() => {
+      setSelectedIds((current) => {
+        if (!extendSelection) {
+          return [personId]
+        }
+
+        if (current.includes(personId)) {
+          return current.filter((id) => id !== personId)
+        }
+
+        if (current.length < 2) {
+          return [...current, personId]
+        }
+
+        return [current[1], personId]
+      })
+    })
+  }
+
+  function beginDrag(pointerId: number, clientX: number, clientY: number) {
+    if (!camera) {
+      return
+    }
+
+    dragRef.current = { pointerId, clientX, clientY, camera }
+  }
+
+  function onPointerMove(event: React.PointerEvent<SVGSVGElement>) {
+    if (!dragRef.current || !canvasRef.current || dragRef.current.pointerId !== event.pointerId) {
+      return
+    }
+
+    const rect = canvasRef.current.getBoundingClientRect()
+    const deltaX = event.clientX - dragRef.current.clientX
+    const deltaY = event.clientY - dragRef.current.clientY
+    const scaleX = dragRef.current.camera.width / Math.max(rect.width, 1)
+    const scaleY = dragRef.current.camera.height / Math.max(rect.height, 1)
+
+    setCamera({
+      ...dragRef.current.camera,
+      x: dragRef.current.camera.x - deltaX * scaleX,
+      y: dragRef.current.camera.y - deltaY * scaleY,
+    })
+  }
+
+  function endDrag(pointerId: number) {
+    if (dragRef.current?.pointerId === pointerId) {
+      dragRef.current = null
+    }
+  }
+
+  function onWheel(event: React.WheelEvent<SVGSVGElement>) {
+    event.preventDefault()
+
+    const zoomFactor = event.deltaY < 0 ? 0.92 : 1.08
+
+    setCamera((current) => {
+      if (!current) {
+        return current
+      }
+
+      const nextWidth = current.width * zoomFactor
+      const nextHeight = current.height * zoomFactor
+
+      return {
+        width: nextWidth,
+        height: nextHeight,
+        x: current.x + (current.width - nextWidth) / 2,
+        y: current.y + (current.height - nextHeight) / 2,
+      }
+    })
+  }
+
+  function openSpouseContinuation(relationId: UUID, ownerId: UUID) {
+    setSpouseOwnerOverrides((current) => ({
+      ...current,
+      [relationId]: ownerId,
+    }))
+
+    startTransition(() => {
+      setSelectedIds([ownerId])
+    })
+  }
+
+  async function ensureSourcePreview(person: Person) {
+    const primarySource = getPrimarySourceLink(person)
+
+    if (!primarySource) {
+      return
+    }
+
+    let shouldFetch = false
+
+    setSourcePreviewByPerson((current) => {
+      if (current[person.id]) {
+        return current
+      }
+
+      shouldFetch = true
+      return {
+        ...current,
+        [person.id]: { status: 'loading' },
+      }
+    })
+
+    if (!shouldFetch) {
+      return
+    }
+
+    const controller = new AbortController()
+    const timeoutHandle = window.setTimeout(() => controller.abort(), 4000)
+
+    try {
+      const response = await fetch(`/source-preview?url=${encodeURIComponent(primarySource.url)}`, {
+        signal: controller.signal,
+      })
+
+      if (!response.ok) {
+        throw new Error(`Preview request failed: ${response.status}`)
+      }
+
+      const preview = (await response.json()) as SourcePreviewPayload
+
+      if (!preview.title.trim()) {
+        throw new Error('Empty preview title')
+      }
+
+      setSourcePreviewByPerson((current) => ({
+        ...current,
+        [person.id]: {
+          status: 'ready',
+          preview,
+        },
+      }))
+    } catch {
+      setSourcePreviewByPerson((current) => ({
+        ...current,
+        [person.id]: { status: 'fallback' },
+      }))
+    } finally {
+      window.clearTimeout(timeoutHandle)
+    }
+  }
+
+  function showSourcePopover(person: Person, pinned = false) {
+    const primarySource = getPrimarySourceLink(person)
+
+    if (!primarySource) {
+      return
+    }
+
+    clearSourcePopoverHideTimeout()
+
+    setSourcePopover((current) => ({
+      personId: person.id,
+      pinned: current?.personId === person.id ? current.pinned || pinned : pinned,
+    }))
+    void ensureSourcePreview(person)
+  }
+
+  function hideSourcePopover(personId: UUID) {
+    clearSourcePopoverHideTimeout()
+
+    sourcePopoverHideTimeoutRef.current = window.setTimeout(() => {
+      setSourcePopover((current) => {
+        if (!current || current.personId !== personId || current.pinned) {
+          return current
+        }
+
+        return null
+      })
+      sourcePopoverHideTimeoutRef.current = null
+    }, 2000)
+  }
+
+  function clearSourcePopoverHideTimeout() {
+    if (sourcePopoverHideTimeoutRef.current === null) {
+      return
+    }
+
+    window.clearTimeout(sourcePopoverHideTimeoutRef.current)
+    sourcePopoverHideTimeoutRef.current = null
+  }
+
+  function closeSourcePopoverImmediately() {
+    clearSourcePopoverHideTimeout()
+    setSourcePopover((current) => {
+      return current ? null : current
+    })
+  }
+
+  function toggleSourcePopover(person: Person) {
+    const primarySource = getPrimarySourceLink(person)
+
+    if (!primarySource) {
+      return
+    }
+
+    setSourcePopover((current) => {
+      if (current?.personId === person.id) {
+        return current.pinned ? null : { personId: person.id, pinned: true }
+      }
+
+      return { personId: person.id, pinned: true }
+    })
+    void ensureSourcePreview(person)
+  }
+
+  return (
+    <main className="app-shell">
+      <aside className="panel sidebar">
+        <div>
+          <p className="eyebrow">Legendarium Explorer</p>
+          <h1>Deterministic graph MVP</h1>
+          <p className="intro">
+            The client switches between internal testing fixtures, a valid showcase demo, and the published prod dataset while keeping biological validation deterministic.
+          </p>
+        </div>
+
+        <section className="panel-block dataset-switcher">
+          <div className="panel-heading">
+            <h2>Dataset</h2>
+            <span className="badge neutral">{datasetName}</span>
+          </div>
+          <div className="segmented-control" aria-label="Dataset switcher">
+            <button
+              type="button"
+              className={datasetName === 'testing' ? 'active' : ''}
+              onClick={() => setDatasetName('testing')}
+            >
+              Testing
+            </button>
+            <button
+              type="button"
+              className={datasetName === 'demo' ? 'active' : ''}
+              onClick={() => setDatasetName('demo')}
+            >
+              Demo
+            </button>
+            <button
+              type="button"
+              className={datasetName === 'prod' ? 'active' : ''}
+              onClick={() => setDatasetName('prod')}
+            >
+              Prod
+            </button>
+          </div>
+          <p className="dataset-note">
+            Testing keeps regression fixtures including invalid cases, Demo stays valid and presentable, and Prod is reserved for the published end-user dataset.
+          </p>
+        </section>
+
+        <section className="stat-grid">
+          <article>
+            <span className="stat-label">Persons</span>
+            <strong>{validation.persons.length}</strong>
+          </article>
+          <article>
+            <span className="stat-label">Valid bio edges</span>
+            <strong>{renderedBiologicalRelations.length}</strong>
+          </article>
+          <article>
+            <span className="stat-label">Overlays</span>
+            <strong>{validation.validOverlayRelations.length}</strong>
+          </article>
+          <article>
+            <span className="stat-label">Warnings</span>
+            <strong>{validation.warnings.length}</strong>
+          </article>
+        </section>
+
+        <section className="panel-block">
+          <div className="panel-heading">
+            <h2>Contract status</h2>
+            <span className={`badge ${contractBadgeClass}`}>
+              {contractBadgeLabel}
+            </span>
+          </div>
+          <p>{contractScenario?.description ?? 'No contract scenario defined.'}</p>
+          {contractEvaluation ? <ContractSummary evaluation={contractEvaluation} /> : null}
+        </section>
+
+        <section className="panel-block">
+          <div className="panel-heading">
+            <h2>Search</h2>
+            <button type="button" className="ghost-button" onClick={resetView}>
+              Reset view
+            </button>
+          </div>
+          <label className="search-field">
+            <span>Find a person</span>
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search by name"
+            />
+          </label>
+          <ul className="person-list">
+            {filteredPeople.map((person) => (
+              <li key={person.id}>
+                <button type="button" onClick={() => focusPerson(person.id)}>
+                  <span>{person.name}</span>
+                  <small>{person.houses?.join(', ') || 'No house tag'}</small>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="panel-block">
+          <div className="panel-heading">
+            <h2>Selection</h2>
+            <span className="badge neutral">{selectedIds.length}/2</span>
+          </div>
+          {selectedIds.length === 0 ? (
+            <p>Click a node to inspect it. Shift and click a second node to run lowest common ancestor analysis.</p>
+          ) : (
+            <ul className="selection-list">
+              {selectedIds.map((personId) => {
+                const person = validation.personById.get(personId)
+
+                return <li key={personId}>{person?.name ?? personId}</li>
+              })}
+            </ul>
+          )}
+          {selectedAnalysis ? (
+            <p className="analysis-output">
+              Lowest common ancestor: <strong>{validation.personById.get(selectedAnalysis.ancestorId)?.name}</strong>
+            </p>
+          ) : null}
+        </section>
+
+        <section className="panel-block">
+          <div className="panel-heading">
+            <h2>Warnings</h2>
+            <span className="badge warn">{validation.warnings.length}</span>
+          </div>
+          <ul className="warning-list">
+            {validation.warnings.map((warning) => (
+              <li key={`${warning.code}-${warning.relationId ?? warning.personId ?? warning.message}`}>
+                <strong>{warning.code}</strong>
+                <span>{warning.message}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </aside>
+
+      <section className="graph-stage">
+        <header className="stage-header">
+          <div>
+            <p className="eyebrow">Render state</p>
+            <h2>Validated biological tree with social overlays</h2>
+            <p className="dataset-caption">Active dataset: {datasetCaptionByName[datasetName]}</p>
+          </div>
+        </header>
+
+        <svg
+          ref={canvasRef}
+          className="graph-canvas"
+          viewBox={`${camera.x} ${camera.y} ${camera.width} ${camera.height}`}
+          onWheel={onWheel}
+          onPointerMove={onPointerMove}
+          onPointerUp={(event) => endDrag(event.pointerId)}
+          onPointerLeave={(event) => endDrag(event.pointerId)}
+          onDoubleClick={resetView}
+        >
+          <rect
+            x={camera.x}
+            y={camera.y}
+            width={camera.width}
+            height={camera.height}
+            className="graph-backdrop"
+            onPointerDown={(event) => beginDrag(event.pointerId, event.clientX, event.clientY)}
+          />
+
+          {houseAnchors.map((anchor) => {
+            const rootNodes = anchor.memberIds
+              .map((memberId) => layout.nodes.get(memberId))
+              .filter((node): node is PositionedNode => node !== undefined)
+
+            if (rootNodes.length === 0) {
+              return null
+            }
+
+            const anchorCenterX = anchor.x + anchor.width / 2
+            const anchorBottomY = anchor.y + anchor.height
+            const junctionY = anchorBottomY + 18
+            const minRootX = Math.min(...rootNodes.map((node) => node.x + node.width / 2))
+            const maxRootX = Math.max(...rootNodes.map((node) => node.x + node.width / 2))
+
+            return (
+              <g key={anchor.house} className="house-anchor">
+                <line
+                  x1={anchorCenterX}
+                  y1={anchorBottomY}
+                  x2={anchorCenterX}
+                  y2={junctionY}
+                  className="house-anchor-line"
+                />
+                {rootNodes.length > 1 ? (
+                  <line
+                    x1={minRootX}
+                    y1={junctionY}
+                    x2={maxRootX}
+                    y2={junctionY}
+                    className="house-anchor-line"
+                  />
+                ) : null}
+                {rootNodes.map((node) => (
+                  <line
+                    key={`${anchor.house}:${node.id}`}
+                    x1={node.x + node.width / 2}
+                    y1={junctionY}
+                    x2={node.x + node.width / 2}
+                    y2={node.y}
+                    className="house-anchor-line"
+                  />
+                ))}
+                <g transform={`translate(${anchor.x} ${anchor.y})`}>
+                  <rect width={anchor.width} height={anchor.height} rx="16" ry="16" className="house-anchor-chip" />
+                  <text x={anchor.width / 2} y={23} textAnchor="middle" className="house-anchor-label">
+                    {anchor.house}
+                  </text>
+                </g>
+              </g>
+            )
+          })}
+
+          {renderedOverlayRelations.map((relation) => {
+            const fromNode = layout.nodes.get(relation.from)
+            const toNode = layout.nodes.get(relation.to)
+
+            if (!fromNode || !toNode) {
+              return null
+            }
+
+            const faded = fadeUnrelated && !highlightedEdgeIds.has(relation.id)
+            const renderInlineMarriage = relation.type === 'marriage' && canRenderInlineMarriage(fromNode, toNode)
+            const leftNode = fromNode.x <= toNode.x ? fromNode : toNode
+            const rightNode = leftNode.id === fromNode.id ? toNode : fromNode
+            const x1 = renderInlineMarriage ? leftNode.x + leftNode.width : fromNode.x + fromNode.width / 2
+            const y1 = renderInlineMarriage ? leftNode.y + leftNode.height / 2 : fromNode.y + fromNode.height / 2
+            const x2 = renderInlineMarriage ? rightNode.x : toNode.x + toNode.width / 2
+            const y2 = renderInlineMarriage ? rightNode.y + rightNode.height / 2 : toNode.y + toNode.height / 2
+
+            return (
+              <line
+                key={relation.id}
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                className={`overlay-edge ${faded ? 'faded' : ''}`}
+              />
+            )
+          })}
+
+          {biologicalChildGroups.map((group) => {
+            const highlighted = group.relationIds.some((relationId) => highlightedEdgeIds.has(relationId))
+            const faded = fadeUnrelated && !highlighted
+            const edgeClassName = `biological-edge ${highlighted ? 'highlighted' : ''} ${faded ? 'faded' : ''}`
+            const childCenters = group.childNodes.map((node) => node.x + node.width / 2)
+            const siblingMinX = Math.min(...childCenters)
+            const siblingMaxX = Math.max(...childCenters)
+            const isSingleChildGroup = group.childNodes.length === 1
+            const singleChildNode = isSingleChildGroup ? group.childNodes[0] : null
+
+            return (
+              <g key={group.key}>
+                {group.parentNodes.map((node) => {
+                  const parentCenterX = node.x + node.width / 2
+                  const parentBottomY = node.y + node.height
+                  const targetX = singleChildNode ? singleChildNode.x + singleChildNode.width / 2 : group.junctionX
+                  const targetY = singleChildNode ? singleChildNode.y : group.junctionY
+                  const controlY = singleChildNode
+                    ? parentBottomY + Math.max((targetY - parentBottomY) * 0.45, 18)
+                    : parentBottomY + Math.max((group.junctionY - parentBottomY) * 0.7, 16)
+
+                  return (
+                    <path
+                      key={`${group.key}:${node.id}:parent`}
+                      d={`M ${parentCenterX} ${parentBottomY} Q ${parentCenterX} ${controlY} ${targetX} ${targetY}`}
+                      className={edgeClassName}
+                    />
+                  )
+                })}
+
+                {!isSingleChildGroup && group.siblingY > group.junctionY ? (
+                  <line
+                    x1={group.junctionX}
+                    y1={group.junctionY}
+                    x2={group.junctionX}
+                    y2={group.siblingY}
+                    className={edgeClassName}
+                  />
+                ) : null}
+
+                {group.childNodes.length > 1 ? (
+                  <line
+                    x1={siblingMinX}
+                    y1={group.siblingY}
+                    x2={siblingMaxX}
+                    y2={group.siblingY}
+                    className={edgeClassName}
+                  />
+                ) : null}
+
+                {!isSingleChildGroup ? group.childNodes.map((node) => {
+                  const childCenterX = node.x + node.width / 2
+                  const childTopY = node.y
+
+                  return (
+                    <line
+                      key={`${group.key}:${node.id}:child`}
+                      x1={childCenterX}
+                      y1={group.childNodes.length > 1 ? group.siblingY : group.junctionY}
+                      x2={childCenterX}
+                      y2={childTopY}
+                      className={edgeClassName}
+                    />
+                  )
+                }) : null}
+              </g>
+            )
+          })}
+
+          {spouseProjection.nodes.map((projection) => {
+            const ownerNode = layout.nodes.get(projection.ownerId)
+            const ownerPerson = validation.personById.get(projection.ownerId)
+            const companionPerson = validation.personById.get(projection.companionId)
+
+            if (!ownerNode || !ownerPerson || !companionPerson) {
+              return null
+            }
+
+            const isSelected = selectedSet.has(projection.companionId)
+            const isHighlighted = highlightedNodeIds.has(projection.ownerId) || highlightedNodeIds.has(projection.companionId)
+            const isFaded = fadeUnrelated && !isHighlighted
+            const linkStartX = projection.side === 'right' ? ownerNode.x + ownerNode.width : ownerNode.x
+            const linkEndX = projection.side === 'right' ? projection.x : projection.x + projection.width
+            const linkY = ownerNode.y + ownerNode.height / 2
+
+            return (
+              <g key={`${projection.relationId}:${projection.ownerId}:${projection.companionId}`} className={`spouse-projection ${isSelected ? 'selected' : ''} ${isFaded ? 'faded' : ''}`}>
+                <line
+                  x1={linkStartX}
+                  y1={linkY}
+                  x2={linkEndX}
+                  y2={projection.y + projection.height / 2}
+                  className="spouse-link"
+                />
+                <g
+                  className="spouse-chip"
+                  transform={`translate(${projection.x} ${projection.y})`}
+                  onClick={() => openSpouseContinuation(projection.relationId, projection.companionId)}
+                >
+                  <rect width={projection.width} height={projection.height} rx="16" ry="16" />
+                  <text x={14} y={22} className="name">
+                    {companionPerson.name}
+                  </text>
+                  <text x={14} y={39} className="meta">
+                    {companionPerson.species ?? companionPerson.houses?.[0] ?? 'Spouse branch'}
+                  </text>
+                  <text x={projection.width - 14} y={39} className="action-label" textAnchor="end">
+                    Open line
+                  </text>
+                </g>
+              </g>
+            )
+          })}
+
+          {validation.persons.map((person) => {
+            const node = layout.nodes.get(person.id)
+
+            if (!node) {
+              return null
+            }
+
+            const isSelected = selectedSet.has(person.id)
+            const isHighlighted = highlightedNodeIds.has(person.id)
+            const isFaded = fadeUnrelated && !isHighlighted
+            const personWarnings = validation.warnings.some((warning) => warning.personId === person.id)
+            const sourceLinks = getSourceLinks(person)
+            const primarySource = sourceLinks[0] ?? null
+            const isSourceOpen = sourcePopover?.personId === person.id
+
+            return (
+              <g
+                key={person.id}
+                className={`person-node ${isSelected ? 'selected' : ''} ${isHighlighted ? 'highlighted' : ''} ${isFaded ? 'faded' : ''}`}
+                transform={`translate(${node.x} ${node.y})`}
+                onClick={(event) => updateSelection(person.id, event.shiftKey)}
+              >
+                <rect width={node.width} height={node.height} rx="18" ry="18" />
+                <text x={node.width - 14} y={22} className="gender-badge" textAnchor="end">
+                  {getGenderBadge(person.gender)}
+                </text>
+                <text x={16} y={26} className="name">
+                  {person.name}
+                </text>
+                <text x={16} y={48} className="meta">
+                  {person.species ?? (person.birth ? `${person.birth.era} ${person.birth.year}` : 'Unknown date')}
+                </text>
+                {personWarnings ? <circle cx={node.width - 18} cy={18} r={7} className="warning-dot" /> : null}
+
+                {primarySource ? (
+                  <g
+                    className={`source-trigger ${isSourceOpen ? 'open' : ''}`}
+                    transform={`translate(${node.width - 18} ${node.height - 16})`}
+                    onMouseEnter={() => showSourcePopover(person)}
+                    onMouseLeave={() => hideSourcePopover(person.id)}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      toggleSourcePopover(person)
+                    }}
+                  >
+                    <circle cx={0} cy={0} r={11} />
+                    <text x={0} y={4} textAnchor="middle" className="source-trigger-label">
+                      i
+                    </text>
+                  </g>
+                ) : null}
+              </g>
+            )
+          })}
+
+          {openSourcePerson && openSourceNode && openPrimarySource ? (() => {
+            const popoverWidth = 240
+            const popoverHeight = openSourcePerson.portraitUrl ? 332 : 260
+            const popoverX = openSourceNode.x > camera.x + camera.width * 0.55
+              ? openSourceNode.x + openSourceNode.width - 18 - popoverWidth - 12
+              : openSourceNode.x + openSourceNode.width - 18 + 12
+            const popoverY = openSourceNode.y + openSourceNode.height - 26
+
+            return (
+              <g className="source-popover-layer">
+                <foreignObject x={popoverX} y={popoverY} width={popoverWidth} height={popoverHeight}>
+                  <div className="source-popover" onMouseEnter={clearSourcePopoverHideTimeout} onMouseLeave={() => hideSourcePopover(openSourcePerson.id)}>
+                    <div className="source-popover-header">
+                      <p className="source-popover-kicker">Primary source</p>
+                      <button
+                        type="button"
+                        className="source-close"
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          closeSourcePopoverImmediately()
+                        }}
+                      >
+                        Close
+                      </button>
+                    </div>
+
+                    {openSourcePerson.portraitUrl ? (
+                      <figure className="source-portrait">
+                        <img src={openSourcePerson.portraitUrl} alt={`${openSourcePerson.name} portrait`} loading="lazy" />
+                        <figcaption>
+                          {openSourcePerson.portraitSourceUrl ? (
+                            <a href={openSourcePerson.portraitSourceUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+                              {openSourcePerson.portraitSourceLabel ?? 'Image source'}
+                            </a>
+                          ) : (
+                            openSourcePerson.portraitSourceLabel ?? openPrimarySource.label
+                          )}
+                        </figcaption>
+                      </figure>
+                    ) : null}
+
+                    <h4>{openSourcePreviewState?.status === 'ready' ? openSourcePreviewState.preview?.title : openPrimarySource.label}</h4>
+                    <p className="source-host">
+                      {openSourcePreviewState?.status === 'ready'
+                        ? openSourcePreviewState.preview?.sourceHost
+                        : getSourceHostLabel(openPrimarySource.url)}
+                    </p>
+                    <p className="source-description">
+                      {openSourcePreviewState?.status === 'loading'
+                        ? 'Fetching a best-effort preview for the primary source.'
+                        : openSourcePreviewState?.status === 'ready'
+                          ? openSourcePreviewState.preview?.description ?? 'Preview loaded. Open the source for the full record.'
+                          : 'Preview unavailable within the MVP timeout window. Using the authored link list instead.'}
+                    </p>
+
+                    <div className="source-actions">
+                      <a href={openPrimarySource.url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+                        Open primary source
+                      </a>
+                    </div>
+
+                    <ul className="source-link-list">
+                      {openSourceLinks.map((link) => (
+                        <li key={`${openSourcePerson.id}:${link.label}:${link.url}`}>
+                          <a href={link.url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+                            <span>{link.label}</span>
+                            <small>{getSourceHostLabel(link.url)}</small>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </foreignObject>
+              </g>
+            )
+          })() : null}
+
+          {validation.persons.length === 0 ? (
+            <text x={camera.x + 64} y={camera.y + 96} className="empty-graph-copy">
+              No people yet in this dataset. Create them through the PSModule and switch back here.
+            </text>
+          ) : null}
+        </svg>
+
+        <section className="graph-legend" aria-label="Graph legend">
+          <div className="legend-heading">
+            <h3>Legend</h3>
+            <p>Colors, icons, and line styles used in the current graph view.</p>
+          </div>
+          <div className="legend-grid">
+            <article className="legend-card">
+              <span className="legend-swatch node-person">Person box</span>
+              <p>Cream card for a canonical person in the biological tree.</p>
+            </article>
+            <article className="legend-card">
+              <span className="legend-swatch node-house">House start</span>
+              <p>Top anchor chip that marks the deterministic entry point for one house branch.</p>
+            </article>
+            <article className="legend-card">
+              <span className="legend-swatch node-spouse">Spouse branch</span>
+              <p>Green companion chip for a cross-context spouse continuation.</p>
+            </article>
+            <article className="legend-card">
+              <span className="legend-swatch edge-biological">Biological parent</span>
+              <p>Solid blue edge used for parent-child lineage.</p>
+            </article>
+            <article className="legend-card">
+              <span className="legend-swatch edge-overlay">Social overlay</span>
+              <p>Dashed ochre edge for marriage, step-parent, mentor, adoption, and other social links.</p>
+            </article>
+            <article className="legend-card">
+              <span className="legend-swatch edge-house">House guide</span>
+              <p>Dotted slate guide from each house anchor to its top biological roots.</p>
+            </article>
+            <article className="legend-card">
+              <span className="legend-swatch state-warning">Warning dot</span>
+              <p>Orange marker on a person box when a validation warning targets that person.</p>
+            </article>
+            <article className="legend-card">
+              <span className="legend-swatch state-gender">Gender icon</span>
+              <p>Top-right badge on each person: ♂ male, ♀ female, ? unspecified in JSON.</p>
+            </article>
+            <article className="legend-card">
+              <span className="legend-swatch state-source">Source info</span>
+              <p>Bottom-right info trigger for authored sources, optional portraits, and primary-source preview.</p>
+            </article>
+          </div>
+        </section>
+      </section>
+    </main>
+  )
+}
+
+function buildHouseAnchors(validation: ValidationResult, layout: LayoutResult): HouseAnchor[] {
+  const houseMembers = new Map<string, UUID[]>()
+
+  for (const person of validation.persons) {
+    const primaryHouse = getPrimaryHouse(person.houses)
+
+    if (!primaryHouse) {
+      continue
+    }
+
+    const currentMembers = houseMembers.get(primaryHouse) ?? []
+    currentMembers.push(person.id)
+    currentMembers.sort((left, right) => left.localeCompare(right))
+    houseMembers.set(primaryHouse, currentMembers)
+  }
+
+  const groupedAnchors = Array.from(houseMembers.entries())
+    .sort(([leftHouse], [rightHouse]) => leftHouse.localeCompare(rightHouse))
+    .map(([house, memberIds]) => {
+      const nodes = memberIds
+        .map((memberId) => layout.nodes.get(memberId))
+        .filter((node): node is PositionedNode => node !== undefined)
+
+      if (nodes.length === 0) {
+        return null
+      }
+
+      const minY = Math.min(...nodes.map((node) => node.y))
+      const topNodes = nodes.filter((node) => Math.abs(node.y - minY) < 1)
+      const minX = Math.min(...topNodes.map((node) => node.x))
+      const maxX = Math.max(...topNodes.map((node) => node.x + node.width))
+      const width = Math.max(140, house.length * 8 + 42)
+      const centerX = (minX + maxX) / 2
+
+      return {
+        house,
+        memberIds: topNodes.map((node) => node.id).sort((left, right) => left.localeCompare(right)),
+        centerX,
+        minY,
+        width,
+      }
+    })
+    .filter((entry): entry is { house: string; memberIds: UUID[]; centerX: number; minY: number; width: number } => entry !== null)
+
+  if (groupedAnchors.length === 0) {
+    return []
+  }
+
+  const topRowY = Math.min(...groupedAnchors.map((entry) => entry.minY)) - 86
+  const anchorGap = 18
+  const placedAnchors: Array<{
+    house: string
+    memberIds: UUID[]
+    centerX: number
+    minY: number
+    width: number
+    x: number
+  }> = []
+
+  for (const entry of groupedAnchors
+    .slice()
+    .sort((left, right) => left.centerX - right.centerX || left.house.localeCompare(right.house))) {
+    const idealX = entry.centerX - entry.width / 2
+    const previous = placedAnchors.at(-1)
+    const minX = previous ? previous.x + previous.width + anchorGap : idealX
+
+    placedAnchors.push({
+      ...entry,
+      x: Math.max(idealX, minX),
+    })
+  }
+
+  return placedAnchors.map((entry) => ({
+    house: entry.house,
+    memberIds: entry.memberIds,
+    x: entry.x,
+    y: topRowY,
+    width: entry.width,
+    height: 34,
+  }))
+}
+
+function getPrimaryHouse(houses: string[] | undefined): string | null {
+  const primaryHouse = houses?.[0]?.trim()
+  return primaryHouse ? primaryHouse : null
+}
+
+function buildBiologicalChildGroups(
+  relations: Relation[],
+  layout: LayoutResult,
+): BiologicalChildGroup[] {
+  const relationsByChild = new Map<UUID, Relation[]>()
+
+  for (const relation of relations) {
+    const childRelations = relationsByChild.get(relation.to) ?? []
+    childRelations.push(relation)
+    childRelations.sort((left, right) => left.id.localeCompare(right.id))
+    relationsByChild.set(relation.to, childRelations)
+  }
+
+  const groupedChildren = new Map<string, { parentIds: UUID[]; childIds: UUID[]; relationIds: UUID[] }>()
+
+  for (const [childId, childRelations] of relationsByChild) {
+    const parentIds = childRelations.map((relation) => relation.from).sort((left, right) => left.localeCompare(right))
+    const groupKey = parentIds.join('|')
+    const existingGroup = groupedChildren.get(groupKey)
+
+    if (existingGroup) {
+      existingGroup.childIds.push(childId)
+      existingGroup.childIds.sort((left, right) => left.localeCompare(right))
+      existingGroup.relationIds.push(...childRelations.map((relation) => relation.id))
+      existingGroup.relationIds.sort((left, right) => left.localeCompare(right))
+      continue
+    }
+
+    groupedChildren.set(groupKey, {
+      parentIds,
+      childIds: [childId],
+      relationIds: childRelations.map((relation) => relation.id).sort((left, right) => left.localeCompare(right)),
+    })
+  }
+
+  return Array.from(groupedChildren.entries())
+    .map(([groupKey, group]) => {
+      const parentNodes = group.parentIds
+        .map((parentId) => layout.nodes.get(parentId))
+        .filter((node): node is PositionedNode => node !== undefined)
+        .sort((left, right) => left.x - right.x || left.id.localeCompare(right.id))
+      const childNodes = group.childIds
+        .map((childId) => layout.nodes.get(childId))
+        .filter((node): node is PositionedNode => node !== undefined)
+        .sort((left, right) => left.x - right.x || left.id.localeCompare(right.id))
+
+      if (parentNodes.length === 0 || childNodes.length === 0) {
+        return null
+      }
+
+      const parentCenters = parentNodes.map((node) => node.x + node.width / 2)
+      const childTopY = Math.min(...childNodes.map((node) => node.y))
+      const parentBottomY = Math.max(...parentNodes.map((node) => node.y + node.height))
+      const gap = Math.max(childTopY - parentBottomY, 36)
+      const junctionY = parentBottomY + Math.min(Math.max(gap * 0.22, 18), 34)
+      const siblingY = Math.max(junctionY + 18, childTopY - 20)
+
+      return {
+        key: groupKey,
+        parentIds: group.parentIds,
+        childIds: group.childIds,
+        relationIds: group.relationIds,
+        junctionX:
+          parentCenters.length === 1
+            ? parentCenters[0]
+            : (Math.min(...parentCenters) + Math.max(...parentCenters)) / 2,
+        junctionY,
+        siblingY,
+        parentNodes,
+        childNodes,
+      }
+    })
+    .filter((group): group is BiologicalChildGroup => group !== null)
+    .sort((left, right) => left.junctionY - right.junctionY || left.key.localeCompare(right.key))
+}
+
+function getSingleChildCenterTargets(
+  layout: LayoutResult,
+  relations: Relation[],
+): Map<UUID, number> {
+  const centerTargets = new Map<UUID, number>()
+  const groupedChildren = buildBiologicalChildGroups(relations, layout)
+
+  for (const group of groupedChildren) {
+    if (group.parentIds.length < 2 || group.childIds.length !== 1) {
+      continue
+    }
+
+    centerTargets.set(group.childIds[0], group.junctionX)
+  }
+
+  return centerTargets
+}
+
+function alignSingleChildNodes(
+  layout: LayoutResult,
+  centerTargets: Map<UUID, number>,
+): LayoutResult {
+  const adjustedNodes = new Map(layout.nodes)
+
+  for (const [childId, centerX] of centerTargets) {
+    const currentNode = adjustedNodes.get(childId)
+
+    if (!currentNode) {
+      continue
+    }
+
+    adjustedNodes.set(childId, {
+      ...currentNode,
+      x: centerX - currentNode.width / 2,
+    })
+  }
+
+  return {
+    nodes: adjustedNodes,
+  }
+}
+
+function alignMarriagePairs(
+  layout: LayoutResult,
+  relations: Relation[],
+  anchoredNodeIds: Set<UUID>,
+): LayoutResult {
+  const adjustedNodes = new Map(layout.nodes)
+  const targetGap = 32
+
+  for (const relation of relations
+    .filter((candidate) => candidate.type === 'marriage')
+    .sort((left, right) => left.id.localeCompare(right.id))) {
+    const firstNode = adjustedNodes.get(relation.from)
+    const secondNode = adjustedNodes.get(relation.to)
+
+    if (!firstNode || !secondNode) {
+      continue
+    }
+
+    const centerYDelta = Math.abs(
+      firstNode.y + firstNode.height / 2 - (secondNode.y + secondNode.height / 2),
+    )
+
+    if (centerYDelta > 28) {
+      continue
+    }
+
+    const [leftNode, rightNode] = firstNode.x <= secondNode.x
+      ? [firstNode, secondNode]
+      : [secondNode, firstNode]
+    const currentGap = rightNode.x - (leftNode.x + leftNode.width)
+
+    if (Math.abs(currentGap - targetGap) < 1) {
+      continue
+    }
+
+    if (anchoredNodeIds.has(leftNode.id) && !anchoredNodeIds.has(rightNode.id)) {
+      adjustedNodes.set(rightNode.id, {
+        ...rightNode,
+        x: leftNode.x + leftNode.width + targetGap,
+      })
+      continue
+    }
+
+    if (anchoredNodeIds.has(rightNode.id) && !anchoredNodeIds.has(leftNode.id)) {
+      adjustedNodes.set(leftNode.id, {
+        ...leftNode,
+        x: rightNode.x - targetGap - leftNode.width,
+      })
+      continue
+    }
+
+    const pairMidpoint =
+      (leftNode.x + leftNode.width / 2 + rightNode.x + rightNode.width / 2) / 2
+    const totalWidth = leftNode.width + rightNode.width + targetGap
+    const nextLeftX = pairMidpoint - totalWidth / 2
+
+    adjustedNodes.set(leftNode.id, {
+      ...leftNode,
+      x: nextLeftX,
+    })
+    adjustedNodes.set(rightNode.id, {
+      ...rightNode,
+      x: nextLeftX + leftNode.width + targetGap,
+    })
+  }
+
+  return {
+    nodes: adjustedNodes,
+  }
+}
+
+function getGenderBadge(gender: string | null | undefined): string {
+  const normalized = gender?.trim().toLocaleLowerCase()
+
+  if (!normalized) {
+    return '?'
+  }
+
+  if (['male', 'm', 'man', 'masculine', 'masc', 'mannlich', 'männlich'].includes(normalized)) {
+    return '♂'
+  }
+
+  if (['female', 'f', 'woman', 'feminine', 'fem', 'weiblich'].includes(normalized)) {
+    return '♀'
+  }
+
+  return '?'
+}
+
+function getSourceLinks(person: Person): SourceLink[] {
+  return (person.sourceLinks ?? [])
+    .map((link) => ({
+      label: link.label.trim(),
+      url: link.url.trim(),
+    }))
+    .filter((link) => link.label.length > 0 && link.url.length > 0)
+}
+
+function getPrimarySourceLink(person: Person): SourceLink | null {
+  return getSourceLinks(person)[0] ?? null
+}
+
+function getSourceHostLabel(url: string): string {
+  try {
+    return new URL(url).host.replace(/^www\./, '')
+  } catch {
+    return 'external source'
+  }
+}
+
+function buildSpouseProjectionState(
+  validation: ValidationResult,
+  layout: LayoutResult,
+  selectedIds: UUID[],
+  spouseOwnerOverrides: Record<string, UUID>,
+): SpouseProjectionState {
+  const hiddenChildEdgeKeys = new Set<string>()
+  const projectedMarriageIds = new Set<UUID>()
+  const nodes: SpouseProjectionNode[] = []
+  const occupiedRects: ProjectionRect[] = Array.from(layout.nodes.values()).map((node) => ({
+    x: node.x,
+    y: node.y,
+    width: node.width,
+    height: node.height,
+  }))
+  const rankedNodes = Array.from(layout.nodes.values()).sort(
+    (left, right) => left.y - right.y || left.x - right.x || left.id.localeCompare(right.id),
+  )
+  const rankById = new Map(rankedNodes.map((node, index) => [node.id, index]))
+
+  const marriages = validation.validOverlayRelations
+    .filter((relation) => relation.type === 'marriage')
+    .sort((left, right) => left.id.localeCompare(right.id))
+
+  for (const relation of marriages) {
+    const fromNode = layout.nodes.get(relation.from)
+    const toNode = layout.nodes.get(relation.to)
+
+    if (!fromNode || !toNode) {
+      continue
+    }
+
+    if (canRenderInlineMarriage(fromNode, toNode)) {
+      continue
+    }
+
+    const sharedChildren = getSharedChildren(relation.from, relation.to, validation)
+
+    const overrideOwnerId = spouseOwnerOverrides[relation.id]
+    const selectedOwnerId = selectedIds.find((selectedId) => selectedId === relation.from || selectedId === relation.to)
+    const ownerId =
+      overrideOwnerId === relation.from || overrideOwnerId === relation.to
+        ? overrideOwnerId
+        : selectedOwnerId ?? defaultMarriageOwnerId(relation, rankById)
+    const companionId = ownerId === relation.from ? relation.to : relation.from
+    const ownerNode = layout.nodes.get(ownerId)
+    const companionNode = layout.nodes.get(companionId)
+
+    if (!ownerNode || !companionNode) {
+      continue
+    }
+
+    projectedMarriageIds.add(relation.id)
+
+    for (const childId of sharedChildren) {
+      const collapsedParentId = ownerId === relation.from ? relation.to : relation.from
+      hiddenChildEdgeKeys.add(`${collapsedParentId}|${childId}`)
+    }
+
+    const width = 152
+    const height = 54
+    const horizontalGap = 28
+
+    for (const anchorId of [relation.from, relation.to] as const) {
+      const anchorNode = layout.nodes.get(anchorId)
+      const partnerId = anchorId === relation.from ? relation.to : relation.from
+      const partnerNode = layout.nodes.get(partnerId)
+
+      if (!anchorNode || !partnerNode) {
+        continue
+      }
+
+      const side = partnerNode.x >= anchorNode.x ? 'right' : 'left'
+      const placement = findProjectionPlacement(anchorNode, side, width, height, horizontalGap, occupiedRects)
+
+      occupiedRects.push({
+        x: placement.x,
+        y: placement.y,
+        width,
+        height,
+      })
+
+      nodes.push({
+        relationId: relation.id,
+        ownerId: anchorId,
+        companionId: partnerId,
+        sharedChildren,
+        x: placement.x,
+        y: placement.y,
+        width,
+        height,
+        side,
+      })
+    }
+  }
+
+  return {
+    hiddenChildEdgeKeys,
+    projectedMarriageIds,
+    nodes,
+  }
+}
+
+function findProjectionPlacement(
+  anchorNode: { x: number; y: number; width: number; height: number },
+  side: 'left' | 'right',
+  width: number,
+  height: number,
+  horizontalGap: number,
+  occupiedRects: ProjectionRect[],
+): { x: number; y: number } {
+  const baseX = side === 'right' ? anchorNode.x + anchorNode.width + horizontalGap : anchorNode.x - width - horizontalGap
+  const baseY = anchorNode.y + 6
+  const offsets = [0, -(height + 18), height + 18, -2 * (height + 18), 2 * (height + 18), -3 * (height + 18), 3 * (height + 18)]
+
+  for (const offsetY of offsets) {
+    const candidate = {
+      x: baseX,
+      y: baseY + offsetY,
+      width,
+      height,
+    }
+
+    if (!occupiedRects.some((occupiedRect) => rectsOverlap(candidate, occupiedRect, 10))) {
+      return { x: candidate.x, y: candidate.y }
+    }
+  }
+
+  return { x: baseX, y: baseY + 4 * (height + 18) }
+}
+
+function canRenderInlineMarriage(
+  firstNode: { x: number; y: number; width: number; height: number },
+  secondNode: { x: number; y: number; width: number; height: number },
+): boolean {
+  const centerYDelta = Math.abs(firstNode.y + firstNode.height / 2 - (secondNode.y + secondNode.height / 2))
+  const [leftNode, rightNode] = firstNode.x <= secondNode.x ? [firstNode, secondNode] : [secondNode, firstNode]
+  const boxGap = rightNode.x - (leftNode.x + leftNode.width)
+  const maxInlineGap = Math.max(leftNode.width, rightNode.width) * 0.8
+
+  return centerYDelta <= 28 && boxGap >= 0 && boxGap <= maxInlineGap
+}
+
+function rectsOverlap(first: ProjectionRect, second: ProjectionRect, padding: number): boolean {
+  return !(
+    first.x + first.width + padding <= second.x ||
+    second.x + second.width + padding <= first.x ||
+    first.y + first.height + padding <= second.y ||
+    second.y + second.height + padding <= first.y
+  )
+}
+
+function getSharedChildren(firstParentId: UUID, secondParentId: UUID, validation: ValidationResult): UUID[] {
+  const firstChildren = new Set(validation.childrenByParent.get(firstParentId) ?? [])
+  const secondChildren = validation.childrenByParent.get(secondParentId) ?? []
+
+  return secondChildren.filter((childId) => firstChildren.has(childId)).sort((left, right) => left.localeCompare(right))
+}
+
+function defaultMarriageOwnerId(relation: Relation, rankById: Map<UUID, number>): UUID {
+  const fromRank = rankById.get(relation.from) ?? Number.MAX_SAFE_INTEGER
+  const toRank = rankById.get(relation.to) ?? Number.MAX_SAFE_INTEGER
+
+  if (fromRank !== toRank) {
+    return fromRank < toRank ? relation.from : relation.to
+  }
+
+  return relation.from.localeCompare(relation.to) <= 0 ? relation.from : relation.to
+}
+
+function expandCameraBounds(
+  camera: CameraView,
+  projections: SpouseProjectionNode[],
+  houseAnchors: HouseAnchor[],
+): CameraView {
+  if (projections.length === 0 && houseAnchors.length === 0) {
+    return camera
+  }
+
+  const overlayRects = [
+    ...projections.map((projection) => ({
+      minX: projection.x - 40,
+      minY: projection.y - 40,
+      maxX: projection.x + projection.width + 40,
+      maxY: projection.y + projection.height + 40,
+    })),
+    ...houseAnchors.map((anchor) => ({
+      minX: anchor.x - 40,
+      minY: anchor.y - 40,
+      maxX: anchor.x + anchor.width + 40,
+      maxY: anchor.y + anchor.height + 72,
+    })),
+  ]
+
+  const minX = Math.min(camera.x, ...overlayRects.map((rect) => rect.minX))
+  const minY = Math.min(camera.y, ...overlayRects.map((rect) => rect.minY))
+  const maxX = Math.max(camera.x + camera.width, ...overlayRects.map((rect) => rect.maxX))
+  const maxY = Math.max(camera.y + camera.height, ...overlayRects.map((rect) => rect.maxY))
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  }
+}
+
+function ContractSummary({ evaluation }: { evaluation: ContractEvaluation }) {
+  return (
+    <ul className="contract-list">
+      <li>
+        <span>Ignored relations</span>
+        <strong>{evaluation.actual.ignoredRelations.length}</strong>
+      </li>
+      <li>
+        <span>Warning codes</span>
+        <strong>{evaluation.actual.warnings.length}</strong>
+      </li>
+      <li>
+        <span>Status</span>
+        <strong>{evaluation.actual.status}</strong>
+      </li>
+      {evaluation.mismatches.length > 0 ? (
+        <li className="contract-mismatch">
+          <span>Mismatches</span>
+          <strong>{evaluation.mismatches.join('; ')}</strong>
+        </li>
+      ) : null}
+    </ul>
+  )
+}
+
+export default App
