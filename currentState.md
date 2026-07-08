@@ -76,6 +76,7 @@ Implemented:
 35. Demo and testing datasets now extend the Tolkien branch upward with Thingol and Melian as parents of Lúthien, and Tuor and Idril as parents of Eärendil, including marriage overlays for both parent pairs.
 36. App asset and preview requests now derive from Vite `BASE_URL`, while the build base stays configurable through `VITE_BASE_PATH` so local root-based work remains the default and GitHub Pages-style subpath deploys can be built explicitly.
 37. GitHub Actions builds now auto-derive the GitHub Pages project-site base path from `GITHUB_REPOSITORY`, and the repo now includes a Pages deployment workflow that publishes `app/dist`.
+38. The Pages workflow now uses current major action versions and optionally auto-enables GitHub Pages when a `PAGES_ADMIN_TOKEN` repository secret is present; otherwise the repo must have Pages enabled once manually.
 
 ## Validation Status
 
@@ -103,6 +104,7 @@ Implemented:
 - app build passes after adding source-link metadata support, the person source popover, and the best-effort primary-source preview endpoint
 - app build passes after making dataset and source-preview requests base-path aware for configurable subpath deployments
 - app build passes both locally and in a simulated GitHub Actions project-site environment without manually setting `VITE_BASE_PATH`
+- GitHub Pages workflow was updated to current action majors and to support optional auto-enable through `PAGES_ADMIN_TOKEN`; remote validation still depends on repository-side Pages permissions and settings
 - PowerShell roundtrip validation now confirms that authoring commands persist `sourceLinks`, `portraitUrl`, `portraitSourceLabel`, and `portraitSourceUrl` into a temporary prod dataset without touching the repository dataset roots
 
 ## Immediate Next Slice
@@ -142,3 +144,4 @@ The next implementation slice should cover:
 - The current ELK tuning also spaces disconnected components and same-band nodes more aggressively, which reduces cramped inline spouse pairs without reintroducing duplicate pair projections.
 - Source preview is intentionally best-effort through the local Vite server path; when no preview is available quickly, the UI still shows the authored links and keeps the graph interactive.
 - Local work should continue with the default root base path; GitHub Actions now derives the project-site subpath automatically, while `VITE_BASE_PATH` remains available for explicit overrides.
+- A repository that has never enabled Pages before will still need either one manual Pages activation in GitHub or a `PAGES_ADMIN_TOKEN` secret because the default `GITHUB_TOKEN` cannot perform that admin enablement step.

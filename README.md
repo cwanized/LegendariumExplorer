@@ -82,6 +82,13 @@ npm run build
 
 GitHub Pages deployment is supported through the repository workflow in .github/workflows/deploy-pages.yml. On GitHub Actions, the app automatically derives the project-site base path from `GITHUB_REPOSITORY` unless `VITE_BASE_PATH` is explicitly set.
 
+Important first-use note for GitHub Pages:
+
+- the repository must already have GitHub Pages enabled once, or
+- you must add a repository secret named `PAGES_ADMIN_TOKEN` so the workflow can enable Pages automatically
+
+`PAGES_ADMIN_TOKEN` must be a token with sufficient repository administration and Pages write permissions. Without that secret, the workflow can deploy only after Pages has been enabled for the repository.
+
 Optional deploy base path:
 
 ```powershell
@@ -104,6 +111,7 @@ Important behavior:
 - static deployments without the preview middleware still retain the link-list fallback
 - GitHub Pages project-site builds derive that subpath automatically in GitHub Actions
 - `VITE_BASE_PATH` remains available as an explicit override for custom subpaths or non-GitHub CI
+- if the repository has never had Pages enabled, `actions/configure-pages` cannot auto-enable it with the default `GITHUB_TOKEN`
 
 ## PowerShell Module
 
