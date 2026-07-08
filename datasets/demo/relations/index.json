@@ -191,6 +191,39 @@
     },
     {
       "id": "8f8c7ea5-75c4-4179-b6d2-d3c5d44e4f4f",
+    {
+      "id": "84f1c210-c18a-4b27-9e21-7f2d1a3b1007",
+      "type": "biological_parent",
+      "from": "5d9eaf01-c304-4068-bf94-3b5a7e980005",
+      "to": "3b7c8d9e-a1f2-4e46-9d72-1f3e5c760003",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 444
+        }
+      }
+    },
+    {
+      "id": "85f2d321-d29b-4c38-af32-8e3f2b4c2008",
+      "type": "biological_parent",
+      "from": "6eaf1023-d415-4179-8ca5-4c6b8fa90006",
+      "to": "3b7c8d9e-a1f2-4e46-9d72-1f3e5c760003",
+      "attributes": {
+        "date": {
+          "era": "First Age",
+          "year": 444
+        }
+      }
+    },
+    {
+      "id": "86f3e432-e3ac-4d49-b043-9f4a3c5d3009",
+      "type": "marriage",
+      "from": "5d9eaf01-c304-4068-bf94-3b5a7e980005",
+      "to": "6eaf1023-d415-4179-8ca5-4c6b8fa90006",
+      "attributes": {
+        "date": null
+      }
+    },
       "type": "biological_parent",
       "from": "69ad37d4-e81e-4027-9867-46321eb8895f",
       "to": "8cf5f5c9-3d67-4311-8d85-a9a9ff76ef11",

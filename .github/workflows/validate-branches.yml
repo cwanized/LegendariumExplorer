@@ -1,0 +1,75 @@
+name: Validate Branch Flow
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - 'fb/**'
+  pull_request:
+    branches:
+      - main
+      - dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-frontend-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: app
+        run: npm run build
+
+  validate-pages-path-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: Build frontend with Pages-style base path
+        working-directory: app
+        env:
+          GITHUB_ACTIONS: 'true'
+          GITHUB_REPOSITORY: cwanized/LegendariumExplorer
+        run: npm run build
+
+      - name: Smoke test built Pages artifact
+        shell: bash
+        run: |
+          test -f app/dist/index.html
+          test -f app/dist/datasets/demo/persons/index.json
+          grep -q '<div id="root"></div>' app/dist/index.html
+          grep -q '/LegendariumExplorer/assets/' app/dist/index.html

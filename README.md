@@ -82,6 +82,55 @@ npm run build
 
 GitHub Pages deployment is supported through the repository workflow in .github/workflows/deploy-pages.yml. On GitHub Actions, the app automatically derives the project-site base path from `GITHUB_REPOSITORY` unless `VITE_BASE_PATH` is explicitly set.
 
+Current live deployment:
+
+- https://cwanized.github.io/LegendariumExplorer/
+
+Deployment notes:
+
+- local development remains rooted at `/`
+- GitHub Pages is published from `main` only
+- GitHub Pages project-site builds automatically use the repository subpath
+- portrait images continue to load on GitHub Pages because they are fetched directly by the browser
+- source preview metadata remains best-effort and may still fall back to the authored source links
+
+## Branching And Promotion
+
+Current intended flow:
+
+- `fb/*`: direct feature work, local commits allowed, always using the `fb/` prefix
+- `dev`: local integration branch for merged feature work before release promotion
+- `main`: release branch and the only branch that deploys to GitHub Pages
+
+Recommended usage:
+
+- develop and test on `fb/*`
+- merge `fb/*` into `dev` and test the merged integration state locally
+- promote `dev` into `main` only after the integrated local state is acceptable
+- protect `dev` and `main` in GitHub so they accept changes only through pull or merge requests
+
+This keeps GitHub Pages simple while still giving one branch for integrated pre-release validation.
+
+Prepared CI support for that flow:
+
+- `.github/workflows/validate-branches.yml` runs on pushes to `fb/*`, `dev`, and `main`
+- the same workflow also runs on pull requests targeting `dev` or `main`
+- it currently enforces two checks:
+  - `validate-frontend-build`
+  - `validate-pages-path-build`
+
+Recommended GitHub branch protection:
+
+- `fb/*`: no protection, direct commits allowed
+- `dev`: require pull request or merge request, no mandatory review for now, require the two validation checks above
+- `main`: require pull request or merge request, no mandatory review for now, require the two validation checks above initially, and allow stricter checks later, while keeping GitHub Pages deployment sourced from `main` only
+
+Why no dedicated remote `dev` preview right now:
+
+- GitHub Pages can publish only one project site per repository cleanly
+- a downloadable build artifact from CI would only be useful if you wanted someone else to fetch and inspect a packaged build manually
+- because you already plan to validate `fb -> dev` locally, an artifact-only preview adds little value at the moment
+
 Important first-use note for GitHub Pages:
 
 - the repository must already have GitHub Pages enabled once, or
@@ -140,3 +189,5 @@ The current source/portrait slice is build-validated with:
 cd app
 npm run build
 ```
+
+The GitHub Pages workflow also runs a small smoke test against the built artifact before upload, including checks that `index.html` exists, the root mount container is present, the built asset path is emitted, and the demo dataset JSON was copied into `dist/datasets`.
