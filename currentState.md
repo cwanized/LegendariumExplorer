@@ -84,6 +84,7 @@ Implemented:
 43. A local `dev` branch has now been created from the current repository state, and the current uncommitted workflow/documentation changes are intentionally carried on that branch rather than being stashed.
 44. A dedicated validation workflow now exists for `fb/*`, `dev`, and `main`, plus pull requests into `dev` and `main`, with stable required-check names `validate-frontend-build` and `validate-pages-path-build` prepared for branch protection.
 45. The branch policy is now refined further: feature branches must use the `fb/` prefix, `dev` and `main` should require merge requests but not mandatory reviews for now, and `main` is expected to gain stricter required checks later than `dev`.
+46. Demo and testing datasets now extend the Tuor branch one generation upward with Huor and Rían as biological parents of Tuor, including their marriage overlay and First Age birth/death dates.
 
 ## Validation Status
 
