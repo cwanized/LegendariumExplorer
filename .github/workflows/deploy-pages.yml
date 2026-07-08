@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - master
   workflow_dispatch:
 
 permissions:
@@ -44,6 +43,14 @@ jobs:
       - name: Build frontend
         working-directory: app
         run: npm run build
+
+      - name: Smoke test build artifact
+        shell: bash
+        run: |
+          test -f app/dist/index.html
+          test -f app/dist/datasets/demo/persons/index.json
+          grep -q '<div id="root"></div>' app/dist/index.html
+          grep -q '/LegendariumExplorer/assets/' app/dist/index.html
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v5

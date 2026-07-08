@@ -78,6 +78,12 @@ Implemented:
 37. GitHub Actions builds now auto-derive the GitHub Pages project-site base path from `GITHUB_REPOSITORY`, and the repo now includes a Pages deployment workflow that publishes `app/dist`.
 38. The Pages workflow now uses current major action versions and optionally auto-enables GitHub Pages when a `PAGES_ADMIN_TOKEN` repository secret is present; otherwise the repo must have Pages enabled once manually.
 39. Runtime request paths no longer use `new URL(..., import.meta.env.BASE_URL)` because Vite `BASE_URL` is typically a path like `/LegendariumExplorer/`, not an absolute URL; dataset and preview requests now join that base as a plain path so the GitHub Pages app can boot correctly.
+40. Root documentation now records the live GitHub Pages URL and the workflow now smoke-tests the built artifact for `index.html`, the root mount container, the emitted asset path, and copied demo dataset JSON before upload.
+41. The live GitHub Pages deployment at `https://cwanized.github.io/LegendariumExplorer/` is now verified end-to-end by the user, including graph boot, popovers, and portrait image display.
+42. Agreed branch flow for now is `fb/* -> dev -> main`, with direct commits allowed on `fb/*`, local integration testing on `dev`, and GitHub Pages deployments limited to `main` only.
+43. A local `dev` branch has now been created from the current repository state, and the current uncommitted workflow/documentation changes are intentionally carried on that branch rather than being stashed.
+44. A dedicated validation workflow now exists for `fb/*`, `dev`, and `main`, plus pull requests into `dev` and `main`, with stable required-check names `validate-frontend-build` and `validate-pages-path-build` prepared for branch protection.
+45. The branch policy is now refined further: feature branches must use the `fb/` prefix, `dev` and `main` should require merge requests but not mandatory reviews for now, and `main` is expected to gain stricter required checks later than `dev`.
 
 ## Validation Status
 
@@ -107,6 +113,12 @@ Implemented:
 - app build passes both locally and in a simulated GitHub Actions project-site environment without manually setting `VITE_BASE_PATH`
 - GitHub Pages workflow was updated to current action majors and to support optional auto-enable through `PAGES_ADMIN_TOKEN`; remote validation still depends on repository-side Pages permissions and settings
 - GitHub Pages runtime failure `Failed to construct 'URL': Invalid base URL` was fixed locally by switching request-path construction from URL-base resolution to path joining against `BASE_URL`
+- GitHub Pages now runs successfully at the live project-site URL, and the workflow includes a pre-upload smoke test to catch missing dist assets earlier
+- user verification confirms the live GitHub Pages app loads successfully and still shows working popovers plus preview images
+- branch promotion strategy is now explicitly defined: `fb/*` for direct work, `dev` for local integration, `main` for release and Pages deploys
+- branch naming is now fixed to the `fb/` prefix for direct feature work, with no mandatory reviews yet on `dev` or `main`
+- local repository state is now on branch `dev`, with the current documentation/workflow edits still uncommitted by design
+- CI now supports the intended branch flow without adding a second remote preview surface: `fb/*`, `dev`, and `main` all validate, while GitHub Pages still deploys from `main` only
 - PowerShell roundtrip validation now confirms that authoring commands persist `sourceLinks`, `portraitUrl`, `portraitSourceLabel`, and `portraitSourceUrl` into a temporary prod dataset without touching the repository dataset roots
 
 ## Immediate Next Slice
@@ -114,13 +126,16 @@ Implemented:
 The next implementation slice should cover:
 
 1. Add automated tests for validation determinism, contract scenario evaluation, manifest helpers, and source-link schema persistence.
-2. Improve chunk size and bundle strategy around the graph stack.
+2. Improve chunk size and bundle strategy around the graph stack, but defer this until a later optimization pass because current local and GitHub Pages behavior is functionally correct.
 3. Decide whether app and PSModule should share one exported validation core.
 4. Decide whether prod authoring should remain direct or whether a separate unpublished working dataset tier is needed later.
 5. Decide whether prod should gain its own optional scenario manifest once published fixtures stabilize.
 6. Refine the inline-pair versus alias-projection rule for harder cases such as multiple marriages on the same generation band.
 7. Expand the curated demo portrait subset only after explicitly reviewing any further external image sources.
 8. Refine spouse projection for more complex cases such as multiple marriages and branch ownership beyond the current single-pair MVP heuristic.
+9. Decide later whether `dev` should gain its own remote preview path or remain local-only while `main` stays the sole GitHub Pages target.
+10. Apply GitHub branch protection rules for `dev` and `main` using the now-prepared validation check names, with no mandatory reviews initially.
+11. Decide later which stricter checks should become `main`-only requirements beyond the current shared validation baseline.
 
 ## Pending Todos
 
@@ -147,3 +162,6 @@ The next implementation slice should cover:
 - Source preview is intentionally best-effort through the local Vite server path; when no preview is available quickly, the UI still shows the authored links and keeps the graph interactive.
 - Local work should continue with the default root base path; GitHub Actions now derives the project-site subpath automatically, while `VITE_BASE_PATH` remains available for explicit overrides.
 - A repository that has never enabled Pages before will still need either one manual Pages activation in GitHub or a `PAGES_ADMIN_TOKEN` secret because the default `GITHUB_TOKEN` cannot perform that admin enablement step.
+- Desired GitHub governance is direct commits on `fb/*`, while `dev` and `main` should later be protected to accept changes only through pull or merge requests.
+- Initial GitHub governance should not require reviews yet, but should enforce merge-request-only updates on `dev` and `main`; stricter checks are expected to arrive on `main` later.
+- Remote `dev` preview remains intentionally unimplemented for now because the repository already uses the single GitHub Pages project site for `main`, and the user prefers local integration testing over artifact-only previews.
