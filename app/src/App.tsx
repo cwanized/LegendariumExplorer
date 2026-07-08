@@ -85,6 +85,10 @@ type SourcePreviewState = {
   preview?: SourcePreviewPayload
 }
 
+function getAppRequestPath(relativePath: string): string {
+  return new URL(relativePath.replace(/^\//, ''), import.meta.env.BASE_URL).toString()
+}
+
 function App() {
   const [datasetName, setDatasetName] = useState<DatasetName>('demo')
   const [graphState, setGraphState] = useState<GraphMvpState | null>(null)
@@ -384,7 +388,8 @@ function App() {
     const timeoutHandle = window.setTimeout(() => controller.abort(), 4000)
 
     try {
-      const response = await fetch(`/source-preview?url=${encodeURIComponent(primarySource.url)}`, {
+      const previewUrl = getAppRequestPath(`source-preview?url=${encodeURIComponent(primarySource.url)}`)
+      const response = await fetch(previewUrl, {
         signal: controller.signal,
       })
 

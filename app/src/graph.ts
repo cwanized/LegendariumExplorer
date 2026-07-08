@@ -166,9 +166,13 @@ const elk = new ELK()
 const nodeWidth = 176
 const nodeHeight = 64
 
+function getAppAssetPath(relativePath: string): string {
+  return new URL(relativePath.replace(/^\//, ''), import.meta.env.BASE_URL).toString()
+}
+
 export async function loadDataset(datasetName: DatasetName): Promise<LoadedDataset> {
   const allowMissing = datasetName === 'prod'
-  const basePath = `/datasets/${datasetName}`
+  const basePath = getAppAssetPath(`datasets/${datasetName}`)
   const [manifest, persons, relations, events] = await Promise.all([
     loadJson<ScenarioManifest>(`${basePath}/scenario-manifest.json`, allowMissing, { scenarios: [] }),
     loadJson<DatasetIndex<Person>>(`${basePath}/persons/index.json`, allowMissing, { items: [] }),

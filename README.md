@@ -80,6 +80,17 @@ Build validation:
 npm run build
 ```
 
+GitHub Pages deployment is supported through the repository workflow in .github/workflows/deploy-pages.yml. On GitHub Actions, the app automatically derives the project-site base path from `GITHUB_REPOSITORY` unless `VITE_BASE_PATH` is explicitly set.
+
+Optional deploy base path:
+
+```powershell
+$env:VITE_BASE_PATH = '/LegendariumExplorer/'
+npm run build
+```
+
+Leave `VITE_BASE_PATH` unset for normal local development and local preview at `/`.
+
 The app reads dataset JSON through `/datasets/<role>/...` paths served by Vite in development and copied into `dist/datasets` during build.
 
 ## Source Preview Behavior
@@ -91,6 +102,8 @@ Important behavior:
 - graph rendering must not depend on preview success
 - preview requests time out quickly and fall back to the authored links
 - static deployments without the preview middleware still retain the link-list fallback
+- GitHub Pages project-site builds derive that subpath automatically in GitHub Actions
+- `VITE_BASE_PATH` remains available as an explicit override for custom subpaths or non-GitHub CI
 
 ## PowerShell Module
 

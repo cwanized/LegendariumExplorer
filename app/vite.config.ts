@@ -3,7 +3,41 @@ import path from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-function datasetPlugin() {
+function normalizeBasePath(value: string | undefined): string {
+  const trimmed = (value ?? '/').trim()
+
+  if (!trimmed || trimmed === '/') {
+    return '/'
+  }
+
+  const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+  return withLeadingSlash.endsWith('/') ? withLeadingSlash : `${withLeadingSlash}/`
+}
+
+function resolveBasePath(): string {
+  const explicitBasePath = process.env.VITE_BASE_PATH
+
+  if (explicitBasePath) {
+    return normalizeBasePath(explicitBasePath)
+  }
+
+  const repositorySlug = process.env.GITHUB_REPOSITORY?.trim()
+  const isGithubActions = process.env.GITHUB_ACTIONS === 'true'
+
+  if (!isGithubActions || !repositorySlug) {
+    return '/'
+  }
+
+  const [, repositoryName] = repositorySlug.split('/')
+
+  if (!repositoryName || repositoryName.toLowerCase().endsWith('.github.io')) {
+    return '/'
+  }
+
+  return normalizeBasePath(`/${repositoryName}/`)
+}
+
+function datasetPlugin(basePath: string) {
   const repoRoot = path.resolve(__dirname, '..')
   const datasetRoots = new Map([
     ['testing', path.join(repoRoot, 'datasets', 'testing')],
@@ -14,10 +48,10 @@ function datasetPlugin() {
   return {
     name: 'legendarium-datasets',
     configureServer(server: { middlewares: { use: (handler: (req: { url?: string }, res: { setHeader: (name: string, value: string) => void; end: (body: string) => void; statusCode: number }, next: () => void) => void) => void } }) {
-      server.middlewares.use(createLegendariumMiddleware(datasetRoots))
+      server.middlewares.use(createLegendariumMiddleware(datasetRoots, basePath))
     },
     configurePreviewServer(server: { middlewares: { use: (handler: (req: { url?: string }, res: { setHeader: (name: string, value: string) => void; end: (body: string) => void; statusCode: number }, next: () => void) => void) => void } }) {
-      server.middlewares.use(createLegendariumMiddleware(datasetRoots))
+      server.middlewares.use(createLegendariumMiddleware(datasetRoots, basePath))
     },
     async closeBundle() {
       const distRoot = path.resolve(__dirname, 'dist', 'datasets')
@@ -31,13 +65,23 @@ function datasetPlugin() {
   }
 }
 
-function createLegendariumMiddleware(datasetRoots: Map<string, string>) {
+function stripBasePath(requestUrl: string, basePath: string): string {
+  if (basePath === '/') {
+    return requestUrl
+  }
+
+  return requestUrl.startsWith(basePath)
+    ? requestUrl.slice(basePath.length - 1)
+    : requestUrl
+}
+
+function createLegendariumMiddleware(datasetRoots: Map<string, string>, basePath: string) {
   return async (
     req: { url?: string },
     res: { setHeader: (name: string, value: string) => void; end: (body: string) => void; statusCode: number },
     next: () => void,
   ) => {
-    const requestUrl = req.url ?? ''
+    const requestUrl = stripBasePath(req.url ?? '', basePath)
 
     if (requestUrl.startsWith('/datasets/')) {
       const sanitizedPath = requestUrl.split('?')[0]
@@ -180,7 +224,12 @@ function escapeRegExp(value: string): string {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
-  publicDir: false,
-  plugins: [react(), datasetPlugin()],
+export default defineConfig(() => {
+  const basePath = resolveBasePath()
+
+  return {
+    base: basePath,
+    publicDir: false as const,
+    plugins: [react(), datasetPlugin(basePath)],
+  }
 })

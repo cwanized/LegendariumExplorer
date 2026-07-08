@@ -74,6 +74,8 @@ Implemented:
 33. Eärendil now also carries an explicit Tolkien Gateway portrait in the demo dataset, using the direct image asset plus the media-view page as visible provenance.
 34. The source popover now renders in a dedicated overlay layer at the end of the SVG, so it stays above person cards instead of being occluded by later node draws.
 35. Demo and testing datasets now extend the Tolkien branch upward with Thingol and Melian as parents of Lúthien, and Tuor and Idril as parents of Eärendil, including marriage overlays for both parent pairs.
+36. App asset and preview requests now derive from Vite `BASE_URL`, while the build base stays configurable through `VITE_BASE_PATH` so local root-based work remains the default and GitHub Pages-style subpath deploys can be built explicitly.
+37. GitHub Actions builds now auto-derive the GitHub Pages project-site base path from `GITHUB_REPOSITORY`, and the repo now includes a Pages deployment workflow that publishes `app/dist`.
 
 ## Validation Status
 
@@ -99,6 +101,8 @@ Implemented:
 - app build passes after the follow-up inline-marriage realignment; browser retest on the shared 5176 page shows zero spouse chips and a centered Dior with Nimloth, Elwing with Eärendil, and Arwen with Aragorn restored as inline-only pairs
 - app build passes after removing the incorrect demo adoption edge from Elrond to Eldarion, and the refreshed demo graph no longer shows that dashed overlay line
 - app build passes after adding source-link metadata support, the person source popover, and the best-effort primary-source preview endpoint
+- app build passes after making dataset and source-preview requests base-path aware for configurable subpath deployments
+- app build passes both locally and in a simulated GitHub Actions project-site environment without manually setting `VITE_BASE_PATH`
 - PowerShell roundtrip validation now confirms that authoring commands persist `sourceLinks`, `portraitUrl`, `portraitSourceLabel`, and `portraitSourceUrl` into a temporary prod dataset without touching the repository dataset roots
 
 ## Immediate Next Slice
@@ -137,3 +141,4 @@ The next implementation slice should cover:
 - Inline-versus-alias classification now uses the real box gap on the same generation band, not the raw left-edge delta, which keeps the rule stable when ELK spacing changes.
 - The current ELK tuning also spaces disconnected components and same-band nodes more aggressively, which reduces cramped inline spouse pairs without reintroducing duplicate pair projections.
 - Source preview is intentionally best-effort through the local Vite server path; when no preview is available quickly, the UI still shows the authored links and keeps the graph interactive.
+- Local work should continue with the default root base path; GitHub Actions now derives the project-site subpath automatically, while `VITE_BASE_PATH` remains available for explicit overrides.
