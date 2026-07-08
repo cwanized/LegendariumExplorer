@@ -86,7 +86,11 @@ type SourcePreviewState = {
 }
 
 function getAppRequestPath(relativePath: string): string {
-  return new URL(relativePath.replace(/^\//, ''), import.meta.env.BASE_URL).toString()
+  const normalizedBasePath = import.meta.env.BASE_URL.endsWith('/')
+    ? import.meta.env.BASE_URL
+    : `${import.meta.env.BASE_URL}/`
+
+  return `${normalizedBasePath}${relativePath.replace(/^\/+/, '')}`
 }
 
 function App() {

@@ -167,7 +167,11 @@ const nodeWidth = 176
 const nodeHeight = 64
 
 function getAppAssetPath(relativePath: string): string {
-  return new URL(relativePath.replace(/^\//, ''), import.meta.env.BASE_URL).toString()
+  const normalizedBasePath = import.meta.env.BASE_URL.endsWith('/')
+    ? import.meta.env.BASE_URL
+    : `${import.meta.env.BASE_URL}/`
+
+  return `${normalizedBasePath}${relativePath.replace(/^\/+/, '')}`
 }
 
 export async function loadDataset(datasetName: DatasetName): Promise<LoadedDataset> {

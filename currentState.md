@@ -77,6 +77,7 @@ Implemented:
 36. App asset and preview requests now derive from Vite `BASE_URL`, while the build base stays configurable through `VITE_BASE_PATH` so local root-based work remains the default and GitHub Pages-style subpath deploys can be built explicitly.
 37. GitHub Actions builds now auto-derive the GitHub Pages project-site base path from `GITHUB_REPOSITORY`, and the repo now includes a Pages deployment workflow that publishes `app/dist`.
 38. The Pages workflow now uses current major action versions and optionally auto-enables GitHub Pages when a `PAGES_ADMIN_TOKEN` repository secret is present; otherwise the repo must have Pages enabled once manually.
+39. Runtime request paths no longer use `new URL(..., import.meta.env.BASE_URL)` because Vite `BASE_URL` is typically a path like `/LegendariumExplorer/`, not an absolute URL; dataset and preview requests now join that base as a plain path so the GitHub Pages app can boot correctly.
 
 ## Validation Status
 
@@ -105,6 +106,7 @@ Implemented:
 - app build passes after making dataset and source-preview requests base-path aware for configurable subpath deployments
 - app build passes both locally and in a simulated GitHub Actions project-site environment without manually setting `VITE_BASE_PATH`
 - GitHub Pages workflow was updated to current action majors and to support optional auto-enable through `PAGES_ADMIN_TOKEN`; remote validation still depends on repository-side Pages permissions and settings
+- GitHub Pages runtime failure `Failed to construct 'URL': Invalid base URL` was fixed locally by switching request-path construction from URL-base resolution to path joining against `BASE_URL`
 - PowerShell roundtrip validation now confirms that authoring commands persist `sourceLinks`, `portraitUrl`, `portraitSourceLabel`, and `portraitSourceUrl` into a temporary prod dataset without touching the repository dataset roots
 
 ## Immediate Next Slice
