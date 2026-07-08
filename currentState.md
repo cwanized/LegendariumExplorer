@@ -85,6 +85,7 @@ Implemented:
 44. A dedicated validation workflow now exists for `fb/*`, `dev`, and `main`, plus pull requests into `dev` and `main`, with stable required-check names `validate-frontend-build` and `validate-pages-path-build` prepared for branch protection.
 45. The branch policy is now refined further: feature branches must use the `fb/` prefix, `dev` and `main` should require merge requests but not mandatory reviews for now, and `main` is expected to gain stricter required checks later than `dev`.
 46. Demo and testing datasets now extend the Tuor branch one generation upward with Huor and Rían as biological parents of Tuor, including their marriage overlay and First Age birth/death dates.
+47. The Tuor-parent dataset extension also required a follow-up JSON repair in demo and testing relations after one existing Elwing -> Elros relation object was accidentally split during insertion, which had caused the demo dataset to fail parsing in the browser.
 
 ## Validation Status
 
@@ -112,6 +113,7 @@ Implemented:
 - app build passes after adding source-link metadata support, the person source popover, and the best-effort primary-source preview endpoint
 - app build passes after making dataset and source-preview requests base-path aware for configurable subpath deployments
 - app build passes both locally and in a simulated GitHub Actions project-site environment without manually setting `VITE_BASE_PATH`
+- app build passes again after repairing the malformed demo/testing relations JSON that had blocked browser parsing of the demo dataset
 - GitHub Pages workflow was updated to current action majors and to support optional auto-enable through `PAGES_ADMIN_TOKEN`; remote validation still depends on repository-side Pages permissions and settings
 - GitHub Pages runtime failure `Failed to construct 'URL': Invalid base URL` was fixed locally by switching request-path construction from URL-base resolution to path joining against `BASE_URL`
 - GitHub Pages now runs successfully at the live project-site URL, and the workflow includes a pre-upload smoke test to catch missing dist assets earlier
