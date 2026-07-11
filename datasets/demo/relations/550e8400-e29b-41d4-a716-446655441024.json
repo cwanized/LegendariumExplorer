@@ -1,0 +1,9 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655441024",
+  "type": "biological_parent",
+  "from": "550e8400-e29b-41d4-a716-446655440017",
+  "to": "5d9eaf01-c304-4068-bf94-3b5a7e980005",
+  "attributes": {
+    "date": null
+  }
+}

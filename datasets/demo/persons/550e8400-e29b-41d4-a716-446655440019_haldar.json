@@ -1,0 +1,19 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440019",
+  "name": "Haldar",
+  "gender": "male",
+  "birth": null,
+  "death": null,
+  "houses": [
+    "House of Haleth"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Haldar"
+    }
+  ],
+  "metadata": {
+    "description": "Start of the House of Haleth"
+  }
+}
