@@ -61,15 +61,38 @@ Short aliases such as `p1`, `r1`, or `e1` MUST NOT be used as IDs.
 
 ## 3.2 Filenames
 
-Filenames MAY be human-readable.
+Filenames are human-readable but follow a strict naming convention to support per-item JSON file storage.
+
+**Persons:** `{uuid}_{kebab-case-name}.json`
 
 Example:
 
 ```text
-datasets/demo/persons/aragorn.json
+datasets/demo/persons/550e8400-e29b-41d4-a716-446655440003_aragorn-ii.json
 ```
 
-Identity is determined only by the JSON `id` field.
+**Relations:** `{uuid}.json` (UUID only, no type suffix)
+
+Example:
+
+```text
+datasets/demo/relations/0fd327c3-9f1b-4190-928e-c19f7cd003b2.json
+```
+
+**Events:** `{uuid}_{kebab-case-type}.json`
+
+Example:
+
+```text
+datasets/demo/events/550e8400-e29b-41d4-a716-446655442001_marriage.json
+```
+
+IMPORTANT: 
+
+- Identity is determined **only by the JSON `id` field**, not by the filename
+- Filenames are used only for file organization and SlimIndex references
+- The kebab-case name portion in person/event filenames is for readability and MUST NOT be parsed for identity
+- Accented characters in names are normalized to ASCII (e.g., Eärendil → erendil, Túor → tuor)
 
 ---
 
@@ -80,8 +103,17 @@ Identity is determined only by the JSON `id` field.
 ```text
 datasets/testing/
 ├── persons/
+│   ├── index.json
+│   ├── {uuid}_{name}.json
+│   └── ...
 ├── relations/
+│   ├── index.json
+│   ├── {uuid}.json
+│   └── ...
 ├── events/
+│   ├── index.json
+│   ├── {uuid}_{type}.json
+│   └── ...
 └── scenario-manifest.json
 ```
 
@@ -91,6 +123,29 @@ Rules:
 - contract scenarios live here
 - deterministic validation expectations are defined here
 
+Per-Item File Structure (IMPORTANT):
+
+- **Each person, relation, and event is stored in an individual JSON file**
+- Person files: `{uuid}_{kebab-case-name}.json` (e.g., `550e8400-e29b-41d4-a716-446655440001_aragorn-ii.json`)
+- Relation files: `{uuid}.json` (e.g., `0fd327c3-9f1b-4190-928e-c19f7cd003b2.json`)
+- Event files: `{uuid}_{kebab-case-type}.json` (e.g., `550e8400-e29b-41d4-a716-446655442001_marriage.json`)
+
+Index Format (SlimIndex):
+
+Each `index.json` contains ONLY a list of filenames, not embedded objects:
+
+```json
+{
+  "items": [
+    "550e8400-e29b-41d4-a716-446655440001_arathorn-ii.json",
+    "550e8400-e29b-41d4-a716-446655440002_gilraen.json",
+    "550e8400-e29b-41d4-a716-446655440003_aragorn-ii.json"
+  ]
+}
+```
+
+The frontend app loads the index, then fetches each item file individually.
+
 ---
 
 ## 4.2 Demo Dataset
@@ -98,8 +153,17 @@ Rules:
 ```text
 datasets/demo/
 ├── persons/
+│   ├── index.json
+│   ├── {uuid}_{name}.json
+│   └── ...
 ├── relations/
+│   ├── index.json
+│   ├── {uuid}.json
+│   └── ...
 ├── events/
+│   ├── index.json
+│   ├── {uuid}_{type}.json
+│   └── ...
 └── scenario-manifest.json
 ```
 
@@ -109,6 +173,7 @@ Rules:
 - no synthetic invalid fault cases
 - intended for visual review, onboarding, and presentation
 - persons MAY include sourceLinks and optional portrait metadata for source/portrait UI review
+- follows the same per-item file structure as testing dataset
 
 ---
 
@@ -117,14 +182,25 @@ Rules:
 ```text
 datasets/prod/
 ├── persons/
+│   ├── index.json
+│   ├── {uuid}_{name}.json
+│   └── ...
 ├── relations/
+│   ├── index.json
+│   ├── {uuid}.json
+│   └── ...
 ├── events/
+│   ├── index.json
+│   ├── {uuid}_{type}.json
+│   └── ...
 └── scenario-manifest.json
 ```
 
 The prod dataset is the published end-user dataset.
 
 It MAY start empty until a curated publication-ready dataset exists.
+
+Follows the same per-item file structure as testing and demo datasets.
 
 ---
 

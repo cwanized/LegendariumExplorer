@@ -60,6 +60,27 @@ function New-LegendariumUuid {
     [guid]::NewGuid().Guid
 }
 
+function ConvertTo-SlugName {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name
+    )
+
+    # Convert to kebab-case for use in filenames: remove accents, lowercase, replace spaces with hyphens
+    $slug = $Name.ToLower()
+    $slug = $slug -replace '[àáâãäå]', 'a'
+    $slug = $slug -replace '[èéêë]', 'e'
+    $slug = $slug -replace '[ìíîï]', 'i'
+    $slug = $slug -replace '[òóôõö]', 'o'
+    $slug = $slug -replace '[ùúûü]', 'u'
+    $slug = $slug -replace '[ýÿ]', 'y'
+    $slug = $slug -replace '[^a-z0-9]+', '-'
+    $slug = $slug -replace '^-+|-+$', ''
+
+    return $slug
+}
+
 function ConvertTo-SortedJson {
     [CmdletBinding()]
     param(
@@ -228,9 +249,37 @@ function Save-LegendariumDataset {
 
     $datasetRoot = Get-LegendariumDatasetPath -RootPath $RootPath -DatasetName $DatasetName
 
-    Write-LegendariumJsonFile -Path (Join-Path $datasetRoot 'persons\index.json') -Value ([ordered]@{ items = @($Dataset.persons | Sort-Object -Property id) })
-    Write-LegendariumJsonFile -Path (Join-Path $datasetRoot 'relations\index.json') -Value ([ordered]@{ items = @($Dataset.relations | Sort-Object -Property id) })
-    Write-LegendariumJsonFile -Path (Join-Path $datasetRoot 'events\index.json') -Value ([ordered]@{ items = @($Dataset.events | Sort-Object -Property id) })
+    # Write each person to individual file and collect filenames for index
+    $personFilenames = @()
+    foreach ($person in ($Dataset.persons | Sort-Object -Property id)) {
+        $filename = "{0}_{1}.json" -f $person.id, (ConvertTo-SlugName -Name $person.name)
+        $filepath = Join-Path $datasetRoot "persons\$filename"
+        Write-LegendariumJsonFile -Path $filepath -Value $person
+        $personFilenames += $filename
+    }
+
+    # Write each relation to individual file and collect filenames for index
+    $relationFilenames = @()
+    foreach ($relation in ($Dataset.relations | Sort-Object -Property id)) {
+        $filename = "{0}.json" -f $relation.id
+        $filepath = Join-Path $datasetRoot "relations\$filename"
+        Write-LegendariumJsonFile -Path $filepath -Value $relation
+        $relationFilenames += $filename
+    }
+
+    # Write each event to individual file and collect filenames for index
+    $eventFilenames = @()
+    foreach ($event in ($Dataset.events | Sort-Object -Property id)) {
+        $filename = "{0}_{1}.json" -f $event.id, (ConvertTo-SlugName -Name $event.type)
+        $filepath = Join-Path $datasetRoot "events\$filename"
+        Write-LegendariumJsonFile -Path $filepath -Value $event
+        $eventFilenames += $filename
+    }
+
+    # Write SlimIndex files containing only filenames, not embedded objects
+    Write-LegendariumJsonFile -Path (Join-Path $datasetRoot 'persons\index.json') -Value ([ordered]@{ items = @($personFilenames) })
+    Write-LegendariumJsonFile -Path (Join-Path $datasetRoot 'relations\index.json') -Value ([ordered]@{ items = @($relationFilenames) })
+    Write-LegendariumJsonFile -Path (Join-Path $datasetRoot 'events\index.json') -Value ([ordered]@{ items = @($eventFilenames) })
     Write-LegendariumJsonFile -Path (Join-Path $datasetRoot 'scenario-manifest.json') -Value $Dataset.manifest
 
     [pscustomobject]@{
@@ -349,6 +398,8 @@ function Export-TestingDataset {
 
     $testingPath = Get-LegendariumTestingPath -RootPath $RootPath
     $dataset = Get-EmbeddedDemoDataset
+    
+    # Check if index files exist and fail unless -Force
     $targets = @(
         (Join-Path $testingPath 'persons\index.json')
         (Join-Path $testingPath 'relations\index.json')
@@ -364,10 +415,8 @@ function Export-TestingDataset {
         }
     }
 
-    Write-LegendariumJsonFile -Path (Join-Path $testingPath 'persons\index.json') -Value $dataset.persons
-    Write-LegendariumJsonFile -Path (Join-Path $testingPath 'relations\index.json') -Value $dataset.relations
-    Write-LegendariumJsonFile -Path (Join-Path $testingPath 'events\index.json') -Value $dataset.events
-    Write-LegendariumJsonFile -Path (Join-Path $testingPath 'scenario-manifest.json') -Value $dataset.manifest
+    # Use Save-LegendariumDataset which writes per-item files with SlimIndex
+    $null = Save-LegendariumDataset -Dataset $dataset -RootPath $RootPath -DatasetName 'testing'
 
     [pscustomobject]@{
         DatasetName = 'testing'
@@ -413,10 +462,36 @@ function Import-LegendariumDataset {
         }
     }
 
-    $persons = (Get-Content -LiteralPath $personsPath -Raw | ConvertFrom-Json -AsHashtable).items
-    $relations = (Get-Content -LiteralPath $relationsPath -Raw | ConvertFrom-Json -AsHashtable).items
-    $events = (Get-Content -LiteralPath $eventsPath -Raw | ConvertFrom-Json -AsHashtable).items
+    # Load SlimIndex files which contain only filenames
+    $personIndex = Get-Content -LiteralPath $personsPath -Raw | ConvertFrom-Json -AsHashtable
+    $relationIndex = Get-Content -LiteralPath $relationsPath -Raw | ConvertFrom-Json -AsHashtable
+    $eventIndex = Get-Content -LiteralPath $eventsPath -Raw | ConvertFrom-Json -AsHashtable
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json -AsHashtable
+
+    # Load individual item files referenced by SlimIndex filenames
+    $persons = @()
+    foreach ($filename in $personIndex.items) {
+        $itemPath = Join-Path $datasetRoot "persons\$filename"
+        if (Test-Path -LiteralPath $itemPath) {
+            $persons += (Get-Content -LiteralPath $itemPath -Raw | ConvertFrom-Json -AsHashtable)
+        }
+    }
+
+    $relations = @()
+    foreach ($filename in $relationIndex.items) {
+        $itemPath = Join-Path $datasetRoot "relations\$filename"
+        if (Test-Path -LiteralPath $itemPath) {
+            $relations += (Get-Content -LiteralPath $itemPath -Raw | ConvertFrom-Json -AsHashtable)
+        }
+    }
+
+    $events = @()
+    foreach ($filename in $eventIndex.items) {
+        $itemPath = Join-Path $datasetRoot "events\$filename"
+        if (Test-Path -LiteralPath $itemPath) {
+            $events += (Get-Content -LiteralPath $itemPath -Raw | ConvertFrom-Json -AsHashtable)
+        }
+    }
 
     [pscustomobject]@{
         persons = @(Sort-ById -Items $persons)

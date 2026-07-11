@@ -40,16 +40,61 @@ The project treats biological lineage as the only layout input. Social relations
 
 The frontend currently supports these optional descriptive fields on person records:
 
-- gender
-- species
-- sourceLinks
-- portraitUrl
-- portraitSourceLabel
-- portraitSourceUrl
+- `gender` (string: "male", "female", or other; displays as ♂, ♀, or ?)
+- `species` (string: "Half-elven", "Elf", "Human", etc.)
+- `sourceLinks` (array of { label, url })
+- `portraitUrl` (string URL to portrait image)
+- `portraitSourceLabel` (string: attribution label for the portrait)
+- `portraitSourceUrl` (string: URL to portrait provenance/source)
 
-`sourceLinks` is an ordered array. The first entry is the primary source used for the source popover and preview request. Links must be authored explicitly in JSON; the app does not derive Tolkien Gateway URLs from names.
+### sourceLinks Behavior
 
-Portraits are optional. If a person has `portraitUrl`, the popover shows the image and its provenance when `portraitSourceLabel` and `portraitSourceUrl` are present.
+`sourceLinks` is an **ordered array**. The first entry (`sourceLinks[0]`) is the **primary source** used for:
+
+1. **Source popover display** - shown when clicking the info icon on a person card
+2. **Preview metadata fetch** - the app attempts to fetch preview metadata from `sourceLinks[0].url` with a **4-second timeout**
+3. **Best-effort rendering** - if preview fetch fails or times out, the UI falls back to displaying the authored source link list without blocking graph rendering
+
+Links must be authored explicitly in JSON; the app does not derive Tolkien Gateway URLs from names or make any automatic URL generation.
+
+Example:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440001",
+  "name": "Aragorn II",
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Aragorn"
+    },
+    {
+      "label": "Lord of the Rings Wiki",
+      "url": "https://lotr.fandom.com/wiki/Aragorn"
+    }
+  ]
+}
+```
+
+### Portrait Behavior
+
+Portraits are optional. If a person has `portraitUrl`, the source popover:
+
+1. **Loads and displays** the image from the provided URL
+2. **Shows provenance** when `portraitSourceLabel` and `portraitSourceUrl` are present (as a link to the source page)
+3. **Falls back gracefully** if the image URL is unreachable or invalid
+
+Example:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440003",
+  "name": "Elrond",
+  "portraitUrl": "https://example.org/elrond-portrait.png",
+  "portraitSourceLabel": "Tolkien Gateway",
+  "portraitSourceUrl": "https://tolkiengateway.net/wiki/Elrond"
+}
+```
 
 ## Dataset Roles
 
