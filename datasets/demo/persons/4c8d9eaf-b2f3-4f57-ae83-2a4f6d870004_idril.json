@@ -1,0 +1,16 @@
+{
+  "id": "4c8d9eaf-b2f3-4f57-ae83-2a4f6d870004",
+  "name": "Idril",
+  "gender": "female",
+  "birth": null,
+  "death": null,
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Idril"
+    }
+  ],
+  "metadata": {
+    "description": "Mother of Eärendil"
+  }
+}

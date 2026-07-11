@@ -76,10 +76,6 @@ export type ScenarioManifest = {
   scenarios: ScenarioDefinition[]
 }
 
-type DatasetIndex<T> = {
-  items: T[]
-}
-
 export type LoadedDataset = {
   persons: Person[]
   relations: Relation[]
@@ -177,18 +173,25 @@ function getAppAssetPath(relativePath: string): string {
 export async function loadDataset(datasetName: DatasetName): Promise<LoadedDataset> {
   const allowMissing = datasetName === 'prod'
   const basePath = getAppAssetPath(`datasets/${datasetName}`)
-  const [manifest, persons, relations, events] = await Promise.all([
+  const [manifest, personIndex, relationIndex, eventIndex] = await Promise.all([
     loadJson<ScenarioManifest>(`${basePath}/scenario-manifest.json`, allowMissing, { scenarios: [] }),
-    loadJson<DatasetIndex<Person>>(`${basePath}/persons/index.json`, allowMissing, { items: [] }),
-    loadJson<DatasetIndex<Relation>>(`${basePath}/relations/index.json`, allowMissing, { items: [] }),
-    loadJson<DatasetIndex<EventRecord>>(`${basePath}/events/index.json`, allowMissing, { items: [] }),
+    loadJson<{ items: string[] }>(`${basePath}/persons/index.json`, allowMissing, { items: [] }),
+    loadJson<{ items: string[] }>(`${basePath}/relations/index.json`, allowMissing, { items: [] }),
+    loadJson<{ items: string[] }>(`${basePath}/events/index.json`, allowMissing, { items: [] }),
+  ])
+
+  // Load individual item files in parallel
+  const [persons, relations, events] = await Promise.all([
+    Promise.all(personIndex.items.map((filename) => loadJson<Person>(`${basePath}/persons/${filename}`))),
+    Promise.all(relationIndex.items.map((filename) => loadJson<Relation>(`${basePath}/relations/${filename}`))),
+    Promise.all(eventIndex.items.map((filename) => loadJson<EventRecord>(`${basePath}/events/${filename}`))),
   ])
 
   return {
     manifest,
-    persons: sortById(persons.items),
-    relations: sortById(relations.items),
-    events: sortById(events.items),
+    persons: sortById(persons),
+    relations: sortById(relations),
+    events: sortById(events),
   }
 }
 

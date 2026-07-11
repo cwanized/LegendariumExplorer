@@ -1,0 +1,25 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440002",
+  "name": "Gilraen",
+  "gender": "female",
+  "birth": {
+    "era": "Third Age",
+    "year": 2907
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 3007
+  },
+  "houses": [
+    "Dunedain"
+  ],
+  "metadata": {
+    "description": "Mother of Aragorn"
+  },
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Gilraen"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "id": "69ad37d4-e81e-4027-9867-46321eb8895f",
+  "name": "Elwing",
+  "gender": "female",
+  "birth": {
+    "era": "First Age",
+    "year": 503
+  },
+  "death": null,
+  "houses": [
+    "Thingol"
+  ],
+  "metadata": {
+    "description": null
+  },
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Elwing"
+    }
+  ]
+}

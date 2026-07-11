@@ -1,0 +1,23 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440004",
+  "name": "Arwen",
+  "gender": "female",
+  "species": "Half-elven",
+  "birth": {
+    "era": "Third Age",
+    "year": 241
+  },
+  "death": {
+    "era": "Fourth Age",
+    "year": 121
+  },
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Arwen"
+    }
+  ],
+  "metadata": {
+    "description": "Daughter of Elrond"
+  }
+}

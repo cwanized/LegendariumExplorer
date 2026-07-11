@@ -1,0 +1,22 @@
+{
+  "id": "e8116f81-e20a-4d76-babe-71a29fad8dc8",
+  "name": "Luthien",
+  "gender": "female",
+  "birth": {
+    "era": "First Age",
+    "year": 1200
+  },
+  "death": null,
+  "houses": [
+    "Thingol"
+  ],
+  "metadata": {
+    "description": null
+  },
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Luthien"
+    }
+  ]
+}

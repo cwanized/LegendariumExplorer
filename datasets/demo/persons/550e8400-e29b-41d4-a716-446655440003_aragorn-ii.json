@@ -1,0 +1,32 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440003",
+  "name": "Aragorn II",
+  "gender": "male",
+  "birth": {
+    "era": "Third Age",
+    "year": 2931
+  },
+  "death": {
+    "era": "Fourth Age",
+    "year": 120
+  },
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Aragorn%20II"
+    },
+    {
+      "label": "The One Wiki to Rule Them All",
+      "url": "https://lotr.fandom.com/wiki/Aragorn_II"
+    }
+  ],
+  "portraitUrl": "https://en.wikipedia.org/wiki/Special:Redirect/file/File:Aragorn300ppx.png",
+  "portraitSourceLabel": "Wikipedia article image",
+  "portraitSourceUrl": "https://en.wikipedia.org/wiki/Aragorn",
+  "metadata": {
+    "description": "King Elessar"
+  }
+}

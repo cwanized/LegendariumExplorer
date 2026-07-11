@@ -1,0 +1,22 @@
+{
+  "id": "6eaf1023-d415-4179-8ca5-4c6b8fa90006",
+  "name": "Rían",
+  "gender": "female",
+  "birth": {
+    "era": "First Age",
+    "year": 450
+  },
+  "death": {
+    "era": "First Age",
+    "year": 472
+  },
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=R%C3%ADan"
+    }
+  ],
+  "metadata": {
+    "description": "Mother of Tuor"
+  }
+}
