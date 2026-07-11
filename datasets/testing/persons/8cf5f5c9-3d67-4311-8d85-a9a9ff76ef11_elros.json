@@ -1,0 +1,20 @@
+{
+  "id": "8cf5f5c9-3d67-4311-8d85-a9a9ff76ef11",
+  "name": "Elros",
+  "gender": "male",
+  "species": "Half-elven",
+  "birth": {
+    "era": "First Age",
+    "year": 532
+  },
+  "death": null,
+  "metadata": {
+    "description": "Brother of Elrond"
+  },
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Elros"
+    }
+  ]
+}

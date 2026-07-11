@@ -1,0 +1,20 @@
+{
+  "id": "fa716466-ebfb-4c49-942c-06390baa5503",
+  "name": "Dior",
+  "gender": "male",
+  "species": "Half-elven",
+  "birth": {
+    "era": "First Age",
+    "year": 470
+  },
+  "death": null,
+  "metadata": {
+    "description": null
+  },
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Dior"
+    }
+  ]
+}

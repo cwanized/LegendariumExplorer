@@ -1,0 +1,22 @@
+{
+  "id": "791e0599-9da2-4082-be6d-6c88c3075838",
+  "name": "Nimloth",
+  "gender": "female",
+  "birth": {
+    "era": "First Age",
+    "year": 506
+  },
+  "death": null,
+  "houses": [
+    "Thingol"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Nimloth"
+    }
+  ],
+  "metadata": {
+    "description": null
+  }
+}

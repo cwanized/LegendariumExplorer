@@ -1,0 +1,13 @@
+{
+  "id": "cd81908d-986c-4710-ae92-ea4c0f0761c8",
+  "type": "marriage",
+  "date": {
+    "era": "First Age",
+    "year": 497
+  },
+  "participants": [
+    "fa716466-ebfb-4c49-942c-06390baa5503",
+    "791e0599-9da2-4082-be6d-6c88c3075838"
+  ],
+  "metadata": {}
+}

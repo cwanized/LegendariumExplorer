@@ -1,0 +1,12 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440013",
+  "name": "Cycle Gamma",
+  "birth": null,
+  "death": null,
+  "houses": [
+    "Demo"
+  ],
+  "metadata": {
+    "description": "Cycle test node"
+  }
+}

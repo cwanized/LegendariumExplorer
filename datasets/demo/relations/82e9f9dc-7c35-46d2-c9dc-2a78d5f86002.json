@@ -1,0 +1,12 @@
+{
+  "id": "82e9f9dc-7c35-46d2-c9dc-2a78d5f86002",
+  "type": "biological_parent",
+  "from": "2a6b7c8d-91e2-4f35-8c61-0e2d4b650002",
+  "to": "e8116f81-e20a-4d76-babe-71a29fad8dc8",
+  "attributes": {
+    "date": {
+      "era": "First Age",
+      "year": 1200
+    }
+  }
+}
