@@ -44,7 +44,7 @@
     {
       "id": "house-of-hador",
       "displayName": "House of Hador",
-      "aliases": ["House of Hador"],
+      "aliases": ["Hador", "House of Hador"],
       "tier": "start",
       "anchor": {
         "enabled": true,
