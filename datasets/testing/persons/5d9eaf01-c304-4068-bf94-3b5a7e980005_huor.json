@@ -1,0 +1,25 @@
+{
+  "id": "5d9eaf01-c304-4068-bf94-3b5a7e980005",
+  "name": "Huor",
+  "gender": "male",
+  "birth": {
+    "era": "First Age",
+    "year": 444
+  },
+  "death": {
+    "era": "First Age",
+    "year": 472
+  },
+  "houses": [
+    "Hador"
+  ],
+  "metadata": {
+    "description": "Father of Tuor"
+  },
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Huor"
+    }
+  ]
+}

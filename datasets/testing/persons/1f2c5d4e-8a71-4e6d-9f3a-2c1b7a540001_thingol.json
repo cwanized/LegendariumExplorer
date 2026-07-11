@@ -1,0 +1,19 @@
+{
+  "id": "1f2c5d4e-8a71-4e6d-9f3a-2c1b7a540001",
+  "name": "Thingol",
+  "gender": "male",
+  "birth": null,
+  "death": null,
+  "houses": [
+    "Thingol"
+  ],
+  "metadata": {
+    "description": "King of Doriath"
+  },
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Thingol"
+    }
+  ]
+}

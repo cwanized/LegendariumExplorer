@@ -1,0 +1,12 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655441005",
+  "type": "biological_parent",
+  "from": "550e8400-e29b-41d4-a716-446655440004",
+  "to": "550e8400-e29b-41d4-a716-446655440005",
+  "attributes": {
+    "date": {
+      "era": "Fourth Age",
+      "year": 1
+    }
+  }
+}

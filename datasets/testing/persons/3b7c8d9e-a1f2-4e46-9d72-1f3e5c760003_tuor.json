@@ -1,0 +1,19 @@
+{
+  "id": "3b7c8d9e-a1f2-4e46-9d72-1f3e5c760003",
+  "name": "Tuor",
+  "gender": "male",
+  "birth": null,
+  "death": null,
+  "houses": [
+    "Hador"
+  ],
+  "metadata": {
+    "description": "Father of Eärendil"
+  },
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Tuor"
+    }
+  ]
+}

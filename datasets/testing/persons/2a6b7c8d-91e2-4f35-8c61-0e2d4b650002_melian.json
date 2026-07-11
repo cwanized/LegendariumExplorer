@@ -1,0 +1,20 @@
+{
+  "id": "2a6b7c8d-91e2-4f35-8c61-0e2d4b650002",
+  "name": "Melian",
+  "gender": "female",
+  "species": "Maia",
+  "birth": null,
+  "death": null,
+  "houses": [
+    "Thingol"
+  ],
+  "metadata": {
+    "description": "Queen of Doriath"
+  },
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Melian"
+    }
+  ]
+}

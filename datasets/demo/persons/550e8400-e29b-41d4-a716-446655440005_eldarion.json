@@ -1,0 +1,19 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440005",
+  "name": "Eldarion",
+  "gender": "male",
+  "birth": {
+    "era": "Fourth Age",
+    "year": 1
+  },
+  "death": null,
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Eldarion"
+    }
+  ],
+  "metadata": {
+    "description": "Heir of Aragorn and Arwen"
+  }
+}
