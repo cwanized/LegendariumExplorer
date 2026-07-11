@@ -86,6 +86,11 @@ Current live deployment:
 
 - https://cwanized.github.io/LegendariumExplorer/
 
+Important:
+
+- the GitHub Pages URL is case-sensitive; use `/LegendariumExplorer/`, not `/legendariumexplorer/`
+- the current live deployment already includes the Huor and Rian/Tuor branch extension plus the follow-up JSON repair
+
 Deployment notes:
 
 - local development remains rooted at `/`
@@ -130,6 +135,44 @@ Why no dedicated remote `dev` preview right now:
 - GitHub Pages can publish only one project site per repository cleanly
 - a downloadable build artifact from CI would only be useful if you wanted someone else to fetch and inspect a packaged build manually
 - because you already plan to validate `fb -> dev` locally, an artifact-only preview adds little value at the moment
+
+## Current Promotion Status
+
+At the time of this handover:
+
+- `origin/dev` already contains the merged `fb/core` work, including the Huor and Rian/Tuor dataset extension and the follow-up JSON repair
+- `origin/main` has already been promoted from `dev`
+- GitHub Pages is serving the promoted `main` state at the live URL above
+- `main` remains the only deploy branch; `dev` is an integration branch and does not publish a separate remote preview
+
+## Continue On Another Workstation
+
+Recommended sync steps:
+
+```powershell
+git fetch --all --prune
+git switch main
+git pull --ff-only
+git switch dev
+git pull --ff-only
+git switch fb/<your-next-slice>
+```
+
+If the next session is for local UI work, run the frontend from `app/`:
+
+```powershell
+cd app
+npm install
+npm run dev
+```
+
+Notes for seamless continuation:
+
+- use `main` when you want the currently deployed release baseline
+- use `dev` when you want the current integrated pre-release baseline
+- create new work on `fb/*`, then promote `fb/* -> dev -> main`
+- the app build/serve commands belong in `app/`; running `npm run dev` from the repository root is not the intended path
+- `currentState.md` is the operational handover document and should be refreshed whenever branch/deploy state materially changes
 
 Important first-use note for GitHub Pages:
 

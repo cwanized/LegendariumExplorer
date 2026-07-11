@@ -4,6 +4,12 @@
 
 First MVP is implemented and build-validated.
 
+The currently promoted remote state is:
+
+- `origin/dev` at merge commit `c1bbb1c` (`Merge pull request #4 from cwanized/fb/core`)
+- `origin/main` at merge commit `675af9a` (`Merge pull request #5 from cwanized/dev`)
+- live GitHub Pages at `https://cwanized.github.io/LegendariumExplorer/`
+
 The repository now contains the agreed top-level scaffold:
 
 - app
@@ -86,6 +92,7 @@ Implemented:
 45. The branch policy is now refined further: feature branches must use the `fb/` prefix, `dev` and `main` should require merge requests but not mandatory reviews for now, and `main` is expected to gain stricter required checks later than `dev`.
 46. Demo and testing datasets now extend the Tuor branch one generation upward with Huor and Rían as biological parents of Tuor, including their marriage overlay and First Age birth/death dates.
 47. The Tuor-parent dataset extension also required a follow-up JSON repair in demo and testing relations after one existing Elwing -> Elros relation object was accidentally split during insertion, which had caused the demo dataset to fail parsing in the browser.
+48. The repaired Tuor-parent dataset slice has now been promoted through `dev` into `main`, and the live GitHub Pages deployment reflects that promoted state.
 
 ## Validation Status
 
@@ -118,9 +125,10 @@ Implemented:
 - GitHub Pages runtime failure `Failed to construct 'URL': Invalid base URL` was fixed locally by switching request-path construction from URL-base resolution to path joining against `BASE_URL`
 - GitHub Pages now runs successfully at the live project-site URL, and the workflow includes a pre-upload smoke test to catch missing dist assets earlier
 - user verification confirms the live GitHub Pages app loads successfully and still shows working popovers plus preview images
+- live GitHub Pages now also confirms the promoted Huor and Rían dataset extension after the `dev -> main` merge
 - branch promotion strategy is now explicitly defined: `fb/*` for direct work, `dev` for local integration, `main` for release and Pages deploys
 - branch naming is now fixed to the `fb/` prefix for direct feature work, with no mandatory reviews yet on `dev` or `main`
-- local repository state is now on branch `dev`, with the current documentation/workflow edits still uncommitted by design
+- remote promotion is now current through `main`; local branches on any workstation should be treated as potentially stale until refreshed with `git fetch --all --prune` plus `git pull --ff-only` on the branch you want to continue from
 - CI now supports the intended branch flow without adding a second remote preview surface: `fb/*`, `dev`, and `main` all validate, while GitHub Pages still deploys from `main` only
 - PowerShell roundtrip validation now confirms that authoring commands persist `sourceLinks`, `portraitUrl`, `portraitSourceLabel`, and `portraitSourceUrl` into a temporary prod dataset without touching the repository dataset roots
 
@@ -139,6 +147,37 @@ The next implementation slice should cover:
 9. Decide later whether `dev` should gain its own remote preview path or remain local-only while `main` stays the sole GitHub Pages target.
 10. Apply GitHub branch protection rules for `dev` and `main` using the now-prepared validation check names, with no mandatory reviews initially.
 11. Decide later which stricter checks should become `main`-only requirements beyond the current shared validation baseline.
+
+## Workstation Handover
+
+Use this as the minimum restart context on another machine:
+
+1. The release currently live on GitHub Pages is the `main` branch state at `https://cwanized.github.io/LegendariumExplorer/`.
+2. The Pages path is case-sensitive; the working URL uses `/LegendariumExplorer/`.
+3. `dev` already contains the integrated `fb/core` work and was promoted into `main`.
+4. The most recent content change promoted through the flow is the Tuor upward extension with Huor and Rían, plus the JSON repair required to keep demo/testing relations parseable.
+5. Only `main` deploys remotely; `dev` remains an integration branch without a separate Pages preview.
+6. Frontend commands are run from `app/`, not from the repository root.
+
+Recommended resync commands on another workstation:
+
+```powershell
+git fetch --all --prune
+git switch main
+git pull --ff-only
+git switch dev
+git pull --ff-only
+```
+
+If continuing feature work, branch from the refreshed baseline:
+
+```powershell
+git switch dev
+git switch -c fb/<next-slice>
+cd app
+npm install
+npm run dev
+```
 
 ## Pending Todos
 
@@ -168,3 +207,4 @@ The next implementation slice should cover:
 - Desired GitHub governance is direct commits on `fb/*`, while `dev` and `main` should later be protected to accept changes only through pull or merge requests.
 - Initial GitHub governance should not require reviews yet, but should enforce merge-request-only updates on `dev` and `main`; stricter checks are expected to arrive on `main` later.
 - Remote `dev` preview remains intentionally unimplemented for now because the repository already uses the single GitHub Pages project site for `main`, and the user prefers local integration testing over artifact-only previews.
+- The correct live GitHub Pages URL is `https://cwanized.github.io/LegendariumExplorer/`; the lowercase `/legendariumexplorer/` path returns 404.
