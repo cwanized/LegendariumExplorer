@@ -96,6 +96,35 @@ Example:
 }
 ```
 
+## House Definitions
+
+Each dataset may include a `house-definitions.json` file. This file controls which houses are allowed to create visible house anchors in the UI.
+
+Rules:
+
+- `Person.houses` remains the membership tag on the person record
+- a house only becomes an anchor if it exists in `house-definitions.json`
+- if a house has no definition, it does not create an anchor
+
+Recommended v1 fields per house definition:
+
+- `houseId`
+- `displayName`
+- `aliases` optional
+- `tier` (`start` or `later`)
+- `anchor.enabled`
+- `anchor.order`
+
+In v1, only houses with `tier: "start"` and `anchor.enabled: true` are treated as visible root anchors.
+
+Current planned start houses:
+
+- Elben: Vanyar, Noldor, Teleri
+- Menschen: die 3 Häuser der Edain
+- Zwerge: die 7 Väter der Zwerge
+
+Later houses such as Dunedain stay defined but do not create root anchors.
+
 ## Dataset Roles
 
 ### testing
