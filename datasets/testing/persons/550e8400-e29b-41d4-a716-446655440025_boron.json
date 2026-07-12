@@ -1,0 +1,19 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440025",
+  "name": "Boron",
+  "gender": "male",
+  "birth": null,
+  "death": null,
+  "houses": [
+    "House of Beor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Boron"
+    }
+  ],
+  "metadata": {
+    "description": "Son of Baran"
+  }
+}

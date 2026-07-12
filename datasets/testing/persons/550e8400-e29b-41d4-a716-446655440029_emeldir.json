@@ -1,0 +1,19 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440029",
+  "name": "Emeldir",
+  "gender": "female",
+  "birth": null,
+  "death": null,
+  "houses": [
+    "House of Beor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Emeldir"
+    }
+  ],
+  "metadata": {
+    "description": "Wife of Barahir and mother of Beren"
+  }
+}
