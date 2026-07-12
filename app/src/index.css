@@ -44,7 +44,7 @@ p {
 
 h1,
 h2 {
-  font-family: var(--display);
+  font-family: var(--display-font, var(--display));
   color: var(--ink-strong);
 }
 

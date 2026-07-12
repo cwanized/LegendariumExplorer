@@ -1,11 +1,14 @@
 # Current State
 
+**Last Updated: 12. Juli 2026**
+
 ## Repository Status
 
-First MVP is implemented and build-validated.
+First MVP is implemented and build-validated. Core genealogy data model (Beor lineage, Beren Erchamion) expanded. GUI architecture redesigned to use Primary/Secondary panel pattern.
 
 The currently promoted remote state is:
 
+- `origin/fb/core` at commit `c775540` (House of Beor lineage added to demo/testing)
 - `origin/dev` at merge commit `c1bbb1c` (`Merge pull request #4 from cwanized/fb/core`)
 - `origin/main` at merge commit `675af9a` (`Merge pull request #5 from cwanized/dev`)
 - live GitHub Pages at `https://cwanized.github.io/LegendariumExplorer/`
@@ -93,6 +96,11 @@ Implemented:
 46. Demo and testing datasets now extend the Tuor branch one generation upward with Huor and Rían as biological parents of Tuor, including their marriage overlay and First Age birth/death dates.
 47. The Tuor-parent dataset extension also required a follow-up JSON repair in demo and testing relations after one existing Elwing -> Elros relation object was accidentally split during insertion, which had caused the demo dataset to fail parsing in the browser.
 48. The repaired Tuor-parent dataset slice has now been promoted through `dev` into `main`, and the live GitHub Pages deployment reflects that promoted state.
+49. House of Beor lineage added to demo and testing datasets: Beor → Baran → Boron → Beren (the Elder) → Bregor → Barahir → Beren Erchamion, including marriage of Barahir and Emeldir as parents of Beren Erchamion (commit c775540).
+50. The existing "Beren" record was clarified to "Beren Erchamion" with description "Son of Barahir, also known as Beren Erchamion" to distinguish from historical Beren (the Elder) now in the lineage.
+51. GUI architecture redesigned with explicit Primary/Secondary panel separation: Secondary Panels (left/right sidebars for dev tools and quick stats) can be minimized/hidden; Primary Panels (Filter, Highlight/Analyzer, Inspector, Search) are always accessible within the Canvas area, minimizable to chip buttons but never fully hidden.
+52. Four-state GUI mockup created (`docs/mocks/gui-architecture-v1.drawio`): Standard Layout (panels expanded), Minimized (chips visible), Fullscreen (secondary hidden, primary as chips), and Info (architecture reference).
+53. Primary panel naming clarified: "Selection & LCA Analysis" replaces vague "Highlight & Analyze", with concrete content (1/2 person selection, LCA result with ancestor name, fade-unrelated toggle, export path action).
 
 ## Validation Status
 
@@ -136,17 +144,32 @@ Implemented:
 
 The next implementation slice should cover:
 
-1. Add automated tests for validation determinism, contract scenario evaluation, manifest helpers, and source-link schema persistence.
-2. Improve chunk size and bundle strategy around the graph stack, but defer this until a later optimization pass because current local and GitHub Pages behavior is functionally correct.
-3. Decide whether app and PSModule should share one exported validation core.
-4. Decide whether prod authoring should remain direct or whether a separate unpublished working dataset tier is needed later.
-5. Decide whether prod should gain its own optional scenario manifest once published fixtures stabilize.
-6. Refine the inline-pair versus alias-projection rule for harder cases such as multiple marriages on the same generation band.
-7. Expand the curated demo portrait subset only after explicitly reviewing any further external image sources.
-8. Refine spouse projection for more complex cases such as multiple marriages and branch ownership beyond the current single-pair MVP heuristic.
-9. Decide later whether `dev` should gain its own remote preview path or remain local-only while `main` stays the sole GitHub Pages target.
-10. Apply GitHub branch protection rules for `dev` and `main` using the now-prepared validation check names, with no mandatory reviews initially.
-11. Decide later which stricter checks should become `main`-only requirements beyond the current shared validation baseline.
+**GUI Refactor (High Priority):**
+1. Implement Primary/Secondary panel architecture in `app/src/App.tsx`.
+2. Create `ExplorePanel` component (Filter + Search docked).
+3. Create `AnalyzerPanel` component (Selection + LCA Analysis).
+4. Create `InspectorPanel` component (Info/Relations/Sources/Stats tabs).
+5. Create `DevToolsPanel` component (Dataset switcher, Contract, Warnings — secondary, collapsible).
+6. Implement chip-button minimize behavior for all primary panels.
+7. Implement fullscreen mode with hidden secondary sidebars.
+8. Add CSS transitions for panel expand/collapse.
+
+**Data & Validation:**
+9. Add automated tests for validation determinism, contract scenario evaluation, manifest helpers, and source-link schema persistence.
+10. Review House of Beor lineage data against TolkienGateway or other canonical sources for accuracy.
+11. Consider adding more House of Beor context (Haleth-related persons, other Edain houses).
+
+**Later (Defer):**
+12. Improve chunk size and bundle strategy around the graph stack, but defer this until a later optimization pass because current local and GitHub Pages behavior is functionally correct.
+13. Decide whether app and PSModule should share one exported validation core.
+14. Decide whether prod authoring should remain direct or whether a separate unpublished working dataset tier is needed later.
+15. Decide whether prod should gain its own optional scenario manifest once published fixtures stabilize.
+16. Refine the inline-pair versus alias-projection rule for harder cases such as multiple marriages on the same generation band.
+17. Expand the curated demo portrait subset only after explicitly reviewing any further external image sources.
+18. Refine spouse projection for more complex cases such as multiple marriages and branch ownership beyond the current single-pair MVP heuristic.
+19. Decide later whether `dev` should gain its own remote preview path or remain local-only while `main` stays the sole GitHub Pages target.
+20. Apply GitHub branch protection rules for `dev` and `main` using the now-prepared validation check names, with no mandatory reviews initially.
+21. Decide later which stricter checks should become `main`-only requirements beyond the current shared validation baseline.
 
 ## Workstation Handover
 
