@@ -13,8 +13,6 @@ import type {
   ContractEvaluation,
   DatasetName,
   GraphMvpState,
-  HouseDefinition,
-  HouseDefinitions,
   LayoutResult,
   Person,
   PositionedNode,
@@ -50,8 +48,7 @@ type SpouseProjectionState = {
 }
 
 type HouseAnchor = {
-  houseId: string
-  displayName: string
+  house: string
   memberIds: UUID[]
   x: number
   y: number
@@ -156,7 +153,7 @@ function App() {
           contractScenario,
           contractEvaluation,
         })
-        setCamera(expandCameraBounds(bounds, [], buildHouseAnchors(validation, layout, dataset.houseDefinitions)))
+        setCamera(expandCameraBounds(bounds, [], buildHouseAnchors(validation, layout)))
         setSearchQuery('')
         setIsLoading(false)
 
@@ -219,7 +216,7 @@ function App() {
     selectedIds,
     spouseOwnerOverrides,
   )
-  const houseAnchors = buildHouseAnchors(validation, layout, graphState.dataset.houseDefinitions)
+  const houseAnchors = buildHouseAnchors(validation, layout)
   const renderedBiologicalRelations = validation.validBiologicalRelations.filter(
     (relation) =>
       !spouseProjection.hiddenChildEdgeKeys.has(`${relation.from}|${relation.to}`),
@@ -675,7 +672,7 @@ function App() {
             const maxRootX = Math.max(...rootNodes.map((node) => node.x + node.width / 2))
 
             return (
-              <g key={anchor.houseId} className="house-anchor">
+              <g key={anchor.house} className="house-anchor">
                 <line
                   x1={anchorCenterX}
                   y1={anchorBottomY}
@@ -694,7 +691,7 @@ function App() {
                 ) : null}
                 {rootNodes.map((node) => (
                   <line
-                    key={`${anchor.houseId}:${node.id}`}
+                    key={`${anchor.house}:${node.id}`}
                     x1={node.x + node.width / 2}
                     y1={junctionY}
                     x2={node.x + node.width / 2}
@@ -705,7 +702,7 @@ function App() {
                 <g transform={`translate(${anchor.x} ${anchor.y})`}>
                   <rect width={anchor.width} height={anchor.height} rx="16" ry="16" className="house-anchor-chip" />
                   <text x={anchor.width / 2} y={23} textAnchor="middle" className="house-anchor-label">
-                    {anchor.displayName}
+                    {anchor.house}
                   </text>
                 </g>
               </g>
@@ -1043,36 +1040,25 @@ function App() {
   )
 }
 
-function buildHouseAnchors(
-  validation: ValidationResult,
-  layout: LayoutResult,
-  houseDefinitions: HouseDefinitions,
-): HouseAnchor[] {
-  const definitionLookup = buildHouseDefinitionLookup(houseDefinitions)
-  const anchorableDefinitions = houseDefinitions.houses
-    .filter((house) => house.anchor.enabled && house.tier === 'start')
-    .sort((left, right) => left.anchor.order - right.anchor.order || left.displayName.localeCompare(right.displayName) || left.id.localeCompare(right.id))
-
+function buildHouseAnchors(validation: ValidationResult, layout: LayoutResult): HouseAnchor[] {
   const houseMembers = new Map<string, UUID[]>()
-  const labelByHouseId = new Map<string, string>()
 
   for (const person of validation.persons) {
-    const primaryHouse = getPrimaryHouse(person.houses, definitionLookup)
+    const primaryHouse = getPrimaryHouse(person.houses)
 
-    if (!primaryHouse || !primaryHouse.anchor.enabled || primaryHouse.tier !== 'start') {
+    if (!primaryHouse) {
       continue
     }
 
-    const currentMembers = houseMembers.get(primaryHouse.id) ?? []
+    const currentMembers = houseMembers.get(primaryHouse) ?? []
     currentMembers.push(person.id)
     currentMembers.sort((left, right) => left.localeCompare(right))
-    houseMembers.set(primaryHouse.id, currentMembers)
-    labelByHouseId.set(primaryHouse.id, primaryHouse.displayName)
+    houseMembers.set(primaryHouse, currentMembers)
   }
 
-  const groupedAnchors = anchorableDefinitions
-    .map((house) => {
-      const memberIds = houseMembers.get(house.id) ?? []
+  const groupedAnchors = Array.from(houseMembers.entries())
+    .sort(([leftHouse], [rightHouse]) => leftHouse.localeCompare(rightHouse))
+    .map(([house, memberIds]) => {
       const nodes = memberIds
         .map((memberId) => layout.nodes.get(memberId))
         .filter((node): node is PositionedNode => node !== undefined)
@@ -1085,30 +1071,18 @@ function buildHouseAnchors(
       const topNodes = nodes.filter((node) => Math.abs(node.y - minY) < 1)
       const minX = Math.min(...topNodes.map((node) => node.x))
       const maxX = Math.max(...topNodes.map((node) => node.x + node.width))
-      const width = Math.max(140, house.displayName.length * 8 + 42)
+      const width = Math.max(140, house.length * 8 + 42)
       const centerX = (minX + maxX) / 2
 
       return {
-        houseId: house.id,
-        displayName: labelByHouseId.get(house.id) ?? house.displayName,
+        house,
         memberIds: topNodes.map((node) => node.id).sort((left, right) => left.localeCompare(right)),
         centerX,
         minY,
         width,
-        order: house.anchor.order,
       }
     })
-    .filter(
-      (entry): entry is {
-        houseId: string
-        displayName: string
-        memberIds: UUID[]
-        centerX: number
-        minY: number
-        width: number
-        order: number
-      } => entry !== null,
-    )
+    .filter((entry): entry is { house: string; memberIds: UUID[]; centerX: number; minY: number; width: number } => entry !== null)
 
   if (groupedAnchors.length === 0) {
     return []
@@ -1117,19 +1091,17 @@ function buildHouseAnchors(
   const topRowY = Math.min(...groupedAnchors.map((entry) => entry.minY)) - 86
   const anchorGap = 18
   const placedAnchors: Array<{
-    houseId: string
-    displayName: string
+    house: string
     memberIds: UUID[]
     centerX: number
     minY: number
     width: number
-    order: number
     x: number
   }> = []
 
   for (const entry of groupedAnchors
     .slice()
-    .sort((left, right) => left.order - right.order || left.centerX - right.centerX || left.displayName.localeCompare(right.displayName))) {
+    .sort((left, right) => left.centerX - right.centerX || left.house.localeCompare(right.house))) {
     const idealX = entry.centerX - entry.width / 2
     const previous = placedAnchors.at(-1)
     const minX = previous ? previous.x + previous.width + anchorGap : idealX
@@ -1141,8 +1113,7 @@ function buildHouseAnchors(
   }
 
   return placedAnchors.map((entry) => ({
-    houseId: entry.houseId,
-    displayName: entry.displayName,
+    house: entry.house,
     memberIds: entry.memberIds,
     x: entry.x,
     y: topRowY,
@@ -1151,39 +1122,9 @@ function buildHouseAnchors(
   }))
 }
 
-function buildHouseDefinitionLookup(houseDefinitions: HouseDefinitions) {
-  const lookup = new Map<string, HouseDefinition>()
-
-  for (const house of houseDefinitions.houses) {
-    lookup.set(normalizeHouseKey(house.id), house)
-    lookup.set(normalizeHouseKey(house.displayName), house)
-
-    for (const alias of house.aliases ?? []) {
-      lookup.set(normalizeHouseKey(alias), house)
-    }
-  }
-
-  return lookup
-}
-
-function getPrimaryHouse(houses: string[] | undefined, lookup: Map<string, HouseDefinition>): HouseDefinition | null {
-  for (const candidate of houses ?? []) {
-    const house = lookup.get(normalizeHouseKey(candidate))
-
-    if (house) {
-      return house
-    }
-  }
-
-  return null
-}
-
-function normalizeHouseKey(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '')
+function getPrimaryHouse(houses: string[] | undefined): string | null {
+  const primaryHouse = houses?.[0]?.trim()
+  return primaryHouse ? primaryHouse : null
 }
 
 function buildBiologicalChildGroups(
