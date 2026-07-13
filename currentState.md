@@ -23,6 +23,28 @@ The repository now contains the agreed top-level scaffold:
 - PRD
 - PROMPT
 
+## Current Preview UI Status (12. Juli 2026)
+
+The Preview page is currently in a **POC/transitional state** after multiple iterative layout experiments.
+
+What is currently true:
+
+- Primary panel concept is implemented (Filter, Search, Selection & LCA, Inspector) with minimize and undock controls.
+- Drag behavior for undocked primary panels exists and is working at code level.
+- A separate tool-canvas concept has been introduced for tree/page controls.
+- Legend behavior is improved and generally in the expected compact bottom-right style.
+- Theme toggles (page/tree) are present and custom-theme popovers are reworked toward button-anchored behavior.
+
+Known UX/layout issues still open:
+
+- Bottom primary panels (`Search`, `Selection & LCA`) still show edge-placement problems in some view states.
+- Corner rounding is not yet fully consistent in all panel corners and positions.
+- Visual spacing/alignment between control strip, top-right inspector region, and tree area still needs final harmonization.
+
+Decision now locked:
+
+- Preview UI should be treated as **rebuild candidate** (clean reimplementation), using the learned behavior and visual intent from the current POC rather than continuing ad-hoc incremental patching.
+
 ## Authoritative Documents
 
 - PRD/PRD-reviewed3.md: architecture source of truth
@@ -143,6 +165,15 @@ Implemented:
 ## Immediate Next Slice
 
 The next implementation slice should cover:
+
+**Preview UI Rebuild (Highest Priority):**
+1. Rebuild Preview page layout cleanly from scratch using current UX intent as the source of truth.
+2. Preserve the existing domain behavior (selection/LCA/filter/search/inspector), but re-implement layout and interaction shell coherently.
+3. Normalize primary panel geometry and corner logic across all four corners.
+4. Ensure stable edge alignment of bottom and right panels within the tree canvas area.
+5. Keep legend compact and readable with robust placement relative to analyzer panel.
+6. Keep theme behavior clear: tree theme governs tree + primary panels; page theme governs surrounding non-tree surface.
+7. Finalize custom-theme popover behavior anchored to the corresponding theme controls.
 
 **GUI Refactor (High Priority):**
 1. Implement Primary/Secondary panel architecture in `app/src/App.tsx`.

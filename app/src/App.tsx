@@ -1,5 +1,5 @@
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import './App.css'
 import {
   evaluateScenario,
@@ -93,6 +93,8 @@ type SourcePreviewState = {
 type ThemeMode = 'bright' | 'dark' | 'thematic' | 'custom'
 type PreviewDisplayMode = 'default' | 'wide' | 'fullscreen'
 type PrimaryPanelKey = 'filter' | 'search' | 'analyzer' | 'inspector'
+type PrimaryPanelOffset = { x: number, y: number }
+type CustomThemePopoverTarget = 'page' | 'tree'
 
 type PreviewFilterState = {
   houses: string[]
@@ -116,7 +118,7 @@ function App() {
   const isPreviewPage = /\/preview(?:\/|$)/.test(currentPath)
   const [datasetName, setDatasetName] = useState<DatasetName>('demo')
   const [pageTheme, setPageTheme] = useState<ThemeMode>('bright')
-  const [treeTheme, setTreeTheme] = useState<ThemeMode>('thematic')
+  const [treeTheme, setTreeTheme] = useState<ThemeMode>('bright')
   const [customTheme, setCustomTheme] = useState({
     background: '#f5efe1',
     surface: '#fff8ee',
@@ -139,6 +141,8 @@ function App() {
   const [previewDisplayMode, setPreviewDisplayMode] = useState<PreviewDisplayMode>('default')
   const [isLegendMinimized, setIsLegendMinimized] = useState(false)
   const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false)
+  const [openCustomThemePopover, setOpenCustomThemePopover] = useState<CustomThemePopoverTarget | null>(null)
+  const [analyzerDockedWidth, setAnalyzerDockedWidth] = useState(380)
   const [previewFilters, setPreviewFilters] = useState<PreviewFilterState>({
     houses: [],
     species: [],
@@ -159,18 +163,51 @@ function App() {
     analyzer: false,
     inspector: false,
   })
+  const [undockedPrimaryPanelOffsets, setUndockedPrimaryPanelOffsets] = useState<Record<PrimaryPanelKey, PrimaryPanelOffset>>({
+    filter: { x: 0, y: 0 },
+    search: { x: 0, y: 0 },
+    analyzer: { x: 0, y: 0 },
+    inspector: { x: 0, y: 0 },
+  })
+  const [draggingPrimaryPanel, setDraggingPrimaryPanel] = useState<PrimaryPanelKey | null>(null)
   const [camera, setCamera] = useState<CameraView | null>(null)
   const [sourcePopover, setSourcePopover] = useState<SourcePopoverState | null>(null)
   const [sourcePreviewByPerson, setSourcePreviewByPerson] = useState<Record<string, SourcePreviewState>>({})
   const deferredQuery = useDeferredValue(searchQuery)
   const canvasRef = useRef<SVGSVGElement | null>(null)
+  const previewCanvasShellRef = useRef<HTMLDivElement | null>(null)
   const appShellRef = useRef<HTMLElement | null>(null)
   const sourcePopoverHideTimeoutRef = useRef<number | null>(null)
+  const pageCustomThemeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const treeCustomThemeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const pageCustomThemePopoverRef = useRef<HTMLElement | null>(null)
+  const treeCustomThemePopoverRef = useRef<HTMLElement | null>(null)
+  const primaryPanelElementRefs = useRef<Record<PrimaryPanelKey, HTMLElement | null>>({
+    filter: null,
+    search: null,
+    analyzer: null,
+    inspector: null,
+  })
   const dragRef = useRef<{
     pointerId: number
     clientX: number
     clientY: number
     camera: CameraView
+  } | null>(null)
+  const primaryPanelDragRef = useRef<{
+    panel: PrimaryPanelKey
+    startX: number
+    startY: number
+    originX: number
+    originY: number
+    panelStartLeft: number
+    panelStartTop: number
+    panelWidth: number
+    panelHeight: number
+    shellLeft: number
+    shellTop: number
+    shellRight: number
+    shellBottom: number
   } | null>(null)
 
   useEffect(() => {
@@ -258,6 +295,138 @@ function App() {
       document.removeEventListener('fullscreenchange', syncFullscreenState)
     }
   }, [])
+
+  useEffect(() => {
+    if (!draggingPrimaryPanel) {
+      return
+    }
+
+    function handleMouseMove(event: MouseEvent) {
+      const dragState = primaryPanelDragRef.current
+      if (!dragState) {
+        return
+      }
+
+      const deltaX = event.clientX - dragState.startX
+      const deltaY = event.clientY - dragState.startY
+      const rawLeft = dragState.panelStartLeft + deltaX
+      const rawTop = dragState.panelStartTop + deltaY
+      const clampedLeft = Math.min(
+        Math.max(rawLeft, dragState.shellLeft),
+        dragState.shellRight - dragState.panelWidth,
+      )
+      const clampedTop = Math.min(
+        Math.max(rawTop, dragState.shellTop),
+        dragState.shellBottom - dragState.panelHeight,
+      )
+      const nextX = dragState.originX + (clampedLeft - dragState.panelStartLeft)
+      const nextY = dragState.originY + (clampedTop - dragState.panelStartTop)
+
+      setUndockedPrimaryPanelOffsets((current) => ({
+        ...current,
+        [dragState.panel]: { x: nextX, y: nextY },
+      }))
+    }
+
+    function handleMouseUp() {
+      primaryPanelDragRef.current = null
+      setDraggingPrimaryPanel(null)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [draggingPrimaryPanel])
+
+  useEffect(() => {
+    if (!isPreviewPage || openCustomThemePopover === null) {
+      return
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node
+
+      if (openCustomThemePopover === 'page') {
+        const insidePopover = pageCustomThemePopoverRef.current?.contains(target) ?? false
+        const onToggleButton = pageCustomThemeButtonRef.current?.contains(target) ?? false
+
+        if (!insidePopover && !onToggleButton) {
+          setOpenCustomThemePopover(null)
+        }
+      }
+
+      if (openCustomThemePopover === 'tree') {
+        const insidePopover = treeCustomThemePopoverRef.current?.contains(target) ?? false
+        const onToggleButton = treeCustomThemeButtonRef.current?.contains(target) ?? false
+
+        if (!insidePopover && !onToggleButton) {
+          setOpenCustomThemePopover(null)
+        }
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpenCustomThemePopover(null)
+      }
+    }
+
+    window.addEventListener('mousedown', handlePointerDown)
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isPreviewPage, openCustomThemePopover])
+
+  useEffect(() => {
+    if (openCustomThemePopover === 'page' && pageTheme !== 'custom') {
+      setOpenCustomThemePopover(null)
+    }
+
+    if (openCustomThemePopover === 'tree' && treeTheme !== 'custom') {
+      setOpenCustomThemePopover(null)
+    }
+  }, [openCustomThemePopover, pageTheme, treeTheme])
+
+  useEffect(() => {
+    if (!isPreviewPage || collapsedPrimaryPanels.analyzer || undockedPrimaryPanels.analyzer) {
+      return
+    }
+
+    const analyzerPanel = primaryPanelElementRefs.current.analyzer
+    if (!analyzerPanel) {
+      return
+    }
+
+    const updateWidth = () => {
+      const measuredWidth = analyzerPanel.getBoundingClientRect().width
+      if (measuredWidth > 0) {
+        setAnalyzerDockedWidth(Math.round(measuredWidth))
+      }
+    }
+
+    updateWidth()
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateWidth)
+      return () => {
+        window.removeEventListener('resize', updateWidth)
+      }
+    }
+
+    const observer = new ResizeObserver(updateWidth)
+    observer.observe(analyzerPanel)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [isPreviewPage, collapsedPrimaryPanels.analyzer, undockedPrimaryPanels.analyzer])
 
   if (errorMessage) {
     return (
@@ -394,6 +563,34 @@ function App() {
   const openSourceLinks = openSourcePerson ? getSourceLinks(openSourcePerson) : []
   const openPrimarySource = openSourceLinks[0] ?? null
   const openSourcePreviewState = openSourcePerson ? sourcePreviewByPerson[openSourcePerson.id] : undefined
+  const shouldShiftLegend = isPreviewPage && !collapsedPrimaryPanels.analyzer && !undockedPrimaryPanels.analyzer
+  const legendStyle = shouldShiftLegend ? { right: `${analyzerDockedWidth + 8}px` } : undefined
+
+  const applyPageThemeMode = (mode: ThemeMode) => {
+    setPageTheme(mode)
+    setOpenCustomThemePopover((current) => {
+      if (mode !== 'custom' && current === 'page') {
+        return null
+      }
+
+      return mode === 'custom' ? 'page' : current
+    })
+  }
+
+  const applyTreeThemeMode = (mode: ThemeMode) => {
+    setTreeTheme(mode)
+    setOpenCustomThemePopover((current) => {
+      if (mode !== 'custom' && current === 'tree') {
+        return null
+      }
+
+      return mode === 'custom' ? 'tree' : current
+    })
+  }
+
+  const assignPrimaryPanelRef = (panel: PrimaryPanelKey, element: HTMLElement | null) => {
+    primaryPanelElementRefs.current[panel] = element
+  }
 
   function resetView() {
     setCamera(expandCameraBounds(getGraphBounds(layout.nodes), spouseProjection.nodes, houseAnchors))
@@ -646,6 +843,53 @@ function App() {
       ...current,
       [panel]: !current[panel],
     }))
+
+    setDraggingPrimaryPanel((current) => current === panel ? null : current)
+    primaryPanelDragRef.current = null
+  }
+
+  function beginPrimaryPanelDrag(panel: PrimaryPanelKey, event: ReactMouseEvent<HTMLDivElement>) {
+    if (!undockedPrimaryPanels[panel] || event.button !== 0) {
+      return
+    }
+
+    const shellRect = previewCanvasShellRef.current?.getBoundingClientRect()
+    const panelRect = primaryPanelElementRefs.current[panel]?.getBoundingClientRect()
+
+    if (!shellRect || !panelRect) {
+      return
+    }
+
+    event.preventDefault()
+
+    const offset = undockedPrimaryPanelOffsets[panel]
+    primaryPanelDragRef.current = {
+      panel,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: offset.x,
+      originY: offset.y,
+      panelStartLeft: panelRect.left,
+      panelStartTop: panelRect.top,
+      panelWidth: panelRect.width,
+      panelHeight: panelRect.height,
+      shellLeft: shellRect.left,
+      shellTop: shellRect.top,
+      shellRight: shellRect.right,
+      shellBottom: shellRect.bottom,
+    }
+    setDraggingPrimaryPanel(panel)
+  }
+
+  function getPrimaryPanelStyle(panel: PrimaryPanelKey): CSSProperties | undefined {
+    if (!undockedPrimaryPanels[panel]) {
+      return undefined
+    }
+
+    const offset = undockedPrimaryPanelOffsets[panel]
+    return {
+      transform: `translate(${offset.x}px, ${offset.y}px)`,
+    }
   }
 
   async function applyPreviewDisplayMode(nextMode: PreviewDisplayMode) {
@@ -848,11 +1092,30 @@ function App() {
             <div className="stage-actions page-theme-actions">
               <span className="page-theme-label">Page theme</span>
               <div className="canvas-control-group" aria-label="Page theme toggle">
-                <button type="button" className={`canvas-icon-button ${pageTheme === 'bright' ? 'active' : ''}`} title="Bright page theme" aria-label="Bright page theme" onClick={() => setPageTheme('bright')}>☀</button>
-                <button type="button" className={`canvas-icon-button ${pageTheme === 'dark' ? 'active' : ''}`} title="Dark page theme" aria-label="Dark page theme" onClick={() => setPageTheme('dark')}>☾</button>
-                <button type="button" className={`canvas-icon-button ${pageTheme === 'thematic' ? 'active' : ''}`} title="Thematic Gondor page theme" aria-label="Thematic Gondor page theme" onClick={() => setPageTheme('thematic')}>♛</button>
-                <button type="button" className={`canvas-icon-button ${pageTheme === 'custom' ? 'active' : ''}`} title="Custom page theme" aria-label="Custom page theme" onClick={() => setPageTheme('custom')}>✎</button>
+                <button type="button" className={`canvas-icon-button ${pageTheme === 'bright' ? 'active' : ''}`} title="Bright page theme" aria-label="Bright page theme" onClick={() => applyPageThemeMode('bright')}>☀</button>
+                <button type="button" className={`canvas-icon-button ${pageTheme === 'dark' ? 'active' : ''}`} title="Dark page theme" aria-label="Dark page theme" onClick={() => applyPageThemeMode('dark')}>☾</button>
+                <button type="button" className={`canvas-icon-button ${pageTheme === 'thematic' ? 'active' : ''}`} title="Thematic Gondor page theme" aria-label="Thematic Gondor page theme" onClick={() => applyPageThemeMode('thematic')}>♛</button>
+                <button ref={pageCustomThemeButtonRef} type="button" className={`canvas-icon-button ${pageTheme === 'custom' ? 'active' : ''}`} title="Custom page theme" aria-label="Custom page theme" onClick={() => applyPageThemeMode('custom')}>✎</button>
               </div>
+              {isPreviewPage && pageTheme === 'custom' && openCustomThemePopover === 'page' ? (
+                <section ref={pageCustomThemePopoverRef} className="panel-block custom-theme-popover custom-theme-popover-page">
+                  <div className="panel-heading">
+                    <h2>Custom page theme</h2>
+                    <div className="panel-heading-actions">
+                      <span className="badge neutral">live</span>
+                      <button type="button" className="ghost-button icon-only" title="Close custom page theme" aria-label="Close custom page theme" onClick={() => setOpenCustomThemePopover(null)}>✕</button>
+                    </div>
+                  </div>
+                  <div className="custom-theme-grid compact-theme-grid">
+                    <label>Background<input type="color" value={customTheme.background} onChange={(event) => setCustomTheme((current) => ({ ...current, background: event.target.value }))} /></label>
+                    <label>Surface<input type="color" value={customTheme.surface} onChange={(event) => setCustomTheme((current) => ({ ...current, surface: event.target.value }))} /></label>
+                    <label>Text<input type="color" value={customTheme.text} onChange={(event) => setCustomTheme((current) => ({ ...current, text: event.target.value }))} /></label>
+                    <label>Accent<input type="color" value={customTheme.accent} onChange={(event) => setCustomTheme((current) => ({ ...current, accent: event.target.value }))} /></label>
+                    <label className="font-input">Body font<input type="text" value={customTheme.fontBody} onChange={(event) => setCustomTheme((current) => ({ ...current, fontBody: event.target.value }))} /></label>
+                    <label className="font-input">Display font<input type="text" value={customTheme.fontDisplay} onChange={(event) => setCustomTheme((current) => ({ ...current, fontDisplay: event.target.value }))} /></label>
+                  </div>
+                </section>
+              ) : null}
             </div>
           ) : (
             <div className="stage-actions">
@@ -861,67 +1124,83 @@ function App() {
           )}
         </header>
 
-        {isPreviewPage && (pageTheme === 'custom' || treeTheme === 'custom') ? (
-          <section className="panel-block custom-theme-popover">
-            <div className="panel-heading">
-              <h2>Custom theme</h2>
-              <span className="badge neutral">live</span>
-            </div>
-            <div className="custom-theme-grid compact-theme-grid">
-              <label>Background<input type="color" value={customTheme.background} onChange={(event) => setCustomTheme((current) => ({ ...current, background: event.target.value }))} /></label>
-              <label>Surface<input type="color" value={customTheme.surface} onChange={(event) => setCustomTheme((current) => ({ ...current, surface: event.target.value }))} /></label>
-              <label>Text<input type="color" value={customTheme.text} onChange={(event) => setCustomTheme((current) => ({ ...current, text: event.target.value }))} /></label>
-              <label>Accent<input type="color" value={customTheme.accent} onChange={(event) => setCustomTheme((current) => ({ ...current, accent: event.target.value }))} /></label>
-              <label>Node<input type="color" value={customTheme.nodeFill} onChange={(event) => setCustomTheme((current) => ({ ...current, nodeFill: event.target.value }))} /></label>
-              <label>Bio edge<input type="color" value={customTheme.biologicalEdge} onChange={(event) => setCustomTheme((current) => ({ ...current, biologicalEdge: event.target.value }))} /></label>
-              <label>Overlay<input type="color" value={customTheme.overlayEdge} onChange={(event) => setCustomTheme((current) => ({ ...current, overlayEdge: event.target.value }))} /></label>
-              <label className="font-input">Body font<input type="text" value={customTheme.fontBody} onChange={(event) => setCustomTheme((current) => ({ ...current, fontBody: event.target.value }))} /></label>
-              <label className="font-input">Display font<input type="text" value={customTheme.fontDisplay} onChange={(event) => setCustomTheme((current) => ({ ...current, fontDisplay: event.target.value }))} /></label>
-            </div>
-          </section>
-        ) : null}
-
-        <div className={`canvas-shell ${isPreviewPage ? 'preview-canvas-shell' : ''}`}>
+        <div ref={previewCanvasShellRef} className={`canvas-shell ${isPreviewPage ? 'preview-canvas-shell' : ''}`}>
         {isPreviewPage ? (
           <>
-          <div className="canvas-controls" aria-label="Canvas controls">
-            <button type="button" className="canvas-icon-button" title="Reset view" aria-label="Reset view" onClick={resetView}>↺</button>
-            <div className="canvas-control-group" aria-label="Display mode">
-              <button type="button" className={`canvas-icon-button ${previewDisplayMode === 'default' ? 'active' : ''}`} title="Default layout" aria-label="Default layout" onClick={() => void applyPreviewDisplayMode('default')}>▣</button>
-              <button type="button" className={`canvas-icon-button ${previewDisplayMode === 'wide' ? 'active' : ''}`} title="Use all horizontal space" aria-label="Use all horizontal space" onClick={() => void applyPreviewDisplayMode('wide')}>↔</button>
-              <button type="button" className={`canvas-icon-button ${isBrowserFullscreen ? 'active' : ''}`} title="Browser fullscreen" aria-label="Browser fullscreen" onClick={() => void applyPreviewDisplayMode('fullscreen')}>⛶</button>
-            </div>
-            <div className="canvas-control-stack">
-              <span>Tree</span>
-              <div className="canvas-control-group" aria-label="Tree theme toggle">
-                <button type="button" className={`canvas-icon-button ${treeTheme === 'bright' ? 'active' : ''}`} title="Bright tree theme" aria-label="Bright tree theme" onClick={() => setTreeTheme('bright')}>☀</button>
-                <button type="button" className={`canvas-icon-button ${treeTheme === 'dark' ? 'active' : ''}`} title="Dark tree theme" aria-label="Dark tree theme" onClick={() => setTreeTheme('dark')}>☾</button>
-                <button type="button" className={`canvas-icon-button ${treeTheme === 'thematic' ? 'active' : ''}`} title="Thematic Gondor tree theme" aria-label="Thematic Gondor tree theme" onClick={() => setTreeTheme('thematic')}>♜</button>
-                <button type="button" className={`canvas-icon-button ${treeTheme === 'custom' ? 'active' : ''}`} title="Custom tree theme" aria-label="Custom tree theme" onClick={() => setTreeTheme('custom')}>✎</button>
+          <div className="tool-canvas" aria-label="Tool canvas">
+            <div className="canvas-controls" aria-label="Canvas controls">
+              <button type="button" className="canvas-icon-button" title="Reset view" aria-label="Reset view" onClick={resetView}>↺</button>
+              <div className="canvas-control-group" aria-label="Display mode">
+                <button type="button" className={`canvas-icon-button ${previewDisplayMode === 'default' ? 'active' : ''}`} title="Default layout" aria-label="Default layout" onClick={() => void applyPreviewDisplayMode('default')}>▣</button>
+                <button type="button" className={`canvas-icon-button ${previewDisplayMode === 'wide' ? 'active' : ''}`} title="Use all horizontal space" aria-label="Use all horizontal space" onClick={() => void applyPreviewDisplayMode('wide')}>↔</button>
+                <button type="button" className={`canvas-icon-button ${isBrowserFullscreen ? 'active' : ''}`} title="Browser fullscreen" aria-label="Browser fullscreen" onClick={() => void applyPreviewDisplayMode('fullscreen')}>⛶</button>
+              </div>
+              <div className="canvas-control-stack">
+                <span>Tree</span>
+                <div className="canvas-control-group" aria-label="Tree theme toggle">
+                  <button type="button" className={`canvas-icon-button ${treeTheme === 'bright' ? 'active' : ''}`} title="Bright tree theme" aria-label="Bright tree theme" onClick={() => applyTreeThemeMode('bright')}>☀</button>
+                  <button type="button" className={`canvas-icon-button ${treeTheme === 'dark' ? 'active' : ''}`} title="Dark tree theme" aria-label="Dark tree theme" onClick={() => applyTreeThemeMode('dark')}>☾</button>
+                  <button type="button" className={`canvas-icon-button ${treeTheme === 'thematic' ? 'active' : ''}`} title="Thematic Gondor tree theme" aria-label="Thematic Gondor tree theme" onClick={() => applyTreeThemeMode('thematic')}>♜</button>
+                  <button ref={treeCustomThemeButtonRef} type="button" className={`canvas-icon-button ${treeTheme === 'custom' ? 'active' : ''}`} title="Custom tree theme" aria-label="Custom tree theme" onClick={() => applyTreeThemeMode('custom')}>✎</button>
+                </div>
               </div>
             </div>
+            {treeTheme === 'custom' && openCustomThemePopover === 'tree' ? (
+              <section ref={treeCustomThemePopoverRef} className="panel-block custom-theme-popover custom-theme-popover-tree">
+                <div className="panel-heading">
+                  <h2>Custom tree theme</h2>
+                  <div className="panel-heading-actions">
+                    <span className="badge neutral">live</span>
+                    <button type="button" className="ghost-button icon-only" title="Close custom tree theme" aria-label="Close custom tree theme" onClick={() => setOpenCustomThemePopover(null)}>✕</button>
+                  </div>
+                </div>
+                <div className="custom-theme-grid compact-theme-grid">
+                  <label>Node<input type="color" value={customTheme.nodeFill} onChange={(event) => setCustomTheme((current) => ({ ...current, nodeFill: event.target.value }))} /></label>
+                  <label>Bio edge<input type="color" value={customTheme.biologicalEdge} onChange={(event) => setCustomTheme((current) => ({ ...current, biologicalEdge: event.target.value }))} /></label>
+                  <label>Overlay<input type="color" value={customTheme.overlayEdge} onChange={(event) => setCustomTheme((current) => ({ ...current, overlayEdge: event.target.value }))} /></label>
+                  <label>Line<input type="color" value={customTheme.line} onChange={(event) => setCustomTheme((current) => ({ ...current, line: event.target.value }))} /></label>
+                  <label className="font-input">Body font<input type="text" value={customTheme.fontBody} onChange={(event) => setCustomTheme((current) => ({ ...current, fontBody: event.target.value }))} /></label>
+                  <label className="font-input">Display font<input type="text" value={customTheme.fontDisplay} onChange={(event) => setCustomTheme((current) => ({ ...current, fontDisplay: event.target.value }))} /></label>
+                </div>
+              </section>
+            ) : null}
           </div>
 
           <div className="primary-panel-layer" aria-label="Primary panels">
-            <div className="primary-chip-rail">
+            <div className="primary-chip-rail" aria-label="Minimized panels">
               {(Object.keys(collapsedPrimaryPanels) as PrimaryPanelKey[])
                 .filter((panel) => collapsedPrimaryPanels[panel])
                 .map((panel) => (
-                  <button key={`chip-${panel}`} type="button" className="primary-chip" onClick={() => togglePrimaryPanel(panel)}>
+                  <button
+                    key={`chip-${panel}`}
+                    type="button"
+                    className="primary-chip"
+                    onClick={() => togglePrimaryPanel(panel)}
+                    title={`Restore ${panel} panel`}
+                    aria-label={`Restore ${panel} panel`}
+                  >
                     {panel}
                   </button>
                 ))}
             </div>
 
             {!collapsedPrimaryPanels.filter ? (
-              <section className={`panel-block primary-panel panel-filter ${undockedPrimaryPanels.filter ? 'undocked' : ''}`}>
-                <div className="panel-heading">
+              <section ref={(element) => assignPrimaryPanelRef('filter', element)} className={`panel-block primary-panel panel-filter panel-corner-tl ${undockedPrimaryPanels.filter ? 'undocked' : ''}`} style={getPrimaryPanelStyle('filter')}>
+                <div className={`panel-heading ${undockedPrimaryPanels.filter ? 'panel-heading-draggable' : ''} ${draggingPrimaryPanel === 'filter' ? 'panel-heading-dragging' : ''}`} onMouseDown={(event) => beginPrimaryPanelDrag('filter', event)}>
                   <h2>Filter</h2>
                   <div className="panel-heading-actions">
-                    <button type="button" className="ghost-button" onClick={() => togglePrimaryDock('filter')}>
-                      {undockedPrimaryPanels.filter ? 'Dock' : 'Undock'}
+                    <button
+                      type="button"
+                      className="ghost-button icon-only"
+                      title={undockedPrimaryPanels.filter ? 'Dock panel' : 'Undock panel'}
+                      aria-label={undockedPrimaryPanels.filter ? 'Dock panel' : 'Undock panel'}
+                      onClick={() => togglePrimaryDock('filter')}
+                    >
+                      {undockedPrimaryPanels.filter ? '⇲' : '⇱'}
                     </button>
-                    <button type="button" className="ghost-button" onClick={() => togglePrimaryPanel('filter')}>Min</button>
+                    <button type="button" className="ghost-button icon-only" title="Minimize panel" aria-label="Minimize panel" onClick={() => togglePrimaryPanel('filter')}>
+                      🗕
+                    </button>
                   </div>
                 </div>
                 <button type="button" className="ghost-button compact-button" onClick={() => setPreviewFilters({ houses: [], species: [], genders: [], eras: [], hasSourcesOnly: false, hasWarningsOnly: false })}>Clear</button>
@@ -965,14 +1244,22 @@ function App() {
             ) : null}
 
             {!collapsedPrimaryPanels.search ? (
-              <section className={`panel-block primary-panel panel-search ${undockedPrimaryPanels.search ? 'undocked' : ''}`}>
-                <div className="panel-heading">
+              <section ref={(element) => assignPrimaryPanelRef('search', element)} className={`panel-block primary-panel panel-search panel-corner-bl ${undockedPrimaryPanels.search ? 'undocked' : ''}`} style={getPrimaryPanelStyle('search')}>
+                <div className={`panel-heading ${undockedPrimaryPanels.search ? 'panel-heading-draggable' : ''} ${draggingPrimaryPanel === 'search' ? 'panel-heading-dragging' : ''}`} onMouseDown={(event) => beginPrimaryPanelDrag('search', event)}>
                   <h2>Search</h2>
                   <div className="panel-heading-actions">
-                    <button type="button" className="ghost-button" onClick={() => togglePrimaryDock('search')}>
-                      {undockedPrimaryPanels.search ? 'Dock' : 'Undock'}
+                    <button
+                      type="button"
+                      className="ghost-button icon-only"
+                      title={undockedPrimaryPanels.search ? 'Dock panel' : 'Undock panel'}
+                      aria-label={undockedPrimaryPanels.search ? 'Dock panel' : 'Undock panel'}
+                      onClick={() => togglePrimaryDock('search')}
+                    >
+                      {undockedPrimaryPanels.search ? '⇲' : '⇱'}
                     </button>
-                    <button type="button" className="ghost-button" onClick={() => togglePrimaryPanel('search')}>Min</button>
+                    <button type="button" className="ghost-button icon-only" title="Minimize panel" aria-label="Minimize panel" onClick={() => togglePrimaryPanel('search')}>
+                      🗕
+                    </button>
                   </div>
                 </div>
                 <label className="search-field">
@@ -993,14 +1280,22 @@ function App() {
             ) : null}
 
             {!collapsedPrimaryPanels.analyzer ? (
-              <section className={`panel-block primary-panel panel-analyzer ${undockedPrimaryPanels.analyzer ? 'undocked' : ''}`}>
-                <div className="panel-heading">
+              <section ref={(element) => assignPrimaryPanelRef('analyzer', element)} className={`panel-block primary-panel panel-analyzer panel-corner-br ${undockedPrimaryPanels.analyzer ? 'undocked' : ''}`} style={getPrimaryPanelStyle('analyzer')}>
+                <div className={`panel-heading ${undockedPrimaryPanels.analyzer ? 'panel-heading-draggable' : ''} ${draggingPrimaryPanel === 'analyzer' ? 'panel-heading-dragging' : ''}`} onMouseDown={(event) => beginPrimaryPanelDrag('analyzer', event)}>
                   <h2>Selection &amp; LCA</h2>
                   <div className="panel-heading-actions">
-                    <button type="button" className="ghost-button" onClick={() => togglePrimaryDock('analyzer')}>
-                      {undockedPrimaryPanels.analyzer ? 'Dock' : 'Undock'}
+                    <button
+                      type="button"
+                      className="ghost-button icon-only"
+                      title={undockedPrimaryPanels.analyzer ? 'Dock panel' : 'Undock panel'}
+                      aria-label={undockedPrimaryPanels.analyzer ? 'Dock panel' : 'Undock panel'}
+                      onClick={() => togglePrimaryDock('analyzer')}
+                    >
+                      {undockedPrimaryPanels.analyzer ? '⇲' : '⇱'}
                     </button>
-                    <button type="button" className="ghost-button" onClick={() => togglePrimaryPanel('analyzer')}>Min</button>
+                    <button type="button" className="ghost-button icon-only" title="Minimize panel" aria-label="Minimize panel" onClick={() => togglePrimaryPanel('analyzer')}>
+                      🗕
+                    </button>
                   </div>
                 </div>
                 <p className="dataset-note">Selection: {selectedIds.length}/2</p>
@@ -1028,14 +1323,22 @@ function App() {
             ) : null}
 
             {!collapsedPrimaryPanels.inspector ? (
-              <section className={`panel-block primary-panel panel-inspector ${undockedPrimaryPanels.inspector ? 'undocked' : ''}`}>
-                <div className="panel-heading">
+              <section ref={(element) => assignPrimaryPanelRef('inspector', element)} className={`panel-block primary-panel panel-inspector panel-corner-tr ${undockedPrimaryPanels.inspector ? 'undocked' : ''}`} style={getPrimaryPanelStyle('inspector')}>
+                <div className={`panel-heading ${undockedPrimaryPanels.inspector ? 'panel-heading-draggable' : ''} ${draggingPrimaryPanel === 'inspector' ? 'panel-heading-dragging' : ''}`} onMouseDown={(event) => beginPrimaryPanelDrag('inspector', event)}>
                   <h2>Inspector</h2>
                   <div className="panel-heading-actions">
-                    <button type="button" className="ghost-button" onClick={() => togglePrimaryDock('inspector')}>
-                      {undockedPrimaryPanels.inspector ? 'Dock' : 'Undock'}
+                    <button
+                      type="button"
+                      className="ghost-button icon-only"
+                      title={undockedPrimaryPanels.inspector ? 'Dock panel' : 'Undock panel'}
+                      aria-label={undockedPrimaryPanels.inspector ? 'Dock panel' : 'Undock panel'}
+                      onClick={() => togglePrimaryDock('inspector')}
+                    >
+                      {undockedPrimaryPanels.inspector ? '⇲' : '⇱'}
                     </button>
-                    <button type="button" className="ghost-button" onClick={() => togglePrimaryPanel('inspector')}>Min</button>
+                    <button type="button" className="ghost-button icon-only" title="Minimize panel" aria-label="Minimize panel" onClick={() => togglePrimaryPanel('inspector')}>
+                      🗕
+                    </button>
                   </div>
                 </div>
                 {inspectorPerson ? (
@@ -1430,15 +1733,15 @@ function App() {
           ) : null}
         </svg>
 
-        <section className={`graph-legend ${isPreviewPage ? 'preview-legend' : ''} ${isLegendMinimized ? 'minimized' : ''}`} aria-label="Graph legend">
+        <section style={legendStyle} className={`graph-legend ${isPreviewPage ? 'preview-legend' : ''} ${isLegendMinimized ? 'minimized' : ''} ${shouldShiftLegend ? 'legend-shifted' : ''}`} aria-label="Graph legend">
           <div className="legend-heading legend-heading-row">
             <div>
               <h3>Legend</h3>
               <p>Compact key for colors and symbols.</p>
             </div>
             {isPreviewPage ? (
-              <button type="button" className="ghost-button compact-button" onClick={() => setIsLegendMinimized((current) => !current)}>
-                {isLegendMinimized ? 'Open' : 'Min'}
+              <button type="button" className="ghost-button icon-only" title="Toggle legend" aria-label="Toggle legend" onClick={() => setIsLegendMinimized((current) => !current)}>
+                {isLegendMinimized ? '▸' : '▾'}
               </button>
             ) : null}
           </div>
