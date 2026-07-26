@@ -1,6 +1,7 @@
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from 'react'
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import './App.css'
+import Preview2App from './Preview2App'
 import {
   evaluateScenario,
   findLowestCommonAncestor,
@@ -115,7 +116,13 @@ function getAppRequestPath(relativePath: string): string {
 
 function App() {
   const currentPath = typeof window === 'undefined' ? '/' : window.location.pathname.toLocaleLowerCase()
+  const isPreview2Page = /\/preview2(?:\/|$)/.test(currentPath)
   const isPreviewPage = /\/preview(?:\/|$)/.test(currentPath)
+
+  if (isPreview2Page) {
+    return <Preview2App />
+  }
+
   const [datasetName, setDatasetName] = useState<DatasetName>('demo')
   const [pageTheme, setPageTheme] = useState<ThemeMode>('bright')
   const [treeTheme, setTreeTheme] = useState<ThemeMode>('bright')

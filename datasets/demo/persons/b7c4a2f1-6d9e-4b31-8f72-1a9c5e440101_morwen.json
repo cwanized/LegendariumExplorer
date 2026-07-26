@@ -1,0 +1,22 @@
+{
+  "id": "b7c4a2f1-6d9e-4b31-8f72-1a9c5e440101",
+  "name": "Morwen",
+  "gender": "female",
+  "birth": {
+    "era": "First Age",
+    "year": 443
+  },
+  "death": null,
+  "houses": [
+    "Beor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Morwen"
+    }
+  ],
+  "metadata": {
+    "description": "Morwen Eledhwen, wife of Hurin and mother of Turin and Nienor."
+  }
+}
