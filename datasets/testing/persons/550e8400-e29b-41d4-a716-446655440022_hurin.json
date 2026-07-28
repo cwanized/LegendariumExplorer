@@ -1,0 +1,19 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440022",
+  "name": "Hurin",
+  "gender": "male",
+  "birth": null,
+  "death": null,
+  "houses": [
+    "Hador"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Hurin"
+    }
+  ],
+  "metadata": {
+    "description": "Brother of Huor"
+  }
+}

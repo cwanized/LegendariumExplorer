@@ -1,5 +1,7 @@
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from 'react'
+import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import './App.css'
+import Preview2App from './Preview2App'
 import {
   evaluateScenario,
   findLowestCommonAncestor,
@@ -13,11 +15,14 @@ import type {
   ContractEvaluation,
   DatasetName,
   GraphMvpState,
+  HouseDefinition,
+  HouseDefinitions,
   LayoutResult,
   Person,
   PositionedNode,
   Relation,
   SourceLink,
+  TimeValue,
   UUID,
   ValidationResult,
 } from './graph'
@@ -48,7 +53,8 @@ type SpouseProjectionState = {
 }
 
 type HouseAnchor = {
-  house: string
+  houseId: string
+  displayName: string
   memberIds: UUID[]
   x: number
   y: number
@@ -85,6 +91,21 @@ type SourcePreviewState = {
   preview?: SourcePreviewPayload
 }
 
+type ThemeMode = 'bright' | 'dark' | 'thematic' | 'custom'
+type PreviewDisplayMode = 'default' | 'wide' | 'fullscreen'
+type PrimaryPanelKey = 'filter' | 'search' | 'analyzer' | 'inspector'
+type PrimaryPanelOffset = { x: number, y: number }
+type CustomThemePopoverTarget = 'page' | 'tree'
+
+type PreviewFilterState = {
+  houses: string[]
+  species: string[]
+  genders: string[]
+  eras: string[]
+  hasSourcesOnly: boolean
+  hasWarningsOnly: boolean
+}
+
 function getAppRequestPath(relativePath: string): string {
   const normalizedBasePath = import.meta.env.BASE_URL.endsWith('/')
     ? import.meta.env.BASE_URL
@@ -94,24 +115,106 @@ function getAppRequestPath(relativePath: string): string {
 }
 
 function App() {
+  const currentPath = typeof window === 'undefined' ? '/' : window.location.pathname.toLocaleLowerCase()
+  const isPreview2Page = /\/preview2(?:\/|$)/.test(currentPath)
+  const isPreviewPage = /\/preview(?:\/|$)/.test(currentPath)
+
+  if (isPreview2Page) {
+    return <Preview2App />
+  }
+
   const [datasetName, setDatasetName] = useState<DatasetName>('demo')
+  const [pageTheme, setPageTheme] = useState<ThemeMode>('bright')
+  const [treeTheme, setTreeTheme] = useState<ThemeMode>('bright')
+  const [customTheme, setCustomTheme] = useState({
+    background: '#f5efe1',
+    surface: '#fff8ee',
+    text: '#211a14',
+    line: '#6b5a3f',
+    accent: '#8e6a31',
+    nodeFill: '#fffaf0',
+    biologicalEdge: '#2f5a80',
+    overlayEdge: '#94713d',
+    fontBody: 'Inter, Segoe UI, sans-serif',
+    fontDisplay: 'Cinzel, Iowan Old Style, serif',
+  })
   const [graphState, setGraphState] = useState<GraphMvpState | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<UUID[]>([])
   const [spouseOwnerOverrides, setSpouseOwnerOverrides] = useState<Record<string, UUID>>({})
   const [searchQuery, setSearchQuery] = useState('')
+  const [fadeUnrelatedEnabled, setFadeUnrelatedEnabled] = useState(true)
+  const [previewDisplayMode, setPreviewDisplayMode] = useState<PreviewDisplayMode>('default')
+  const [isLegendMinimized, setIsLegendMinimized] = useState(false)
+  const [isBrowserFullscreen, setIsBrowserFullscreen] = useState(false)
+  const [openCustomThemePopover, setOpenCustomThemePopover] = useState<CustomThemePopoverTarget | null>(null)
+  const [analyzerDockedWidth, setAnalyzerDockedWidth] = useState(380)
+  const [previewFilters, setPreviewFilters] = useState<PreviewFilterState>({
+    houses: [],
+    species: [],
+    genders: [],
+    eras: [],
+    hasSourcesOnly: false,
+    hasWarningsOnly: false,
+  })
+  const [collapsedPrimaryPanels, setCollapsedPrimaryPanels] = useState<Record<PrimaryPanelKey, boolean>>({
+    filter: false,
+    search: false,
+    analyzer: false,
+    inspector: false,
+  })
+  const [undockedPrimaryPanels, setUndockedPrimaryPanels] = useState<Record<PrimaryPanelKey, boolean>>({
+    filter: false,
+    search: false,
+    analyzer: false,
+    inspector: false,
+  })
+  const [undockedPrimaryPanelOffsets, setUndockedPrimaryPanelOffsets] = useState<Record<PrimaryPanelKey, PrimaryPanelOffset>>({
+    filter: { x: 0, y: 0 },
+    search: { x: 0, y: 0 },
+    analyzer: { x: 0, y: 0 },
+    inspector: { x: 0, y: 0 },
+  })
+  const [draggingPrimaryPanel, setDraggingPrimaryPanel] = useState<PrimaryPanelKey | null>(null)
   const [camera, setCamera] = useState<CameraView | null>(null)
   const [sourcePopover, setSourcePopover] = useState<SourcePopoverState | null>(null)
   const [sourcePreviewByPerson, setSourcePreviewByPerson] = useState<Record<string, SourcePreviewState>>({})
   const deferredQuery = useDeferredValue(searchQuery)
   const canvasRef = useRef<SVGSVGElement | null>(null)
+  const previewCanvasShellRef = useRef<HTMLDivElement | null>(null)
+  const appShellRef = useRef<HTMLElement | null>(null)
   const sourcePopoverHideTimeoutRef = useRef<number | null>(null)
+  const pageCustomThemeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const treeCustomThemeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const pageCustomThemePopoverRef = useRef<HTMLElement | null>(null)
+  const treeCustomThemePopoverRef = useRef<HTMLElement | null>(null)
+  const primaryPanelElementRefs = useRef<Record<PrimaryPanelKey, HTMLElement | null>>({
+    filter: null,
+    search: null,
+    analyzer: null,
+    inspector: null,
+  })
   const dragRef = useRef<{
     pointerId: number
     clientX: number
     clientY: number
     camera: CameraView
+  } | null>(null)
+  const primaryPanelDragRef = useRef<{
+    panel: PrimaryPanelKey
+    startX: number
+    startY: number
+    originX: number
+    originY: number
+    panelStartLeft: number
+    panelStartTop: number
+    panelWidth: number
+    panelHeight: number
+    shellLeft: number
+    shellTop: number
+    shellRight: number
+    shellBottom: number
   } | null>(null)
 
   useEffect(() => {
@@ -153,7 +256,7 @@ function App() {
           contractScenario,
           contractEvaluation,
         })
-        setCamera(expandCameraBounds(bounds, [], buildHouseAnchors(validation, layout)))
+        setCamera(expandCameraBounds(bounds, [], buildHouseAnchors(validation, layout, dataset.houseDefinitions)))
         setSearchQuery('')
         setIsLoading(false)
 
@@ -183,6 +286,155 @@ function App() {
     }
   }, [datasetName])
 
+  useEffect(() => {
+    function syncFullscreenState() {
+      const fullscreenActive = document.fullscreenElement === appShellRef.current
+      setIsBrowserFullscreen(fullscreenActive)
+
+      if (!fullscreenActive) {
+        setPreviewDisplayMode((current) => (current === 'fullscreen' ? 'default' : current))
+      }
+    }
+
+    document.addEventListener('fullscreenchange', syncFullscreenState)
+
+    return () => {
+      document.removeEventListener('fullscreenchange', syncFullscreenState)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!draggingPrimaryPanel) {
+      return
+    }
+
+    function handleMouseMove(event: MouseEvent) {
+      const dragState = primaryPanelDragRef.current
+      if (!dragState) {
+        return
+      }
+
+      const deltaX = event.clientX - dragState.startX
+      const deltaY = event.clientY - dragState.startY
+      const rawLeft = dragState.panelStartLeft + deltaX
+      const rawTop = dragState.panelStartTop + deltaY
+      const clampedLeft = Math.min(
+        Math.max(rawLeft, dragState.shellLeft),
+        dragState.shellRight - dragState.panelWidth,
+      )
+      const clampedTop = Math.min(
+        Math.max(rawTop, dragState.shellTop),
+        dragState.shellBottom - dragState.panelHeight,
+      )
+      const nextX = dragState.originX + (clampedLeft - dragState.panelStartLeft)
+      const nextY = dragState.originY + (clampedTop - dragState.panelStartTop)
+
+      setUndockedPrimaryPanelOffsets((current) => ({
+        ...current,
+        [dragState.panel]: { x: nextX, y: nextY },
+      }))
+    }
+
+    function handleMouseUp() {
+      primaryPanelDragRef.current = null
+      setDraggingPrimaryPanel(null)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [draggingPrimaryPanel])
+
+  useEffect(() => {
+    if (!isPreviewPage || openCustomThemePopover === null) {
+      return
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node
+
+      if (openCustomThemePopover === 'page') {
+        const insidePopover = pageCustomThemePopoverRef.current?.contains(target) ?? false
+        const onToggleButton = pageCustomThemeButtonRef.current?.contains(target) ?? false
+
+        if (!insidePopover && !onToggleButton) {
+          setOpenCustomThemePopover(null)
+        }
+      }
+
+      if (openCustomThemePopover === 'tree') {
+        const insidePopover = treeCustomThemePopoverRef.current?.contains(target) ?? false
+        const onToggleButton = treeCustomThemeButtonRef.current?.contains(target) ?? false
+
+        if (!insidePopover && !onToggleButton) {
+          setOpenCustomThemePopover(null)
+        }
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpenCustomThemePopover(null)
+      }
+    }
+
+    window.addEventListener('mousedown', handlePointerDown)
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isPreviewPage, openCustomThemePopover])
+
+  useEffect(() => {
+    if (openCustomThemePopover === 'page' && pageTheme !== 'custom') {
+      setOpenCustomThemePopover(null)
+    }
+
+    if (openCustomThemePopover === 'tree' && treeTheme !== 'custom') {
+      setOpenCustomThemePopover(null)
+    }
+  }, [openCustomThemePopover, pageTheme, treeTheme])
+
+  useEffect(() => {
+    if (!isPreviewPage || collapsedPrimaryPanels.analyzer || undockedPrimaryPanels.analyzer) {
+      return
+    }
+
+    const analyzerPanel = primaryPanelElementRefs.current.analyzer
+    if (!analyzerPanel) {
+      return
+    }
+
+    const updateWidth = () => {
+      const measuredWidth = analyzerPanel.getBoundingClientRect().width
+      if (measuredWidth > 0) {
+        setAnalyzerDockedWidth(Math.round(measuredWidth))
+      }
+    }
+
+    updateWidth()
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateWidth)
+      return () => {
+        window.removeEventListener('resize', updateWidth)
+      }
+    }
+
+    const observer = new ResizeObserver(updateWidth)
+    observer.observe(analyzerPanel)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [isPreviewPage, collapsedPrimaryPanels.analyzer, undockedPrimaryPanels.analyzer])
+
   if (errorMessage) {
     return (
       <main className="app-shell error-shell">
@@ -208,6 +460,26 @@ function App() {
   }
 
   const { validation, layout, contractScenario, contractEvaluation } = graphState
+  const pageThemeHost = pageTheme === 'custom' ? 'thematic' : pageTheme
+  const treeThemeHost = treeTheme === 'custom' ? 'thematic' : treeTheme
+  const customThemeStyle: CSSProperties | undefined =
+    pageTheme === 'custom' || treeTheme === 'custom'
+      ? {
+          '--custom-bg': customTheme.background,
+          '--custom-surface': customTheme.surface,
+          '--custom-text': customTheme.text,
+          '--custom-line': customTheme.line,
+          '--custom-accent': customTheme.accent,
+          '--custom-node-fill': customTheme.nodeFill,
+          '--custom-biological-edge': customTheme.biologicalEdge,
+          '--custom-overlay-edge': customTheme.overlayEdge,
+          '--custom-font-body': customTheme.fontBody,
+          '--custom-font-display': customTheme.fontDisplay,
+        } as CSSProperties
+      : undefined
+  const hideSecondaryByMode = isPreviewPage && previewDisplayMode === 'wide'
+  const showLeftSecondary = !hideSecondaryByMode
+  const showRightSecondary = isPreviewPage && !hideSecondaryByMode
   const contractBadgeClass = contractEvaluation ? (contractEvaluation.passed ? 'pass' : 'warn') : 'neutral'
   const contractBadgeLabel = contractEvaluation ? (contractEvaluation.passed ? 'pass' : 'warning') : 'n/a'
   const spouseProjection = buildSpouseProjectionState(
@@ -216,7 +488,7 @@ function App() {
     selectedIds,
     spouseOwnerOverrides,
   )
-  const houseAnchors = buildHouseAnchors(validation, layout)
+  const houseAnchors = buildHouseAnchors(validation, layout, graphState.dataset.houseDefinitions)
   const renderedBiologicalRelations = validation.validBiologicalRelations.filter(
     (relation) =>
       !spouseProjection.hiddenChildEdgeKeys.has(`${relation.from}|${relation.to}`),
@@ -230,14 +502,64 @@ function App() {
     selectedIds.length === 2
       ? findLowestCommonAncestor(selectedIds[0], selectedIds[1], validation)
       : null
+  const warningPersonIds = new Set(
+    validation.warnings
+      .map((warning) => warning.personId)
+      .filter((personId): personId is UUID => typeof personId === 'string'),
+  )
+  const houseFilterOptions = Array.from(new Set(validation.persons.flatMap((person) => person.houses ?? [])))
+    .sort((left, right) => left.localeCompare(right))
+  const speciesFilterOptions = Array.from(
+    new Set(
+      validation.persons
+        .map((person) => person.species)
+        .filter((species): species is string => Boolean(species)),
+    ),
+  ).sort((left, right) => left.localeCompare(right))
+  const genderFilterOptions = Array.from(
+    new Set(
+      validation.persons
+        .map((person) => person.gender)
+        .filter((gender): gender is string => Boolean(gender)),
+    ),
+  ).sort((left, right) => left.localeCompare(right))
+  const eraFilterOptions = Array.from(
+    new Set(
+      validation.persons.flatMap((person) => [person.birth?.era, person.death?.era].filter((era): era is string => Boolean(era))),
+    ),
+  ).sort((left, right) => left.localeCompare(right))
+  const matchesPreviewFilters = (person: Person) => {
+    const personHouses = person.houses ?? []
+    const personSpecies = person.species ?? null
+    const personGender = person.gender ?? null
+    const personEras = [person.birth?.era, person.death?.era].filter((era): era is string => Boolean(era))
+    const hasSources = getSourceLinks(person).length > 0
+    const hasWarnings = warningPersonIds.has(person.id)
+
+    return (
+      (previewFilters.houses.length === 0 || previewFilters.houses.some((house) => personHouses.includes(house)))
+      && (previewFilters.species.length === 0 || (personSpecies !== null && previewFilters.species.includes(personSpecies)))
+      && (previewFilters.genders.length === 0 || (personGender !== null && previewFilters.genders.includes(personGender)))
+      && (previewFilters.eras.length === 0 || previewFilters.eras.some((era) => personEras.includes(era)))
+      && (!previewFilters.hasSourcesOnly || hasSources)
+      && (!previewFilters.hasWarningsOnly || hasWarnings)
+    )
+  }
   const searchValue = deferredQuery.trim().toLocaleLowerCase()
   const filteredPeople = validation.persons.filter((person) =>
-    searchValue.length === 0 ? true : person.name.toLocaleLowerCase().includes(searchValue),
+    matchesPreviewFilters(person)
+    && (searchValue.length === 0 ? true : person.name.toLocaleLowerCase().includes(searchValue)),
   )
-  const fadeUnrelated = selectedAnalysis !== null
+  const fadeUnrelated = selectedAnalysis !== null && fadeUnrelatedEnabled
   const selectedSet = new Set(selectedIds)
   const highlightedNodeIds = selectedAnalysis?.nodeIds ?? new Set<UUID>()
   const highlightedEdgeIds = selectedAnalysis?.edgeIds ?? new Set<UUID>()
+  const filteredOutNodeIds = new Set(
+    validation.persons
+      .filter((person) => !matchesPreviewFilters(person))
+      .map((person) => person.id),
+  )
+  const inspectorPerson = selectedIds.length > 0 ? validation.personById.get(selectedIds[0]) ?? null : null
   const datasetCaptionByName: Record<DatasetName, string> = {
     testing: 'Testing fixtures',
     demo: 'Demo showcase',
@@ -248,6 +570,34 @@ function App() {
   const openSourceLinks = openSourcePerson ? getSourceLinks(openSourcePerson) : []
   const openPrimarySource = openSourceLinks[0] ?? null
   const openSourcePreviewState = openSourcePerson ? sourcePreviewByPerson[openSourcePerson.id] : undefined
+  const shouldShiftLegend = isPreviewPage && !collapsedPrimaryPanels.analyzer && !undockedPrimaryPanels.analyzer
+  const legendStyle = shouldShiftLegend ? { right: `${analyzerDockedWidth + 8}px` } : undefined
+
+  const applyPageThemeMode = (mode: ThemeMode) => {
+    setPageTheme(mode)
+    setOpenCustomThemePopover((current) => {
+      if (mode !== 'custom' && current === 'page') {
+        return null
+      }
+
+      return mode === 'custom' ? 'page' : current
+    })
+  }
+
+  const applyTreeThemeMode = (mode: ThemeMode) => {
+    setTreeTheme(mode)
+    setOpenCustomThemePopover((current) => {
+      if (mode !== 'custom' && current === 'tree') {
+        return null
+      }
+
+      return mode === 'custom' ? 'tree' : current
+    })
+  }
+
+  const assignPrimaryPanelRef = (panel: PrimaryPanelKey, element: HTMLElement | null) => {
+    primaryPanelElementRefs.current[panel] = element
+  }
 
   function resetView() {
     setCamera(expandCameraBounds(getGraphBounds(layout.nodes), spouseProjection.nodes, houseAnchors))
@@ -488,14 +838,118 @@ function App() {
     void ensureSourcePreview(person)
   }
 
+  function togglePrimaryPanel(panel: PrimaryPanelKey) {
+    setCollapsedPrimaryPanels((current) => ({
+      ...current,
+      [panel]: !current[panel],
+    }))
+  }
+
+  function togglePrimaryDock(panel: PrimaryPanelKey) {
+    setUndockedPrimaryPanels((current) => ({
+      ...current,
+      [panel]: !current[panel],
+    }))
+
+    setDraggingPrimaryPanel((current) => current === panel ? null : current)
+    primaryPanelDragRef.current = null
+  }
+
+  function beginPrimaryPanelDrag(panel: PrimaryPanelKey, event: ReactMouseEvent<HTMLDivElement>) {
+    if (!undockedPrimaryPanels[panel] || event.button !== 0) {
+      return
+    }
+
+    const shellRect = previewCanvasShellRef.current?.getBoundingClientRect()
+    const panelRect = primaryPanelElementRefs.current[panel]?.getBoundingClientRect()
+
+    if (!shellRect || !panelRect) {
+      return
+    }
+
+    event.preventDefault()
+
+    const offset = undockedPrimaryPanelOffsets[panel]
+    primaryPanelDragRef.current = {
+      panel,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: offset.x,
+      originY: offset.y,
+      panelStartLeft: panelRect.left,
+      panelStartTop: panelRect.top,
+      panelWidth: panelRect.width,
+      panelHeight: panelRect.height,
+      shellLeft: shellRect.left,
+      shellTop: shellRect.top,
+      shellRight: shellRect.right,
+      shellBottom: shellRect.bottom,
+    }
+    setDraggingPrimaryPanel(panel)
+  }
+
+  function getPrimaryPanelStyle(panel: PrimaryPanelKey): CSSProperties | undefined {
+    if (!undockedPrimaryPanels[panel]) {
+      return undefined
+    }
+
+    const offset = undockedPrimaryPanelOffsets[panel]
+    return {
+      transform: `translate(${offset.x}px, ${offset.y}px)`,
+    }
+  }
+
+  async function applyPreviewDisplayMode(nextMode: PreviewDisplayMode) {
+    if (!isPreviewPage) {
+      return
+    }
+
+    const fullscreenElement = document.fullscreenElement
+
+    if (nextMode === 'fullscreen') {
+      if (appShellRef.current && fullscreenElement !== appShellRef.current) {
+        await appShellRef.current.requestFullscreen()
+      }
+
+      setPreviewDisplayMode('fullscreen')
+      return
+    }
+
+    if (fullscreenElement) {
+      await document.exitFullscreen()
+    }
+
+    setPreviewDisplayMode(nextMode)
+  }
+
+  function toggleFilterValue(category: 'houses' | 'species' | 'genders' | 'eras', value: string) {
+    setPreviewFilters((current) => ({
+      ...current,
+      [category]: current[category].includes(value)
+        ? current[category].filter((entry) => entry !== value)
+        : [...current[category], value].sort((left, right) => left.localeCompare(right)),
+    }))
+  }
+
   return (
-    <main className="app-shell">
-      <aside className="panel sidebar">
+    <main
+      ref={appShellRef}
+      className={`app-shell ${isPreviewPage ? 'preview-shell' : 'legacy-shell'} ${isPreviewPage ? `preview-mode-${previewDisplayMode}` : ''}`}
+      data-page-theme={pageThemeHost}
+      data-page-theme-mode={pageTheme}
+      data-tree-theme={treeThemeHost}
+      data-tree-theme-mode={treeTheme}
+      style={customThemeStyle}
+    >
+      {showLeftSecondary ? (
+      <aside className={`panel sidebar ${isPreviewPage ? 'secondary-panel secondary-left' : ''}`}>
         <div>
           <p className="eyebrow">Legendarium Explorer</p>
-          <h1>Deterministic graph MVP</h1>
+          <h1>{isPreviewPage ? 'Preview Redesign' : 'Deterministic graph MVP'}</h1>
           <p className="intro">
-            The client switches between internal testing fixtures, a valid showcase demo, and the published prod dataset while keeping biological validation deterministic.
+            {isPreviewPage
+              ? 'Parallel redesign page with secondary side panes and primary in-canvas tools.'
+              : 'The client switches between internal testing fixtures, a valid showcase demo, and the published prod dataset while keeping biological validation deterministic.'}
           </p>
         </div>
 
@@ -532,6 +986,7 @@ function App() {
           </p>
         </section>
 
+        {isPreviewPage ? null : (
         <section className="stat-grid">
           <article>
             <span className="stat-label">Persons</span>
@@ -550,6 +1005,7 @@ function App() {
             <strong>{validation.warnings.length}</strong>
           </article>
         </section>
+        )}
 
         <section className="panel-block">
           <div className="panel-heading">
@@ -560,56 +1016,6 @@ function App() {
           </div>
           <p>{contractScenario?.description ?? 'No contract scenario defined.'}</p>
           {contractEvaluation ? <ContractSummary evaluation={contractEvaluation} /> : null}
-        </section>
-
-        <section className="panel-block">
-          <div className="panel-heading">
-            <h2>Search</h2>
-            <button type="button" className="ghost-button" onClick={resetView}>
-              Reset view
-            </button>
-          </div>
-          <label className="search-field">
-            <span>Find a person</span>
-            <input
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search by name"
-            />
-          </label>
-          <ul className="person-list">
-            {filteredPeople.map((person) => (
-              <li key={person.id}>
-                <button type="button" onClick={() => focusPerson(person.id)}>
-                  <span>{person.name}</span>
-                  <small>{person.houses?.join(', ') || 'No house tag'}</small>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="panel-block">
-          <div className="panel-heading">
-            <h2>Selection</h2>
-            <span className="badge neutral">{selectedIds.length}/2</span>
-          </div>
-          {selectedIds.length === 0 ? (
-            <p>Click a node to inspect it. Shift and click a second node to run lowest common ancestor analysis.</p>
-          ) : (
-            <ul className="selection-list">
-              {selectedIds.map((personId) => {
-                const person = validation.personById.get(personId)
-
-                return <li key={personId}>{person?.name ?? personId}</li>
-              })}
-            </ul>
-          )}
-          {selectedAnalysis ? (
-            <p className="analysis-output">
-              Lowest common ancestor: <strong>{validation.personById.get(selectedAnalysis.ancestorId)?.name}</strong>
-            </p>
-          ) : null}
         </section>
 
         <section className="panel-block">
@@ -626,16 +1032,355 @@ function App() {
             ))}
           </ul>
         </section>
-      </aside>
+        {isPreviewPage ? null : (
+          <>
+            <section className="panel-block">
+              <div className="panel-heading">
+                <h2>Search</h2>
+                <button type="button" className="ghost-button" onClick={resetView}>
+                  Reset view
+                </button>
+              </div>
+              <label className="search-field">
+                <span>Find a person</span>
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search by name"
+                />
+              </label>
+              <ul className="person-list">
+                {filteredPeople.map((person) => (
+                  <li key={person.id}>
+                    <button type="button" onClick={() => focusPerson(person.id)}>
+                      <span>{person.name}</span>
+                      <small>{person.houses?.join(', ') || 'No house tag'}</small>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
 
-      <section className="graph-stage">
+            <section className="panel-block">
+              <div className="panel-heading">
+                <h2>Selection</h2>
+                <span className="badge neutral">{selectedIds.length}/2</span>
+              </div>
+              {selectedIds.length === 0 ? (
+                <p>Click a node to inspect it. Shift and click a second node to run lowest common ancestor analysis.</p>
+              ) : (
+                <ul className="selection-list">
+                  {selectedIds.map((personId) => {
+                    const person = validation.personById.get(personId)
+
+                    return <li key={personId}>{person?.name ?? personId}</li>
+                  })}
+                </ul>
+              )}
+              {selectedAnalysis ? (
+                <p className="analysis-output">
+                  Lowest common ancestor: <strong>{validation.personById.get(selectedAnalysis.ancestorId)?.name}</strong>
+                </p>
+              ) : null}
+            </section>
+          </>
+        )}
+      </aside>
+      ) : null}
+
+      <section className={`graph-stage ${isPreviewPage ? 'preview-stage' : ''}`}>
         <header className="stage-header">
           <div>
             <p className="eyebrow">Render state</p>
             <h2>Validated biological tree with social overlays</h2>
             <p className="dataset-caption">Active dataset: {datasetCaptionByName[datasetName]}</p>
           </div>
+          {isPreviewPage ? (
+            <div className="stage-actions page-theme-actions">
+              <span className="page-theme-label">Page theme</span>
+              <div className="canvas-control-group" aria-label="Page theme toggle">
+                <button type="button" className={`canvas-icon-button ${pageTheme === 'bright' ? 'active' : ''}`} title="Bright page theme" aria-label="Bright page theme" onClick={() => applyPageThemeMode('bright')}>☀</button>
+                <button type="button" className={`canvas-icon-button ${pageTheme === 'dark' ? 'active' : ''}`} title="Dark page theme" aria-label="Dark page theme" onClick={() => applyPageThemeMode('dark')}>☾</button>
+                <button type="button" className={`canvas-icon-button ${pageTheme === 'thematic' ? 'active' : ''}`} title="Thematic Gondor page theme" aria-label="Thematic Gondor page theme" onClick={() => applyPageThemeMode('thematic')}>♛</button>
+                <button ref={pageCustomThemeButtonRef} type="button" className={`canvas-icon-button ${pageTheme === 'custom' ? 'active' : ''}`} title="Custom page theme" aria-label="Custom page theme" onClick={() => applyPageThemeMode('custom')}>✎</button>
+              </div>
+              {isPreviewPage && pageTheme === 'custom' && openCustomThemePopover === 'page' ? (
+                <section ref={pageCustomThemePopoverRef} className="panel-block custom-theme-popover custom-theme-popover-page">
+                  <div className="panel-heading">
+                    <h2>Custom page theme</h2>
+                    <div className="panel-heading-actions">
+                      <span className="badge neutral">live</span>
+                      <button type="button" className="ghost-button icon-only" title="Close custom page theme" aria-label="Close custom page theme" onClick={() => setOpenCustomThemePopover(null)}>✕</button>
+                    </div>
+                  </div>
+                  <div className="custom-theme-grid compact-theme-grid">
+                    <label>Background<input type="color" value={customTheme.background} onChange={(event) => setCustomTheme((current) => ({ ...current, background: event.target.value }))} /></label>
+                    <label>Surface<input type="color" value={customTheme.surface} onChange={(event) => setCustomTheme((current) => ({ ...current, surface: event.target.value }))} /></label>
+                    <label>Text<input type="color" value={customTheme.text} onChange={(event) => setCustomTheme((current) => ({ ...current, text: event.target.value }))} /></label>
+                    <label>Accent<input type="color" value={customTheme.accent} onChange={(event) => setCustomTheme((current) => ({ ...current, accent: event.target.value }))} /></label>
+                    <label className="font-input">Body font<input type="text" value={customTheme.fontBody} onChange={(event) => setCustomTheme((current) => ({ ...current, fontBody: event.target.value }))} /></label>
+                    <label className="font-input">Display font<input type="text" value={customTheme.fontDisplay} onChange={(event) => setCustomTheme((current) => ({ ...current, fontDisplay: event.target.value }))} /></label>
+                  </div>
+                </section>
+              ) : null}
+            </div>
+          ) : (
+            <div className="stage-actions">
+              <button type="button" className="ghost-button" onClick={resetView}>Reset view</button>
+            </div>
+          )}
         </header>
+
+        <div ref={previewCanvasShellRef} className={`canvas-shell ${isPreviewPage ? 'preview-canvas-shell' : ''}`}>
+        {isPreviewPage ? (
+          <>
+          <div className="tool-canvas" aria-label="Tool canvas">
+            <div className="canvas-controls" aria-label="Canvas controls">
+              <button type="button" className="canvas-icon-button" title="Reset view" aria-label="Reset view" onClick={resetView}>↺</button>
+              <div className="canvas-control-group" aria-label="Display mode">
+                <button type="button" className={`canvas-icon-button ${previewDisplayMode === 'default' ? 'active' : ''}`} title="Default layout" aria-label="Default layout" onClick={() => void applyPreviewDisplayMode('default')}>▣</button>
+                <button type="button" className={`canvas-icon-button ${previewDisplayMode === 'wide' ? 'active' : ''}`} title="Use all horizontal space" aria-label="Use all horizontal space" onClick={() => void applyPreviewDisplayMode('wide')}>↔</button>
+                <button type="button" className={`canvas-icon-button ${isBrowserFullscreen ? 'active' : ''}`} title="Browser fullscreen" aria-label="Browser fullscreen" onClick={() => void applyPreviewDisplayMode('fullscreen')}>⛶</button>
+              </div>
+              <div className="canvas-control-stack">
+                <span>Tree</span>
+                <div className="canvas-control-group" aria-label="Tree theme toggle">
+                  <button type="button" className={`canvas-icon-button ${treeTheme === 'bright' ? 'active' : ''}`} title="Bright tree theme" aria-label="Bright tree theme" onClick={() => applyTreeThemeMode('bright')}>☀</button>
+                  <button type="button" className={`canvas-icon-button ${treeTheme === 'dark' ? 'active' : ''}`} title="Dark tree theme" aria-label="Dark tree theme" onClick={() => applyTreeThemeMode('dark')}>☾</button>
+                  <button type="button" className={`canvas-icon-button ${treeTheme === 'thematic' ? 'active' : ''}`} title="Thematic Gondor tree theme" aria-label="Thematic Gondor tree theme" onClick={() => applyTreeThemeMode('thematic')}>♜</button>
+                  <button ref={treeCustomThemeButtonRef} type="button" className={`canvas-icon-button ${treeTheme === 'custom' ? 'active' : ''}`} title="Custom tree theme" aria-label="Custom tree theme" onClick={() => applyTreeThemeMode('custom')}>✎</button>
+                </div>
+              </div>
+            </div>
+            {treeTheme === 'custom' && openCustomThemePopover === 'tree' ? (
+              <section ref={treeCustomThemePopoverRef} className="panel-block custom-theme-popover custom-theme-popover-tree">
+                <div className="panel-heading">
+                  <h2>Custom tree theme</h2>
+                  <div className="panel-heading-actions">
+                    <span className="badge neutral">live</span>
+                    <button type="button" className="ghost-button icon-only" title="Close custom tree theme" aria-label="Close custom tree theme" onClick={() => setOpenCustomThemePopover(null)}>✕</button>
+                  </div>
+                </div>
+                <div className="custom-theme-grid compact-theme-grid">
+                  <label>Node<input type="color" value={customTheme.nodeFill} onChange={(event) => setCustomTheme((current) => ({ ...current, nodeFill: event.target.value }))} /></label>
+                  <label>Bio edge<input type="color" value={customTheme.biologicalEdge} onChange={(event) => setCustomTheme((current) => ({ ...current, biologicalEdge: event.target.value }))} /></label>
+                  <label>Overlay<input type="color" value={customTheme.overlayEdge} onChange={(event) => setCustomTheme((current) => ({ ...current, overlayEdge: event.target.value }))} /></label>
+                  <label>Line<input type="color" value={customTheme.line} onChange={(event) => setCustomTheme((current) => ({ ...current, line: event.target.value }))} /></label>
+                  <label className="font-input">Body font<input type="text" value={customTheme.fontBody} onChange={(event) => setCustomTheme((current) => ({ ...current, fontBody: event.target.value }))} /></label>
+                  <label className="font-input">Display font<input type="text" value={customTheme.fontDisplay} onChange={(event) => setCustomTheme((current) => ({ ...current, fontDisplay: event.target.value }))} /></label>
+                </div>
+              </section>
+            ) : null}
+          </div>
+
+          <div className="primary-panel-layer" aria-label="Primary panels">
+            <div className="primary-chip-rail" aria-label="Minimized panels">
+              {(Object.keys(collapsedPrimaryPanels) as PrimaryPanelKey[])
+                .filter((panel) => collapsedPrimaryPanels[panel])
+                .map((panel) => (
+                  <button
+                    key={`chip-${panel}`}
+                    type="button"
+                    className="primary-chip"
+                    onClick={() => togglePrimaryPanel(panel)}
+                    title={`Restore ${panel} panel`}
+                    aria-label={`Restore ${panel} panel`}
+                  >
+                    {panel}
+                  </button>
+                ))}
+            </div>
+
+            {!collapsedPrimaryPanels.filter ? (
+              <section ref={(element) => assignPrimaryPanelRef('filter', element)} className={`panel-block primary-panel panel-filter panel-corner-tl ${undockedPrimaryPanels.filter ? 'undocked' : ''}`} style={getPrimaryPanelStyle('filter')}>
+                <div className={`panel-heading ${undockedPrimaryPanels.filter ? 'panel-heading-draggable' : ''} ${draggingPrimaryPanel === 'filter' ? 'panel-heading-dragging' : ''}`} onMouseDown={(event) => beginPrimaryPanelDrag('filter', event)}>
+                  <h2>Filter</h2>
+                  <div className="panel-heading-actions">
+                    <button
+                      type="button"
+                      className="ghost-button icon-only"
+                      title={undockedPrimaryPanels.filter ? 'Dock panel' : 'Undock panel'}
+                      aria-label={undockedPrimaryPanels.filter ? 'Dock panel' : 'Undock panel'}
+                      onClick={() => togglePrimaryDock('filter')}
+                    >
+                      {undockedPrimaryPanels.filter ? '⇲' : '⇱'}
+                    </button>
+                    <button type="button" className="ghost-button icon-only" title="Minimize panel" aria-label="Minimize panel" onClick={() => togglePrimaryPanel('filter')}>
+                      🗕
+                    </button>
+                  </div>
+                </div>
+                <button type="button" className="ghost-button compact-button" onClick={() => setPreviewFilters({ houses: [], species: [], genders: [], eras: [], hasSourcesOnly: false, hasWarningsOnly: false })}>Clear</button>
+                <div className="filter-group">
+                  <span className="filter-group-title">House</span>
+                  <div className="filter-checklist">
+                    {houseFilterOptions.map((house) => (
+                      <label key={house}><input type="checkbox" checked={previewFilters.houses.includes(house)} onChange={() => toggleFilterValue('houses', house)} />{house}</label>
+                    ))}
+                  </div>
+                </div>
+                <div className="filter-group">
+                  <span className="filter-group-title">Species</span>
+                  <div className="filter-checklist compact-grid">
+                    {speciesFilterOptions.map((species) => (
+                      <label key={species}><input type="checkbox" checked={previewFilters.species.includes(species)} onChange={() => toggleFilterValue('species', species)} />{species}</label>
+                    ))}
+                  </div>
+                </div>
+                <div className="filter-group">
+                  <span className="filter-group-title">Gender</span>
+                  <div className="filter-checklist compact-grid">
+                    {genderFilterOptions.map((gender) => (
+                      <label key={gender}><input type="checkbox" checked={previewFilters.genders.includes(gender)} onChange={() => toggleFilterValue('genders', gender)} />{gender}</label>
+                    ))}
+                  </div>
+                </div>
+                <div className="filter-group">
+                  <span className="filter-group-title">Era</span>
+                  <div className="filter-checklist compact-grid">
+                    {eraFilterOptions.map((era) => (
+                      <label key={era}><input type="checkbox" checked={previewFilters.eras.includes(era)} onChange={() => toggleFilterValue('eras', era)} />{era}</label>
+                    ))}
+                  </div>
+                </div>
+                <div className="filter-checklist compact-grid">
+                  <label><input type="checkbox" checked={previewFilters.hasSourcesOnly} onChange={() => setPreviewFilters((current) => ({ ...current, hasSourcesOnly: !current.hasSourcesOnly }))} />With sources</label>
+                  <label><input type="checkbox" checked={previewFilters.hasWarningsOnly} onChange={() => setPreviewFilters((current) => ({ ...current, hasWarningsOnly: !current.hasWarningsOnly }))} />With warnings</label>
+                </div>
+              </section>
+            ) : null}
+
+            {!collapsedPrimaryPanels.search ? (
+              <section ref={(element) => assignPrimaryPanelRef('search', element)} className={`panel-block primary-panel panel-search panel-corner-bl ${undockedPrimaryPanels.search ? 'undocked' : ''}`} style={getPrimaryPanelStyle('search')}>
+                <div className={`panel-heading ${undockedPrimaryPanels.search ? 'panel-heading-draggable' : ''} ${draggingPrimaryPanel === 'search' ? 'panel-heading-dragging' : ''}`} onMouseDown={(event) => beginPrimaryPanelDrag('search', event)}>
+                  <h2>Search</h2>
+                  <div className="panel-heading-actions">
+                    <button
+                      type="button"
+                      className="ghost-button icon-only"
+                      title={undockedPrimaryPanels.search ? 'Dock panel' : 'Undock panel'}
+                      aria-label={undockedPrimaryPanels.search ? 'Dock panel' : 'Undock panel'}
+                      onClick={() => togglePrimaryDock('search')}
+                    >
+                      {undockedPrimaryPanels.search ? '⇲' : '⇱'}
+                    </button>
+                    <button type="button" className="ghost-button icon-only" title="Minimize panel" aria-label="Minimize panel" onClick={() => togglePrimaryPanel('search')}>
+                      🗕
+                    </button>
+                  </div>
+                </div>
+                <label className="search-field">
+                  <span>Find a person</span>
+                  <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by name" />
+                </label>
+                <ul className="person-list">
+                  {filteredPeople.slice(0, 10).map((person) => (
+                    <li key={person.id}>
+                      <button type="button" onClick={() => focusPerson(person.id)}>
+                        <span>{person.name}</span>
+                        <small>{person.houses?.join(', ') || 'No house tag'}</small>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {!collapsedPrimaryPanels.analyzer ? (
+              <section ref={(element) => assignPrimaryPanelRef('analyzer', element)} className={`panel-block primary-panel panel-analyzer panel-corner-br ${undockedPrimaryPanels.analyzer ? 'undocked' : ''}`} style={getPrimaryPanelStyle('analyzer')}>
+                <div className={`panel-heading ${undockedPrimaryPanels.analyzer ? 'panel-heading-draggable' : ''} ${draggingPrimaryPanel === 'analyzer' ? 'panel-heading-dragging' : ''}`} onMouseDown={(event) => beginPrimaryPanelDrag('analyzer', event)}>
+                  <h2>Selection &amp; LCA</h2>
+                  <div className="panel-heading-actions">
+                    <button
+                      type="button"
+                      className="ghost-button icon-only"
+                      title={undockedPrimaryPanels.analyzer ? 'Dock panel' : 'Undock panel'}
+                      aria-label={undockedPrimaryPanels.analyzer ? 'Dock panel' : 'Undock panel'}
+                      onClick={() => togglePrimaryDock('analyzer')}
+                    >
+                      {undockedPrimaryPanels.analyzer ? '⇲' : '⇱'}
+                    </button>
+                    <button type="button" className="ghost-button icon-only" title="Minimize panel" aria-label="Minimize panel" onClick={() => togglePrimaryPanel('analyzer')}>
+                      🗕
+                    </button>
+                  </div>
+                </div>
+                <p className="dataset-note">Selection: {selectedIds.length}/2</p>
+                {selectedIds.length > 0 ? (
+                  <ul className="selection-list">
+                    {selectedIds.map((personId) => <li key={personId}>{validation.personById.get(personId)?.name ?? personId}</li>)}
+                  </ul>
+                ) : (
+                  <p>Click nodes (Shift+click for second node).</p>
+                )}
+                {selectedAnalysis ? (
+                  <p className="analysis-output">LCA: <strong>{validation.personById.get(selectedAnalysis.ancestorId)?.name}</strong></p>
+                ) : null}
+                <label className="search-field">
+                  <span>Fade unrelated</span>
+                  <select
+                    value={fadeUnrelatedEnabled ? 'on' : 'off'}
+                    onChange={(event) => setFadeUnrelatedEnabled(event.target.value === 'on')}
+                  >
+                    <option value="on">On</option>
+                    <option value="off">Off</option>
+                  </select>
+                </label>
+              </section>
+            ) : null}
+
+            {!collapsedPrimaryPanels.inspector ? (
+              <section ref={(element) => assignPrimaryPanelRef('inspector', element)} className={`panel-block primary-panel panel-inspector panel-corner-tr ${undockedPrimaryPanels.inspector ? 'undocked' : ''}`} style={getPrimaryPanelStyle('inspector')}>
+                <div className={`panel-heading ${undockedPrimaryPanels.inspector ? 'panel-heading-draggable' : ''} ${draggingPrimaryPanel === 'inspector' ? 'panel-heading-dragging' : ''}`} onMouseDown={(event) => beginPrimaryPanelDrag('inspector', event)}>
+                  <h2>Inspector</h2>
+                  <div className="panel-heading-actions">
+                    <button
+                      type="button"
+                      className="ghost-button icon-only"
+                      title={undockedPrimaryPanels.inspector ? 'Dock panel' : 'Undock panel'}
+                      aria-label={undockedPrimaryPanels.inspector ? 'Dock panel' : 'Undock panel'}
+                      onClick={() => togglePrimaryDock('inspector')}
+                    >
+                      {undockedPrimaryPanels.inspector ? '⇲' : '⇱'}
+                    </button>
+                    <button type="button" className="ghost-button icon-only" title="Minimize panel" aria-label="Minimize panel" onClick={() => togglePrimaryPanel('inspector')}>
+                      🗕
+                    </button>
+                  </div>
+                </div>
+                {inspectorPerson ? (
+                  <>
+                    {inspectorPerson.portraitUrl ? (
+                      <figure className="inspector-portrait">
+                        <img src={inspectorPerson.portraitUrl} alt={`${inspectorPerson.name} portrait`} loading="lazy" />
+                        <figcaption>
+                          {inspectorPerson.portraitSourceUrl ? (
+                            <a href={inspectorPerson.portraitSourceUrl} target="_blank" rel="noreferrer">{inspectorPerson.portraitSourceLabel ?? 'Image source'}</a>
+                          ) : (
+                            inspectorPerson.portraitSourceLabel ?? 'Portrait'
+                          )}
+                        </figcaption>
+                      </figure>
+                    ) : null}
+                    <p><strong>{inspectorPerson.name}</strong></p>
+                    <ul className="inspector-attributes">
+                      <li><strong>Gender</strong><span>{inspectorPerson.gender ?? 'n/a'}</span></li>
+                      <li><strong>Species</strong><span>{inspectorPerson.species ?? 'n/a'}</span></li>
+                      <li><strong>Birth</strong><span>{formatTimeValue(inspectorPerson.birth)}</span></li>
+                      <li><strong>Death</strong><span>{formatTimeValue(inspectorPerson.death)}</span></li>
+                      <li><strong>Houses</strong><span>{inspectorPerson.houses?.join(', ') ?? 'n/a'}</span></li>
+                      <li><strong>Sources</strong><span>{getSourceLinks(inspectorPerson).length}</span></li>
+                    </ul>
+                    {inspectorPerson.metadata?.description ? <p className="dataset-note">{inspectorPerson.metadata.description}</p> : null}
+                  </>
+                ) : (
+                  <p>Select a person to inspect details.</p>
+                )}
+              </section>
+            ) : null}
+          </div>
+          </>
+        ) : null}
 
         <svg
           ref={canvasRef}
@@ -672,7 +1417,7 @@ function App() {
             const maxRootX = Math.max(...rootNodes.map((node) => node.x + node.width / 2))
 
             return (
-              <g key={anchor.house} className="house-anchor">
+              <g key={anchor.houseId} className="house-anchor">
                 <line
                   x1={anchorCenterX}
                   y1={anchorBottomY}
@@ -691,7 +1436,7 @@ function App() {
                 ) : null}
                 {rootNodes.map((node) => (
                   <line
-                    key={`${anchor.house}:${node.id}`}
+                    key={`${anchor.houseId}:${node.id}`}
                     x1={node.x + node.width / 2}
                     y1={junctionY}
                     x2={node.x + node.width / 2}
@@ -702,7 +1447,7 @@ function App() {
                 <g transform={`translate(${anchor.x} ${anchor.y})`}>
                   <rect width={anchor.width} height={anchor.height} rx="16" ry="16" className="house-anchor-chip" />
                   <text x={anchor.width / 2} y={23} textAnchor="middle" className="house-anchor-label">
-                    {anchor.house}
+                    {anchor.displayName}
                   </text>
                 </g>
               </g>
@@ -717,7 +1462,10 @@ function App() {
               return null
             }
 
-            const faded = fadeUnrelated && !highlightedEdgeIds.has(relation.id)
+            const faded =
+              (fadeUnrelated && !highlightedEdgeIds.has(relation.id))
+              || filteredOutNodeIds.has(relation.from)
+              || filteredOutNodeIds.has(relation.to)
             const renderInlineMarriage = relation.type === 'marriage' && canRenderInlineMarriage(fromNode, toNode)
             const leftNode = fromNode.x <= toNode.x ? fromNode : toNode
             const rightNode = leftNode.id === fromNode.id ? toNode : fromNode
@@ -740,7 +1488,8 @@ function App() {
 
           {biologicalChildGroups.map((group) => {
             const highlighted = group.relationIds.some((relationId) => highlightedEdgeIds.has(relationId))
-            const faded = fadeUnrelated && !highlighted
+            const groupFiltered = [...group.parentIds, ...group.childIds].some((nodeId) => filteredOutNodeIds.has(nodeId))
+            const faded = (fadeUnrelated && !highlighted) || groupFiltered
             const edgeClassName = `biological-edge ${highlighted ? 'highlighted' : ''} ${faded ? 'faded' : ''}`
             const childCenters = group.childNodes.map((node) => node.x + node.width / 2)
             const siblingMinX = Math.min(...childCenters)
@@ -818,7 +1567,7 @@ function App() {
 
             const isSelected = selectedSet.has(projection.companionId)
             const isHighlighted = highlightedNodeIds.has(projection.ownerId) || highlightedNodeIds.has(projection.companionId)
-            const isFaded = fadeUnrelated && !isHighlighted
+            const isFaded = (fadeUnrelated && !isHighlighted) || filteredOutNodeIds.has(projection.ownerId) || filteredOutNodeIds.has(projection.companionId)
             const linkStartX = projection.side === 'right' ? ownerNode.x + ownerNode.width : ownerNode.x
             const linkEndX = projection.side === 'right' ? projection.x : projection.x + projection.width
             const linkY = ownerNode.y + ownerNode.height / 2
@@ -861,7 +1610,7 @@ function App() {
 
             const isSelected = selectedSet.has(person.id)
             const isHighlighted = highlightedNodeIds.has(person.id)
-            const isFaded = fadeUnrelated && !isHighlighted
+            const isFaded = (fadeUnrelated && !isHighlighted) || filteredOutNodeIds.has(person.id)
             const personWarnings = validation.warnings.some((warning) => warning.personId === person.id)
             const sourceLinks = getSourceLinks(person)
             const primarySource = sourceLinks[0] ?? null
@@ -991,74 +1740,96 @@ function App() {
           ) : null}
         </svg>
 
-        <section className="graph-legend" aria-label="Graph legend">
-          <div className="legend-heading">
-            <h3>Legend</h3>
-            <p>Colors, icons, and line styles used in the current graph view.</p>
+        <section style={legendStyle} className={`graph-legend ${isPreviewPage ? 'preview-legend' : ''} ${isLegendMinimized ? 'minimized' : ''} ${shouldShiftLegend ? 'legend-shifted' : ''}`} aria-label="Graph legend">
+          <div className="legend-heading legend-heading-row">
+            <div>
+              <h3>Legend</h3>
+              <p>Compact key for colors and symbols.</p>
+            </div>
+            {isPreviewPage ? (
+              <button type="button" className="ghost-button icon-only" title="Toggle legend" aria-label="Toggle legend" onClick={() => setIsLegendMinimized((current) => !current)}>
+                {isLegendMinimized ? '▸' : '▾'}
+              </button>
+            ) : null}
           </div>
-          <div className="legend-grid">
-            <article className="legend-card">
-              <span className="legend-swatch node-person">Person box</span>
-              <p>Cream card for a canonical person in the biological tree.</p>
-            </article>
-            <article className="legend-card">
-              <span className="legend-swatch node-house">House start</span>
-              <p>Top anchor chip that marks the deterministic entry point for one house branch.</p>
-            </article>
-            <article className="legend-card">
-              <span className="legend-swatch node-spouse">Spouse branch</span>
-              <p>Green companion chip for a cross-context spouse continuation.</p>
-            </article>
-            <article className="legend-card">
-              <span className="legend-swatch edge-biological">Biological parent</span>
-              <p>Solid blue edge used for parent-child lineage.</p>
-            </article>
-            <article className="legend-card">
-              <span className="legend-swatch edge-overlay">Social overlay</span>
-              <p>Dashed ochre edge for marriage, step-parent, mentor, adoption, and other social links.</p>
-            </article>
-            <article className="legend-card">
-              <span className="legend-swatch edge-house">House guide</span>
-              <p>Dotted slate guide from each house anchor to its top biological roots.</p>
-            </article>
-            <article className="legend-card">
-              <span className="legend-swatch state-warning">Warning dot</span>
-              <p>Orange marker on a person box when a validation warning targets that person.</p>
-            </article>
-            <article className="legend-card">
-              <span className="legend-swatch state-gender">Gender icon</span>
-              <p>Top-right badge on each person: ♂ male, ♀ female, ? unspecified in JSON.</p>
-            </article>
-            <article className="legend-card">
-              <span className="legend-swatch state-source">Source info</span>
-              <p>Bottom-right info trigger for authored sources, optional portraits, and primary-source preview.</p>
-            </article>
-          </div>
+          {!isLegendMinimized ? <div className="legend-inline-list">
+            <div className="legend-inline-item"><span className="legend-chip node-person" />Person box</div>
+            <div className="legend-inline-item"><span className="legend-chip node-house" />House start</div>
+            <div className="legend-inline-item"><span className="legend-chip node-spouse" />Spouse branch</div>
+            <div className="legend-inline-item"><span className="legend-chip edge-biological" />Biological parent</div>
+            <div className="legend-inline-item"><span className="legend-chip edge-overlay" />Social overlay</div>
+            <div className="legend-inline-item"><span className="legend-chip edge-house" />House guide</div>
+            <div className="legend-inline-item"><span className="legend-chip state-warning" />Warning dot</div>
+            <div className="legend-inline-item"><span className="legend-chip state-gender" />Gender icon</div>
+            <div className="legend-inline-item"><span className="legend-chip state-source" />Source info</div>
+          </div> : null}
         </section>
+        </div>
       </section>
+
+      {showRightSecondary ? (
+        <aside className="panel sidebar secondary-panel secondary-right">
+          <section className="panel-block">
+            <div className="panel-heading">
+              <h2>Quick stats</h2>
+              <span className="badge neutral">live</span>
+            </div>
+            <ul className="selection-list">
+              <li>
+                <strong>Persons</strong>
+                <span>{validation.persons.length}</span>
+              </li>
+              <li>
+                <strong>Bio edges</strong>
+                <span>{renderedBiologicalRelations.length}</span>
+              </li>
+              <li>
+                <strong>Overlays</strong>
+                <span>{renderedOverlayRelations.length}</span>
+              </li>
+              <li>
+                <strong>Warnings</strong>
+                <span>{validation.warnings.length}</span>
+              </li>
+            </ul>
+          </section>
+        </aside>
+      ) : null}
+
     </main>
   )
 }
 
-function buildHouseAnchors(validation: ValidationResult, layout: LayoutResult): HouseAnchor[] {
+function buildHouseAnchors(
+  validation: ValidationResult,
+  layout: LayoutResult,
+  houseDefinitions: HouseDefinitions,
+): HouseAnchor[] {
+  const definitionLookup = buildHouseDefinitionLookup(houseDefinitions)
+  const anchorableDefinitions = houseDefinitions.houses
+    .filter((house) => house.anchor.enabled && house.tier === 'start')
+    .sort((left, right) => left.anchor.order - right.anchor.order || left.displayName.localeCompare(right.displayName) || left.id.localeCompare(right.id))
+
   const houseMembers = new Map<string, UUID[]>()
+  const labelByHouseId = new Map<string, string>()
 
   for (const person of validation.persons) {
-    const primaryHouse = getPrimaryHouse(person.houses)
+    const primaryHouse = getPrimaryHouse(person.houses, definitionLookup)
 
-    if (!primaryHouse) {
+    if (!primaryHouse || !primaryHouse.anchor.enabled || primaryHouse.tier !== 'start') {
       continue
     }
 
-    const currentMembers = houseMembers.get(primaryHouse) ?? []
+    const currentMembers = houseMembers.get(primaryHouse.id) ?? []
     currentMembers.push(person.id)
     currentMembers.sort((left, right) => left.localeCompare(right))
-    houseMembers.set(primaryHouse, currentMembers)
+    houseMembers.set(primaryHouse.id, currentMembers)
+    labelByHouseId.set(primaryHouse.id, primaryHouse.displayName)
   }
 
-  const groupedAnchors = Array.from(houseMembers.entries())
-    .sort(([leftHouse], [rightHouse]) => leftHouse.localeCompare(rightHouse))
-    .map(([house, memberIds]) => {
+  const groupedAnchors = anchorableDefinitions
+    .map((house) => {
+      const memberIds = houseMembers.get(house.id) ?? []
       const nodes = memberIds
         .map((memberId) => layout.nodes.get(memberId))
         .filter((node): node is PositionedNode => node !== undefined)
@@ -1071,18 +1842,30 @@ function buildHouseAnchors(validation: ValidationResult, layout: LayoutResult): 
       const topNodes = nodes.filter((node) => Math.abs(node.y - minY) < 1)
       const minX = Math.min(...topNodes.map((node) => node.x))
       const maxX = Math.max(...topNodes.map((node) => node.x + node.width))
-      const width = Math.max(140, house.length * 8 + 42)
+      const width = Math.max(140, house.displayName.length * 8 + 42)
       const centerX = (minX + maxX) / 2
 
       return {
-        house,
+        houseId: house.id,
+        displayName: labelByHouseId.get(house.id) ?? house.displayName,
         memberIds: topNodes.map((node) => node.id).sort((left, right) => left.localeCompare(right)),
         centerX,
         minY,
         width,
+        order: house.anchor.order,
       }
     })
-    .filter((entry): entry is { house: string; memberIds: UUID[]; centerX: number; minY: number; width: number } => entry !== null)
+    .filter(
+      (entry): entry is {
+        houseId: string
+        displayName: string
+        memberIds: UUID[]
+        centerX: number
+        minY: number
+        width: number
+        order: number
+      } => entry !== null,
+    )
 
   if (groupedAnchors.length === 0) {
     return []
@@ -1091,17 +1874,19 @@ function buildHouseAnchors(validation: ValidationResult, layout: LayoutResult): 
   const topRowY = Math.min(...groupedAnchors.map((entry) => entry.minY)) - 86
   const anchorGap = 18
   const placedAnchors: Array<{
-    house: string
+    houseId: string
+    displayName: string
     memberIds: UUID[]
     centerX: number
     minY: number
     width: number
+    order: number
     x: number
   }> = []
 
   for (const entry of groupedAnchors
     .slice()
-    .sort((left, right) => left.centerX - right.centerX || left.house.localeCompare(right.house))) {
+    .sort((left, right) => left.centerX - right.centerX || left.order - right.order || left.displayName.localeCompare(right.displayName))) {
     const idealX = entry.centerX - entry.width / 2
     const previous = placedAnchors.at(-1)
     const minX = previous ? previous.x + previous.width + anchorGap : idealX
@@ -1113,7 +1898,8 @@ function buildHouseAnchors(validation: ValidationResult, layout: LayoutResult): 
   }
 
   return placedAnchors.map((entry) => ({
-    house: entry.house,
+    houseId: entry.houseId,
+    displayName: entry.displayName,
     memberIds: entry.memberIds,
     x: entry.x,
     y: topRowY,
@@ -1122,9 +1908,39 @@ function buildHouseAnchors(validation: ValidationResult, layout: LayoutResult): 
   }))
 }
 
-function getPrimaryHouse(houses: string[] | undefined): string | null {
-  const primaryHouse = houses?.[0]?.trim()
-  return primaryHouse ? primaryHouse : null
+function buildHouseDefinitionLookup(houseDefinitions: HouseDefinitions) {
+  const lookup = new Map<string, HouseDefinition>()
+
+  for (const house of houseDefinitions.houses) {
+    lookup.set(normalizeHouseKey(house.id), house)
+    lookup.set(normalizeHouseKey(house.displayName), house)
+
+    for (const alias of house.aliases ?? []) {
+      lookup.set(normalizeHouseKey(alias), house)
+    }
+  }
+
+  return lookup
+}
+
+function getPrimaryHouse(houses: string[] | undefined, lookup: Map<string, HouseDefinition>): HouseDefinition | null {
+  for (const candidate of houses ?? []) {
+    const house = lookup.get(normalizeHouseKey(candidate))
+
+    if (house) {
+      return house
+    }
+  }
+
+  return null
+}
+
+function normalizeHouseKey(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '')
 }
 
 function buildBiologicalChildGroups(
@@ -1314,6 +2130,14 @@ function alignMarriagePairs(
   return {
     nodes: adjustedNodes,
   }
+}
+
+function formatTimeValue(value: TimeValue): string {
+  if (!value) {
+    return 'n/a'
+  }
+
+  return `${value.era} ${value.year}`
 }
 
 function getGenderBadge(gender: string | null | undefined): string {
