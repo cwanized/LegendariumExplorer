@@ -24,12 +24,46 @@ New-LegendariumUuid
 
 ### Import-LegendariumDataset
 
-Loads one dataset root into memory.
+Loads one dataset root into memory. **Important:** This function loads per-item JSON files based on SlimIndex references.
 
 ```powershell
 Import-LegendariumDataset -RootPath . -DatasetName demo
 Import-LegendariumDataset -RootPath . -DatasetName prod -AllowMissing
 ```
+
+Dataset Structure:
+
+Each dataset is organized as follows:
+
+```
+{dataset-name}/
+├── persons/
+│   ├── index.json (SlimIndex with filenames)
+│   ├── {uuid}_{name}.json (individual person files)
+│   └── ...
+├── relations/
+│   ├── index.json (SlimIndex with filenames)
+│   ├── {uuid}.json (individual relation files)
+│   └── ...
+├── events/
+│   ├── index.json (SlimIndex with filenames)
+│   ├── {uuid}_{type}.json (individual event files)
+│   └── ...
+└── scenario-manifest.json
+```
+
+The `index.json` files contain only **filenames**, not embedded objects:
+
+```json
+{
+  "items": [
+    "550e8400-e29b-41d4-a716-446655440001_arathorn-ii.json",
+    "550e8400-e29b-41d4-a716-446655440002_gilraen.json"
+  ]
+}
+```
+
+`Import-LegendariumDataset` reads these index files and loads each individual item file.
 
 ### Get-LegendariumPerson
 
@@ -43,7 +77,7 @@ Get-LegendariumPerson -RootPath . -DatasetName demo -Id 550e8400-e29b-41d4-a716-
 
 ### Add-LegendariumPerson
 
-Creates one person record and persists it back to the target dataset.
+Creates one person record and persists it back to the target dataset using per-item files.
 
 ```powershell
 Add-LegendariumPerson `
@@ -105,6 +139,20 @@ Runs deterministic validation and optional contract evaluation against `datasets
 ```powershell
 Invoke-TestingValidation -RootPath .
 ```
+
+## Data Persistence and Per-Item Files
+
+When using authoring commands (`Add-LegendariumPerson`, `Add-LegendariumMarriage`, `Add-LegendariumChild`), the PSModule automatically:
+
+1. Updates the in-memory dataset
+2. Calls `Save-LegendariumDataset` which:
+   - Writes **each person** to an individual file: `persons/{uuid}_{name}.json`
+   - Writes **each relation** to an individual file: `relations/{uuid}.json`
+   - Writes **each event** to an individual file: `events/{uuid}_{type}.json`
+   - Writes **SlimIndex files** containing only filenames: `index.json` with `{ items: ["file1.json", "file2.json", ...] }`
+   - Writes the scenario manifest: `scenario-manifest.json`
+
+**Important:** The index files must contain **only filenames**, not embedded objects. The frontend app uses these filenames to fetch individual item files.
 
 ### Invoke-DemoValidation
 

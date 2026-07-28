@@ -1,0 +1,22 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440028",
+  "name": "Barahir",
+  "gender": "male",
+  "birth": null,
+  "death": {
+    "era": "First Age",
+    "year": 460
+  },
+  "houses": [
+    "House of Beor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Barahir"
+    }
+  ],
+  "metadata": {
+    "description": "Son of Bregor and father of Beren"
+  }
+}

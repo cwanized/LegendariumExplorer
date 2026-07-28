@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="Electron" modified="2026-07-12T00:00:00.000Z" agent="5.0" version="24.0.0">
+  <diagram name="View 1: Standard Layout" id="view-1">
+    <mxGraphModel dx="1200" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Header -->
+        <mxCell id="header" value="TOP BAR" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1f5ff;strokeColor=#0277bd;strokeWidth=2;fontSize=11;fontStyle=bold;align=left;verticalAlign=middle;padding=5;" vertex="1" parent="1">
+          <mxGeometry x="0" y="0" width="1600" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="header-content" value="Legendarium Explorer | View: Tree | Reset | Fullscreen | Help" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=none;fontSize=10;align=left;verticalAlign=middle;padding=3;" vertex="1" parent="1">
+          <mxGeometry x="10" y="5" width="400" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- LEFT SECONDARY SIDEBAR -->
+        <mxCell id="left-secondary" value="LEFT SECONDARY SIDEBAR" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#6a1b9a;strokeWidth=2;fontSize=11;fontStyle=bold;" vertex="1" parent="1">
+          <mxGeometry x="0" y="50" width="220" height="950" as="geometry" />
+        </mxCell>
+        <mxCell id="left-content" value="📋 Dev / Settings
+—
+Dataset Switcher
+Contract Status
+Warnings Log
+—
+⟲ Minimize" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#ddd;fontSize=9;align=left;padding=8;" vertex="1" parent="1">
+          <mxGeometry x="5" y="60" width="210" height="930" as="geometry" />
+        </mxCell>
+        
+        <!-- CENTER AREA: Canvas + Primary Panels -->
+        <mxCell id="center-wrapper" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="220" y="50" width="1160" height="950" as="geometry" />
+        </mxCell>
+        
+        <!-- Main Canvas -->
+        <mxCell id="canvas" value="🌳 GENEALOGY TREE CANVAS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#1b5e20;strokeWidth=1;fontSize=11;fontStyle=bold;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="230" y="60" width="1140" height="920" as="geometry" />
+        </mxCell>
+        
+        <!-- PRIMARY PANEL 1: FILTER (Top-Left Corner) -->
+        <mxCell id="filter-panel" value="PRIMARY: FILTER" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#e65100;strokeWidth=2;fontSize=10;fontStyle=bold;padding=5;" vertex="1" parent="1">
+          <mxGeometry x="240" y="70" width="240" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="filter-minimize" value="−" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e65100;strokeColor=#e65100;fontSize=8;fontStyle=bold;textColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="465" y="75" width="12" height="12" as="geometry" />
+        </mxCell>
+        <mxCell id="filter-content" value="⚙️ House Filter
+Era Filter
+Active Filters (chips)
+[Minimize to chip]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#ddd;fontSize=8;align=left;padding=4;" vertex="1" parent="1">
+          <mxGeometry x="245" y="90" width="230" height="175" as="geometry" />
+        </mxCell>
+        
+        <!-- PRIMARY PANEL 2: HIGHLIGHT (Top-Right Corner) -->
+        <mxCell id="highlight-panel" value="PRIMARY: HIGHLIGHT &amp; ANALYZE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#6a1b9a;strokeWidth=2;fontSize=10;fontStyle=bold;padding=5;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="70" width="240" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="highlight-minimize" value="−" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#6a1b9a;strokeColor=#6a1b9a;fontSize=8;fontStyle=bold;textColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="1335" y="75" width="12" height="12" as="geometry" />
+        </mxCell>
+        <mxCell id="highlight-content" value="✨ Selection: 1/2
+LCA Result
+Fade Unrelated
+[Minimize to chip]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f1f8e9;strokeColor=#ddd;fontSize=8;align=left;padding=4;" vertex="1" parent="1">
+          <mxGeometry x="1115" y="90" width="230" height="175" as="geometry" />
+        </mxCell>
+        
+        <!-- PRIMARY PANEL 3: INSPECTOR (Bottom-Right Corner) -->
+        <mxCell id="inspector-panel" value="PRIMARY: INSPECTOR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c2185b;strokeWidth=2;fontSize=10;fontStyle=bold;padding=5;" vertex="1" parent="1">
+          <mxGeometry x="1110" y="730" width="240" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="inspector-minimize" value="−" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#c2185b;strokeColor=#c2185b;fontSize=8;fontStyle=bold;textColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="1335" y="735" width="12" height="12" as="geometry" />
+        </mxCell>
+        <mxCell id="inspector-content" value="📄 Info | Relations | Sources | Stats
+—
+Selected Person:
+Name, Houses, Bio/Death
+Quick Links" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#ddd;fontSize=8;align=left;padding=4;" vertex="1" parent="1">
+          <mxGeometry x="1115" y="750" width="230" height="190" as="geometry" />
+        </mxCell>
+        
+        <!-- Search/Find (Bottom-Left, floating) -->
+        <mxCell id="search-panel" value="🔍 SEARCH" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;strokeWidth=1;fontSize=9;fontStyle=bold;padding=3;" vertex="1" parent="1">
+          <mxGeometry x="240" y="850" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="search-content" value="Find person
+Search input
+Results" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#ddd;fontSize=8;align=left;padding=3;" vertex="1" parent="1">
+          <mxGeometry x="245" y="865" width="170" height="70" as="geometry" />
+        </mxCell>
+        
+        <!-- RIGHT SECONDARY SIDEBAR -->
+        <mxCell id="right-secondary" value="RIGHT SECONDARY SIDEBAR" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c2185b;strokeWidth=2;fontSize=11;fontStyle=bold;" vertex="1" parent="1">
+          <mxGeometry x="1380" y="50" width="220" height="950" as="geometry" />
+        </mxCell>
+        <mxCell id="right-content" value="📊 Quick Stats
+—
+Visible Persons
+Relations
+Warnings
+—
+⟲ Minimize" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#ddd;fontSize=9;align=left;padding=8;" vertex="1" parent="1">
+          <mxGeometry x="1385" y="60" width="210" height="930" as="geometry" />
+        </mxCell>
+        
+        <!-- Footer -->
+        <mxCell id="note" value="VIEW 1: Standard Layout — Secondary Panels left/right | Primary Panels (Filter/Highlight/Inspector) docked in Canvas | Search floating" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=9;fontStyle=bold;align=left;padding=5;" vertex="1" parent="1">
+          <mxGeometry x="0" y="1000" width="1600" height="35" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram name="View 2: Minimized Panels" id="view-2">
+    <mxGraphModel dx="1200" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Header -->
+        <mxCell id="header" value="TOP BAR" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1f5ff;strokeColor=#0277bd;strokeWidth=2;fontSize=11;fontStyle=bold;align=left;verticalAlign=middle;padding=5;" vertex="1" parent="1">
+          <mxGeometry x="0" y="0" width="1600" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- LEFT SECONDARY SIDEBAR (minimized) -->
+        <mxCell id="left-secondary" value="⋮" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#6a1b9a;strokeWidth=2;fontSize=14;fontStyle=bold;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="0" y="50" width="40" height="950" as="geometry" />
+        </mxCell>
+        
+        <!-- CENTER AREA: Canvas (Full Width) -->
+        <mxCell id="canvas" value="🌳 GENEALOGY TREE CANVAS (More Space)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#1b5e20;strokeWidth=1;fontSize=11;fontStyle=bold;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="50" y="60" width="1510" height="920" as="geometry" />
+        </mxCell>
+        
+        <!-- PRIMARY PANELS (Minimized to Chips) -->
+        <mxCell id="filter-chip" value="⚙️ Filter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#e65100;strokeWidth=1;fontSize=8;padding=3;" vertex="1" parent="1">
+          <mxGeometry x="70" y="75" width="50" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="highlight-chip" value="✨ Highlight" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#6a1b9a;strokeWidth=1;fontSize=8;padding=3;" vertex="1" parent="1">
+          <mxGeometry x="130" y="75" width="60" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="search-chip" value="🔍 Search" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1565c0;strokeWidth=1;fontSize=8;padding=3;" vertex="1" parent="1">
+          <mxGeometry x="200" y="75" width="50" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="inspector-chip" value="📄 Info" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c2185b;strokeWidth=1;fontSize=8;padding=3;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="75" width="45" height="25" as="geometry" />
+        </mxCell>
+        
+        <!-- RIGHT SECONDARY SIDEBAR (minimized) -->
+        <mxCell id="right-secondary" value="⋮" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c2185b;strokeWidth=2;fontSize=14;fontStyle=bold;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="1560" y="50" width="40" height="950" as="geometry" />
+        </mxCell>
+        
+        <!-- Footer -->
+        <mxCell id="note" value="VIEW 2: Minimized Panels — Secondary panels collapsed to tab icons | Primary panels minimized to chip buttons | Click chip to expand panel" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=9;fontStyle=bold;align=left;padding=5;" vertex="1" parent="1">
+          <mxGeometry x="0" y="1000" width="1600" height="35" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram name="View 3: Fullscreen Mode" id="view-3">
+    <mxGraphModel dx="1200" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Minimal Header (Fullscreen) -->
+        <mxCell id="header" value="Legendarium Explorer | ↗ Exit Fullscreen" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#1a1a1a;strokeColor=none;fontSize=10;fontColor=#ffffff;align=left;verticalAlign=middle;padding=5;" vertex="1" parent="1">
+          <mxGeometry x="0" y="0" width="1600" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Full Canvas -->
+        <mxCell id="canvas" value="🌳 GENEALOGY TREE CANVAS (Maximized Full-Screen)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#1b5e20;strokeWidth=1;fontSize=11;fontStyle=bold;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="0" y="40" width="1600" height="950" as="geometry" />
+        </mxCell>
+        
+        <!-- PRIMARY PANELS (Still Accessible as Chips) -->
+        <mxCell id="chip-bar" value="Chips stay accessible: ⚙️ Filter | ✨ Highlight | 🔍 Search | 📄 Info" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#333333;strokeColor=#666;fontSize=8;fontColor=#ffffff;align=left;verticalAlign=middle;padding=5;" vertex="1" parent="1">
+          <mxGeometry x="10" y="70" width="350" height="25" as="geometry" />
+        </mxCell>
+        
+        <!-- Footer -->
+        <mxCell id="note" value="VIEW 3: Fullscreen — Secondary sidebars hidden | Canvas maximized | Primary panels minimized to chips (bottom-left) | Click chip to expand panel over canvas" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#f57f17;fontSize=9;fontStyle=bold;align=left;padding=5;" vertex="1" parent="1">
+          <mxGeometry x="0" y="1000" width="1600" height="35" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram name="Info: Panel Types" id="panel-types">
+    <mxGraphModel dx="1000" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <mxCell id="title" value="PANEL ARCHITECTURE" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1f5ff;strokeColor=#0277bd;strokeWidth=2;fontSize=14;fontStyle=bold;align=left;padding=10;" vertex="1" parent="1">
+          <mxGeometry x="10" y="10" width="1380" height="35" as="geometry" />
+        </mxCell>
+        
+        <!-- SECONDARY PANELS -->
+        <mxCell id="sec-title" value="🔷 SECONDARY PANELS (Left &amp; Right Sidebars)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#6a1b9a;strokeWidth=2;fontSize=12;fontStyle=bold;align=left;padding=8;" vertex="1" parent="1">
+          <mxGeometry x="10" y="60" width="1380" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="sec-desc" value="PURPOSE: Dev tools, settings, global overview
+LOCATION: Fixed left/right sidebars (outside Canvas)
+BEHAVIOR: Can be minimized to tab icons | Overlapped by Canvas when fullscreen | Not part of primary workflow
+CONTENT LEFT: Dataset switcher, Contract status, Warnings
+CONTENT RIGHT: Quick statistics, Quick notes" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#ddd;fontSize=10;align=left;padding=8;" vertex="1" parent="1">
+          <mxGeometry x="10" y="95" width="1380" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- PRIMARY PANELS -->
+        <mxCell id="prim-title" value="🔶 PRIMARY PANELS (Docked in Canvas)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#e65100;strokeWidth=2;fontSize=12;fontStyle=bold;align=left;padding=8;" vertex="1" parent="1">
+          <mxGeometry x="10" y="210" width="1380" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="prim-desc" value="PURPOSE: Core analysis workflow (Filter, Highlight, Inspect)
+LOCATION: Floating/docked WITHIN Canvas area (top-left, top-right, bottom-right)
+BEHAVIOR: Can be minimized to chip buttons (≈25px) | Always accessible via chip click | Never fully hidden
+ALWAYS AVAILABLE: ⚙️ Filter | ✨ Highlight | 📄 Inspector | 🔍 Search
+IMPORTANT: These are USER CONTROLS, not peripheral info" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#ddd;fontSize=10;align=left;padding=8;" vertex="1" parent="1">
+          <mxGeometry x="10" y="245" width="1380" height="120" as="geometry" />
+        </mxCell>
+        
+        <!-- STATE MATRIX -->
+        <mxCell id="states-title" value="STATE MATRIX" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#1b5e20;strokeWidth=2;fontSize=12;fontStyle=bold;align=left;padding=8;" vertex="1" parent="1">
+          <mxGeometry x="10" y="380" width="1380" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="state1" value="STANDARD: Secondary panels visible (L+R) | Primary panels expanded (full) | Canvas squeezed between" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#bbb;fontSize=9;align=left;padding=5;" vertex="1" parent="1">
+          <mxGeometry x="10" y="410" width="1380" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="state2" value="MINIMIZED: Secondary panels tabs (⋮) | Primary panels chips (⚙️ ✨ 🔍 📄) | Canvas expanded" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#bbb;fontSize=9;align=left;padding=5;" vertex="1" parent="1">
+          <mxGeometry x="10" y="440" width="1380" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="state3" value="FULLSCREEN: Secondary panels HIDDEN | Primary panels chips (floating) | Canvas full-width/height | Click chip to expand panel as overlay" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f9f9f9;strokeColor=#bbb;fontSize=9;align=left;padding=5;" vertex="1" parent="1">
+          <mxGeometry x="10" y="470" width="1380" height="25" as="geometry" />
+        </mxCell>
+        
+        <!-- KEY RULES -->
+        <mxCell id="rules-title" value="KEY DESIGN RULES" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c2185b;strokeWidth=2;fontSize=12;fontStyle=bold;align=left;padding=8;" vertex="1" parent="1">
+          <mxGeometry x="10" y="510" width="1380" height="25" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="rules" value="1. Secondary panels are optional (can be minimized/hidden)
+2. Primary panels are NEVER fully hidden (minimum: small chip button)
+3. Primary panels are always interactive from Canvas, never require secondary sidebars
+4. Secondary panels provide dev/meta info, not core workflow
+5. Fullscreen mode prioritizes Canvas but keeps primary workflow controls accessible" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#ddd;fontSize=9;align=left;padding=8;" vertex="1" parent="1">
+          <mxGeometry x="10" y="540" width="1380" height="100" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

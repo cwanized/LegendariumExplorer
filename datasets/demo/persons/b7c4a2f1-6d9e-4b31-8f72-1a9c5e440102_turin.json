@@ -1,0 +1,25 @@
+{
+  "id": "b7c4a2f1-6d9e-4b31-8f72-1a9c5e440102",
+  "name": "Turin",
+  "gender": "male",
+  "birth": {
+    "era": "First Age",
+    "year": 464
+  },
+  "death": {
+    "era": "First Age",
+    "year": 499
+  },
+  "houses": [
+    "Hador"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Turin_Turambar"
+    }
+  ],
+  "metadata": {
+    "description": "Turin Turambar, son of Hurin and Morwen."
+  }
+}

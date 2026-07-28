@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "houses": [
+    {
+      "id": "vanyar",
+      "displayName": "Vanyar",
+      "aliases": ["Vanyar"],
+      "tier": "start",
+      "anchor": {
+        "enabled": true,
+        "order": 10
+      }
+    },
+    {
+      "id": "noldor",
+      "displayName": "Noldor",
+      "aliases": ["Noldor"],
+      "tier": "start",
+      "anchor": {
+        "enabled": true,
+        "order": 20
+      }
+    },
+    {
+      "id": "teleri",
+      "displayName": "Teleri",
+      "aliases": ["Teleri"],
+      "tier": "start",
+      "anchor": {
+        "enabled": true,
+        "order": 30
+      }
+    },
+    {
+      "id": "house-of-beor",
+      "displayName": "House of Beor",
+      "aliases": ["House of Beor", "House of Bëor"],
+      "tier": "start",
+      "anchor": {
+        "enabled": true,
+        "order": 40
+      }
+    },
+    {
+      "id": "house-of-hador",
+      "displayName": "House of Hador",
+      "aliases": ["Hador", "House of Hador"],
+      "tier": "start",
+      "anchor": {
+        "enabled": true,
+        "order": 50
+      }
+    },
+    {
+      "id": "house-of-haleth",
+      "displayName": "House of Haleth",
+      "aliases": ["House of Haleth"],
+      "tier": "start",
+      "anchor": {
+        "enabled": true,
+        "order": 60
+      }
+    },
+    {
+      "id": "seven-fathers-of-the-dwarves",
+      "displayName": "Seven Fathers of the Dwarves",
+      "aliases": ["Seven Fathers of the Dwarves"],
+      "tier": "start",
+      "anchor": {
+        "enabled": true,
+        "order": 70
+      }
+    },
+    {
+      "id": "thingol",
+      "displayName": "Thingol",
+      "aliases": ["Thingol"],
+      "tier": "later",
+      "anchor": {
+        "enabled": false,
+        "order": 80
+      }
+    },
+    {
+      "id": "alqualonde",
+      "displayName": "Alqualonde",
+      "aliases": ["Alqualonde", "Alqualondë"],
+      "tier": "later",
+      "anchor": {
+        "enabled": false,
+        "order": 90
+      }
+    },
+    {
+      "id": "dunedain",
+      "displayName": "Dunedain",
+      "aliases": ["Dunedain", "Dúnedain"],
+      "tier": "later",
+      "anchor": {
+        "enabled": false,
+        "order": 100
+      }
+    },
+    {
+      "id": "valar",
+      "displayName": "Valar",
+      "aliases": ["Valar"],
+      "tier": "later",
+      "anchor": {
+        "enabled": false,
+        "order": 110
+      }
+    },
+    {
+      "id": "maiar",
+      "displayName": "Maiar",
+      "aliases": ["Maiar"],
+      "tier": "later",
+      "anchor": {
+        "enabled": false,
+        "order": 120
+      }
+    },
+    {
+      "id": "eru-iluvatar",
+      "displayName": "Eru Iluvatar",
+      "aliases": ["Eru Iluvatar", "Eru Ilúvatar"],
+      "tier": "later",
+      "anchor": {
+        "enabled": false,
+        "order": 130
+      }
+    },
+    {
+      "id": "hobbits",
+      "displayName": "Hobbits",
+      "aliases": ["Hobbits"],
+      "tier": "later",
+      "anchor": {
+        "enabled": false,
+        "order": 140
+      }
+    }
+  ]
+}

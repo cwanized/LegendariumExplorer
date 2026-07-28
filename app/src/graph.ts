@@ -12,6 +12,24 @@ export type SourceLink = {
   url: string
 }
 
+export type HouseTier = 'start' | 'later'
+
+export type HouseDefinition = {
+  id: string
+  displayName: string
+  aliases?: string[]
+  tier: HouseTier
+  anchor: {
+    enabled: boolean
+    order: number
+  }
+}
+
+export type HouseDefinitions = {
+  version: number
+  houses: HouseDefinition[]
+}
+
 export type Person = {
   id: UUID
   name: string
@@ -81,6 +99,7 @@ export type LoadedDataset = {
   relations: Relation[]
   events: EventRecord[]
   manifest: ScenarioManifest
+  houseDefinitions: HouseDefinitions
 }
 
 export type DatasetName = 'testing' | 'demo' | 'prod'
@@ -173,8 +192,9 @@ function getAppAssetPath(relativePath: string): string {
 export async function loadDataset(datasetName: DatasetName): Promise<LoadedDataset> {
   const allowMissing = datasetName === 'prod'
   const basePath = getAppAssetPath(`datasets/${datasetName}`)
-  const [manifest, personIndex, relationIndex, eventIndex] = await Promise.all([
+  const [manifest, houseDefinitions, personIndex, relationIndex, eventIndex] = await Promise.all([
     loadJson<ScenarioManifest>(`${basePath}/scenario-manifest.json`, allowMissing, { scenarios: [] }),
+    loadJson<HouseDefinitions>(`${basePath}/house-definitions.json`, true, { version: 1, houses: [] }),
     loadJson<{ items: string[] }>(`${basePath}/persons/index.json`, allowMissing, { items: [] }),
     loadJson<{ items: string[] }>(`${basePath}/relations/index.json`, allowMissing, { items: [] }),
     loadJson<{ items: string[] }>(`${basePath}/events/index.json`, allowMissing, { items: [] }),
@@ -189,6 +209,7 @@ export async function loadDataset(datasetName: DatasetName): Promise<LoadedDatas
 
   return {
     manifest,
+    houseDefinitions,
     persons: sortById(persons),
     relations: sortById(relations),
     events: sortById(events),
