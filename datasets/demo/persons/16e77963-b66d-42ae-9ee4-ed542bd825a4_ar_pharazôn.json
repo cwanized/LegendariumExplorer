@@ -1,0 +1,23 @@
+{
+  "id": "16e77963-b66d-42ae-9ee4-ed542bd825a4",
+  "name": "Ar-Pharazôn",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Second Age",
+    "year": 2930
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Ar-Pharazôn"
+    }
+  ],
+  "metadata": {
+    "description": "King of the Dúnedain."
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "8a555d7b-547b-40e1-ae9a-af7d6506f325",
+  "name": "Argeleb I",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 1010
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Argeleb_I"
+    }
+  ],
+  "metadata": {
+    "description": "Chieftain of the Dúnedain."
+  }
+}

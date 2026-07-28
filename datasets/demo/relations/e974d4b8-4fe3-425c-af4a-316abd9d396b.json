@@ -1,0 +1,12 @@
+{
+  "id": "e974d4b8-4fe3-425c-af4a-316abd9d396b",
+  "type": "biological_parent",
+  "from": "0cbed210-bca9-4273-a0aa-08ad57ccab2d",
+  "to": "b2484e16-a37e-43bd-a522-0e2906c7b0f0",
+  "attributes": {
+    "date": {
+      "era": "Third Age",
+      "year": 370
+    }
+  }
+}

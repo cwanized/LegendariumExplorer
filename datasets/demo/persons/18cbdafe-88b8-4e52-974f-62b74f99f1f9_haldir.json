@@ -1,0 +1,30 @@
+{
+  "id": "18cbdafe-88b8-4e52-974f-62b74f99f1f9",
+  "name": "Haldir",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "First Age",
+    "year": null
+  },
+  "death": {
+    "era": "First Age",
+    "year": 472
+  },
+  "houses": [
+    "House of Haleth"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Haldir_of_Brethil"
+    },
+    {
+      "label": "Fandom",
+      "url": "https://lotr.fandom.com/wiki/Haldir_(House_of_Haleth)"
+    }
+  ],
+  "metadata": {
+    "description": "Son of Halmir and chieftain of the House of Haleth. Father of Hareth (wife of Galdor of the House of Hador) and Hundar. He fell in the Battle of Tumhalad during the War of Wrath, defending Brethil against the forces of Morgoth."
+  }
+}

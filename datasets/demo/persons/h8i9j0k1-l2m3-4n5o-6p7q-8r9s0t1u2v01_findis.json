@@ -1,0 +1,24 @@
+{
+  "id": "h8i9j0k1-l2m3-4n5o-6p7q-8r9s0t1u2v01",
+  "name": "Findis",
+  "gender": "female",
+  "species": "Elf",
+  "birth": {
+    "era": "Years of the Trees",
+    "year": null
+  },
+  "death": null,
+  "houses": [
+    "Noldor",
+    "Vanyar"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Findis"
+    }
+  ],
+  "metadata": {
+    "description": "Daughter of Finwë and Indis. She was the only daughter of Finwë by his second wife Indis, and the half-sister of Fëanor. Her name means 'Fair Woman' in Quenya. She had three brothers: Fingolfin, Finarfin, and a younger sister Lalwen. Through her father, she was of the Noldor; through her mother Indis (of the House of Ingwë), she had Vanyarin blood, giving her the characteristic golden hair of the Vanyar."
+  }
+}

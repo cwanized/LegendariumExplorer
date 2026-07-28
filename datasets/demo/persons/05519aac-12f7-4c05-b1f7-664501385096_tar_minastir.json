@@ -1,0 +1,23 @@
+{
+  "id": "05519aac-12f7-4c05-b1f7-664501385096",
+  "name": "Tar-Minastir",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Second Age",
+    "year": 1370
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Tar-Minastir"
+    }
+  ],
+  "metadata": {
+    "description": "King of the Dúnedain."
+  }
+}
