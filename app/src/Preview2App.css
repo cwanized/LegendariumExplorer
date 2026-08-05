@@ -91,7 +91,7 @@
 }
 
 .preview2-brand-title {
-  font-size: 1.2rem;
+  font-size: clamp(1.2rem, 1.2vw + 0.95rem, 1.4rem);
 }
 
 .preview2-hamburger,
@@ -113,13 +113,13 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 11px 15px;
   border-radius: 999px;
   cursor: pointer;
 }
 
 .preview2-chip {
-  padding: 8px 11px;
+  padding: 8px 12px;
   border-radius: 999px;
   cursor: pointer;
 }
@@ -238,6 +238,39 @@
   backdrop-filter: blur(18px);
 }
 
+.preview2-inline-menu {
+  position: relative;
+}
+
+.preview2-inline-menu-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 180px;
+  z-index: 25;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--preview2-tree-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--preview2-tree-surface-strong) 92%, transparent);
+  box-shadow: 0 20px 42px var(--preview2-tree-shadow);
+}
+
+.preview2-inline-menu-popover button {
+  border: 1px solid var(--preview2-tree-border);
+  background: color-mix(in srgb, var(--preview2-tree-surface) 85%, transparent);
+  border-radius: 10px;
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--preview2-tree-text);
+  cursor: pointer;
+}
+
+.preview2-inline-menu-popover button:hover {
+  background: color-mix(in srgb, var(--preview2-tree-accent-soft) 46%, transparent);
+}
+
 .preview2-toolbar-group.align-end {
   margin-left: auto;
   justify-content: flex-end;
@@ -307,6 +340,36 @@
   border-radius: 20px;
 }
 
+.preview2-panel-resize-handle {
+  position: absolute;
+  top: 58px;
+  bottom: 14px;
+  width: 10px;
+  z-index: 12;
+}
+
+.preview2-panel-resize-handle.left {
+  right: -5px;
+  cursor: ew-resize;
+}
+
+.preview2-panel-resize-handle.right {
+  left: -5px;
+  cursor: ew-resize;
+}
+
+.preview2-panel-resize-corner {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  right: 8px;
+  bottom: 8px;
+  border-right: 2px solid var(--preview2-tree-border);
+  border-bottom: 2px solid var(--preview2-tree-border);
+  cursor: nwse-resize;
+  opacity: 0.7;
+}
+
 .preview2-panel-header,
 .preview2-section-heading,
 .preview2-filter-label-row {
@@ -370,13 +433,13 @@
 .preview2-person-card,
 .preview2-empty-card,
 .preview2-static-card {
-  padding: 14px;
+  padding: 15px;
   border-radius: 16px;
 }
 
 .preview2-card-block + .preview2-card-block,
 .preview2-person-card + .preview2-person-card {
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .preview2-search-results,
@@ -389,6 +452,13 @@
 .preview2-result-actions-stack {
   flex-direction: column;
   align-items: stretch;
+  justify-content: center;
+}
+
+.preview2-search-action-button {
+  width: 38px;
+  height: 38px;
+  padding: 0;
   justify-content: center;
 }
 
@@ -429,7 +499,7 @@
 }
 
 .preview2-filter-group + .preview2-filter-group {
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .preview2-checkbox-row,
@@ -456,18 +526,25 @@
   border: 1px solid var(--preview2-tree-border);
   border-radius: 12px;
   background: color-mix(in srgb, var(--preview2-tree-surface) 82%, transparent);
+  align-items: center;
 }
 
 .preview2-lca-block {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .preview2-lca-block p {
   margin: 0;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-radius: 12px;
   background: color-mix(in srgb, var(--preview2-tree-accent-soft) 48%, transparent);
+}
+
+.preview2-no-lca {
+  border: 1px dashed var(--preview2-tree-border);
+  border-radius: 10px;
+  padding: 10px 12px;
 }
 
 .preview2-selection-row strong,
@@ -503,7 +580,7 @@
 
 .preview2-restore-button {
   position: absolute;
-  top: 18px;
+  top: 12px;
   z-index: 11;
 }
 
@@ -722,8 +799,8 @@
 
 .preview2-close-fullscreen {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 12px;
+  right: 12px;
   z-index: 12;
   border: 1px solid var(--preview2-page-border);
   background: color-mix(in srgb, var(--preview2-page-surface) 88%, transparent);
@@ -743,6 +820,14 @@
 .preview2-export-error {
   margin: 12px 18px 18px;
   color: #a14d27;
+  border: 1px solid #b68266;
+  border-radius: 12px;
+  background: color-mix(in srgb, #a14d27 12%, var(--preview2-tree-surface-strong));
+  padding: 10px 12px;
+}
+
+.preview2-reset-settings {
+  margin-top: 12px;
 }
 
 .preview2-section-heading.compact {
@@ -824,5 +909,17 @@
     left: 12px;
     right: 12px !important;
     width: auto;
+  }
+
+  .preview2-primary-panel.is-undocked {
+    max-height: 60vh;
+  }
+
+  .preview2-restore-button.left {
+    left: 12px;
+  }
+
+  .preview2-restore-button.right {
+    right: 12px;
   }
 }
