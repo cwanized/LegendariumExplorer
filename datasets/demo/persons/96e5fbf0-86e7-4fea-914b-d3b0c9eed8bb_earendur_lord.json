@@ -1,0 +1,22 @@
+{
+  "id": "96e5fbf0-86e7-4fea-914b-d3b0c9eed8bb",
+  "name": "Eärendur",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Second Age",
+    "year": 1200
+  },
+  "death": {
+    "era": "Second Age",
+    "year": 1500
+  },
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [],
+  "metadata": {
+    "description": "Lord of Andúnie, ancestor of Amandil.",
+    "canonicity": "unfinished_tales"
+  }
+}

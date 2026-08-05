@@ -1,0 +1,28 @@
+{
+  "id": "9092cd49-d042-466a-a60d-fa920d45bebe",
+  "name": "Círdan",
+  "gender": "male",
+  "species": "Elf",
+  "birth": {
+    "era": "Years of the Trees",
+    "year": 1150
+  },
+  "death": {
+    "era": null,
+    "year": null
+  },
+  "houses": [
+    "Teleri",
+    "Sindar"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Círdan"
+    }
+  ],
+  "metadata": {
+    "description": "The Shipwright, lord of the Falas and later the Grey Havens. Bearer of Narya (the Ring of Fire), which he gave to Gandalf. One of the oldest Elves in Middle-earth.",
+    "canonicity": "canonical"
+  }
+}
