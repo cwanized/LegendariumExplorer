@@ -1,6 +1,47 @@
 # Current State
 
-**Last Updated: 04. August 2026**
+**Last Updated: 05. August 2026**
+
+## Step 5 Closure (05. August 2026)
+
+The requested "step 5" continuation (final QA loop + state update + commit-readiness check) is now completed.
+
+What was validated in this closure pass:
+
+- Preview2 shell and core controls are present and interactive (Reset View, Export PNG, dataset select).
+- Tree interaction path is still stable after the recent touch adjustments:
+	- wheel/trackpad-style zoom over the tree changes SVG `viewBox`,
+	- page zoom is prevented in-tree (`defaultPrevented: true`).
+- Build remains green (`npm run build` in `app/`) with no new diagnostics in touched files.
+
+Current assessment:
+
+- Items previously listed as steps 1-4 are currently functioning well based on the latest checks and user confirmation.
+- Workspace is in a practical commit-ready state for the recent Preview2 stabilization changes.
+
+## Feedback Batches Completed (05. August 2026)
+
+Following user-prioritized feedback order was implemented in this session:
+
+- Batch 1 (Panel Usability & Spacing):
+	- safer undocked-panel drag initiation,
+	- improved panel header/title/action layout,
+	- larger and clearer resize affordances.
+- Batch 2 (Selection/LCA UX):
+	- explicit selection count (`x/2 selected`),
+	- quick actions (`Swap A/B`, per-slot `Focus`, clear flow),
+	- explicit LCA state label (`Idle`, `Connected`, `No path`) plus `Center ancestor` action.
+- Batch 3 (Theme/Contrast Tuning):
+	- active controls inside tree panels now follow tree accent semantics,
+	- improved hover/readability in search and LCA state chips.
+- Batch 4 (Export/Toolbar Polish):
+	- PNG menu outside-click behavior hardened via dedicated menu ref,
+	- export actions now lock while PNG export is running to avoid conflicting interactions.
+
+Validation for these batches:
+
+- `npm run build` in `app/` passes after all four feedback batches.
+- No new diagnostics reported in touched Preview2 files.
 
 ## Current Preview2 Status (04. August 2026)
 

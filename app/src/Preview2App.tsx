@@ -698,6 +698,8 @@ export default function Preview2App() {
   const [exportMessage, setExportMessage] = useState('')
   const canvasViewportRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
+  const pngMenuRef = useRef<HTMLDivElement | null>(null)
+  const pinchDistanceRef = useRef<number | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const panelId = useId().replace(/:/g, '-')
 
@@ -778,7 +780,12 @@ export default function Preview2App() {
       return
     }
 
-    const handlePointerDown = () => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (pngMenuRef.current && target instanceof Node && pngMenuRef.current.contains(target)) {
+        return
+      }
+
       setPngMenuOpen(false)
     }
 
@@ -961,22 +968,87 @@ export default function Preview2App() {
   }, [panState])
 
   useEffect(() => {
-    const svg = svgRef.current
-    if (!svg) {
+    if (isLoading || activePage !== 'family-tree') {
       return
     }
 
+    const shell = canvasViewportRef.current
+    if (!shell) {
+      return
+    }
+
+    const isPanelInteraction = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) {
+        return false
+      }
+
+      return Boolean(target.closest('.preview2-panel-body, .preview2-stats-panel, .preview2-theme-editor'))
+    }
+
+    const isInsideTreeShell = (clientX: number, clientY: number) => {
+      const rect = shell.getBoundingClientRect()
+      return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom
+    }
+
     const handleWheel = (event: WheelEvent) => {
+      if (isPanelInteraction(event.target) || !isInsideTreeShell(event.clientX, event.clientY)) {
+        return
+      }
+
       event.preventDefault()
       zoomCanvas(event.deltaY, event.clientX, event.clientY)
     }
 
-    svg.addEventListener('wheel', handleWheel, { passive: false })
+    const handleTouchMove = (event: TouchEvent) => {
+      if (event.touches.length < 2 || isPanelInteraction(event.target)) {
+        return
+      }
+
+      const first = event.touches[0]
+      const second = event.touches[1]
+      const distance = Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY)
+      const centerX = (first.clientX + second.clientX) / 2
+      const centerY = (first.clientY + second.clientY) / 2
+
+      if (!isInsideTreeShell(centerX, centerY)) {
+        pinchDistanceRef.current = null
+        return
+      }
+
+      if (pinchDistanceRef.current === null) {
+        pinchDistanceRef.current = distance
+        event.preventDefault()
+        return
+      }
+
+      const previousDistance = pinchDistanceRef.current
+      const distanceDelta = Math.abs(distance - previousDistance)
+      pinchDistanceRef.current = distance
+      event.preventDefault()
+      if (distanceDelta < 1.5 || distance <= 0) {
+        return
+      }
+
+      const factor = clamp(previousDistance / distance, 0.92, 1.08)
+      zoomCanvasWithFactor(factor, centerX, centerY)
+    }
+
+    const resetPinch = () => {
+      pinchDistanceRef.current = null
+    }
+
+    window.addEventListener('wheel', handleWheel, { passive: false, capture: true })
+    shell.addEventListener('touchmove', handleTouchMove, { passive: false })
+    shell.addEventListener('touchend', resetPinch)
+    shell.addEventListener('touchcancel', resetPinch)
 
     return () => {
-      svg.removeEventListener('wheel', handleWheel)
+      window.removeEventListener('wheel', handleWheel, { capture: true })
+      shell.removeEventListener('touchmove', handleTouchMove)
+      shell.removeEventListener('touchend', resetPinch)
+      shell.removeEventListener('touchcancel', resetPinch)
     }
-  }, [camera])
+  }, [activePage, isLoading])
 
   useEffect(() => {
     if (!graphState || !showInTree || activePage !== 'family-tree') {
@@ -1126,12 +1198,14 @@ export default function Preview2App() {
   const biologicalRelations = validation.validBiologicalRelations.filter((relation) => !shouldHideNode(relation.from) && !shouldHideNode(relation.to))
   const overlayRelations = validation.validOverlayRelations.filter((relation) => !shouldHideNode(relation.from) && !shouldHideNode(relation.to))
   const selectedCount = selectedIds.length
+  const hasBothSelections = Boolean(selectionA && selectionB)
   const rightPanelShift = !rightPanel.collapsed && !rightPanel.undocked && !wideMode && !compactLayout ? rightPanel.width + 28 : 0
   const personA = selectionA ? validation.personById.get(selectionA) ?? null : null
   const personB = selectionB ? validation.personById.get(selectionB) ?? null : null
   const focusPerson = inspectedPersonId ? validation.personById.get(inspectedPersonId) ?? null : null
   const statsHidden = wideMode || contentFullscreen || compactLayout
   const treeThemeLabel = `${treeTheme.mode} / ${treeTheme.preset}`
+  const lcaState: 'idle' | 'connected' | 'disconnected' = lcaAnalysis ? 'connected' : hasBothSelections ? 'disconnected' : 'idle'
 
   function updateThemePreset(scope: ThemeScope, preset: ThemePreset) {
     if (scope === 'page') {
@@ -1264,6 +1338,32 @@ export default function Preview2App() {
     setInspectedPersonId(null)
   }
 
+  function centerSelection(slot: 'a' | 'b') {
+    const personId = slot === 'a' ? selectionA : selectionB
+    if (!personId) {
+      return
+    }
+
+    centerPerson(personId)
+  }
+
+  function swapSelections() {
+    if (!selectionA || !selectionB || selectionA === selectionB) {
+      return
+    }
+
+    setSelectionA(selectionB)
+    setSelectionB(selectionA)
+  }
+
+  function centerLcaAncestor() {
+    if (!lcaAnalysis) {
+      return
+    }
+
+    centerPerson(lcaAnalysis.ancestorId)
+  }
+
   function togglePanelCollapse(side: PanelSide) {
     if (side === 'left') {
       setLeftPanel((current) => ({ ...current, collapsed: !current.collapsed }))
@@ -1286,6 +1386,17 @@ export default function Preview2App() {
       return
     }
 
+    if (!event.isPrimary || event.button !== 0) {
+      return
+    }
+
+    if (
+      event.target instanceof Element
+      && event.target.closest('.preview2-panel-actions, .preview2-panel-resize-handle, .preview2-panel-resize-corner, button, a, input, select, textarea, label')
+    ) {
+      return
+    }
+
     setDragState({ side, startX: event.clientX, startY: event.clientY, originX: panel.x, originY: panel.y })
   }
 
@@ -1304,16 +1415,24 @@ export default function Preview2App() {
   }
 
   function startCanvasPan(event: ReactPointerEvent<SVGRectElement>) {
+    if (event.pointerType === 'touch') {
+      return
+    }
+
     setPanState({ startX: event.clientX, startY: event.clientY, origin: cameraView })
   }
 
   function zoomCanvas(delta: number, clientX: number, clientY: number) {
+    const factor = delta > 0 ? 1.08 : 0.92
+    zoomCanvasWithFactor(factor, clientX, clientY)
+  }
+
+  function zoomCanvasWithFactor(factor: number, clientX: number, clientY: number) {
     const rect = canvasViewportRef.current?.getBoundingClientRect()
     if (!rect) {
       return
     }
 
-    const factor = delta > 0 ? 1.08 : 0.92
     const ratioX = (clientX - rect.left) / rect.width
     const ratioY = (clientY - rect.top) / rect.height
 
@@ -1510,10 +1629,28 @@ export default function Preview2App() {
         <section className="preview2-card-block">
           <div className="preview2-section-heading">
             <h3>Selection</h3>
-            <button type="button" className="preview2-text-button" onClick={clearSelection}>Clear</button>
+            <span className="preview2-selection-summary">{selectedCount}/2 selected</span>
           </div>
-          <p className="preview2-selection-row"><strong>A</strong><span>{personA?.name ?? 'None selected'}</span><button type="button" className="preview2-text-button" onClick={() => removeSelection('a')} disabled={!personA}>Remove</button></p>
-          <p className="preview2-selection-row"><strong>B</strong><span>{personB?.name ?? 'Use Shift+Click or Add B'}</span><button type="button" className="preview2-text-button" onClick={() => removeSelection('b')} disabled={!personB}>Remove</button></p>
+          <div className="preview2-selection-actions">
+            <button type="button" className="preview2-chip" onClick={swapSelections} disabled={!hasBothSelections}>Swap A/B</button>
+            <button type="button" className="preview2-chip" onClick={clearSelection} disabled={selectedCount === 0}>Clear</button>
+          </div>
+          <p className="preview2-selection-row">
+            <strong>A</strong>
+            <span>{personA?.name ?? 'None selected'}</span>
+            <span className="preview2-selection-row-actions">
+              <button type="button" className="preview2-text-button" onClick={() => centerSelection('a')} disabled={!personA}>Focus</button>
+              <button type="button" className="preview2-text-button" onClick={() => removeSelection('a')} disabled={!personA}>Remove</button>
+            </span>
+          </p>
+          <p className="preview2-selection-row">
+            <strong>B</strong>
+            <span>{personB?.name ?? 'Use Shift+Click or Add B'}</span>
+            <span className="preview2-selection-row-actions">
+              <button type="button" className="preview2-text-button" onClick={() => centerSelection('b')} disabled={!personB}>Focus</button>
+              <button type="button" className="preview2-text-button" onClick={() => removeSelection('b')} disabled={!personB}>Remove</button>
+            </span>
+          </p>
           <label className="preview2-field">
             <span>Fade unrelated</span>
             <select value={fadeMode} onChange={(event) => setFadeMode(event.target.value as FadeMode)}>
@@ -1584,7 +1721,10 @@ export default function Preview2App() {
         <section className="preview2-card-block">
           <div className="preview2-section-heading">
             <h3>LCA</h3>
-            <span>{selectionA && selectionB ? 'Active' : 'Idle'}</span>
+            <div className="preview2-lca-heading-actions">
+              <span className={`preview2-lca-state ${lcaState}`}>{lcaState === 'connected' ? 'Connected' : lcaState === 'disconnected' ? 'No path' : 'Idle'}</span>
+              <button type="button" className="preview2-text-button" onClick={centerLcaAncestor} disabled={!lcaAnalysis}>Center ancestor</button>
+            </div>
           </div>
           {lcaAnalysis ? (
             <div className="preview2-lca-block">
@@ -1616,7 +1756,7 @@ export default function Preview2App() {
     return (
       <section className={`preview2-primary-panel preview2-primary-panel-${side} ${state.undocked ? 'is-undocked' : ''}`} style={panelStyle}>
         <div className="preview2-panel-header" onPointerDown={(event) => startPanelDrag(side, event)}>
-          <div>
+          <div className="preview2-panel-title">
             <p className="preview2-panel-kicker">Primary Panel</p>
             <h2>{title}</h2>
           </div>
@@ -1705,8 +1845,8 @@ export default function Preview2App() {
           </div>
           <Preview2Icon name="separator" />
           <div className="preview2-toolbar-group">
-            <div className="preview2-inline-menu" onPointerDown={(event) => event.stopPropagation()}>
-              <IconButton icon="image" label="Export PNG" active={pngMenuOpen} onClick={() => setPngMenuOpen((current) => !current)} />
+            <div ref={pngMenuRef} className="preview2-inline-menu" onPointerDown={(event) => event.stopPropagation()}>
+              <IconButton icon="image" label={exportState === 'working' ? 'Exporting PNG' : 'Export PNG'} active={pngMenuOpen} disabled={exportState === 'working'} onClick={() => setPngMenuOpen((current) => !current)} />
               {pngMenuOpen ? (
                 <div className="preview2-inline-menu-popover" role="menu" aria-label="PNG export scope">
                   <button type="button" role="menuitem" onClick={() => { setPngMenuOpen(false); void handlePngExport('current') }}>Current view</button>
@@ -1714,7 +1854,7 @@ export default function Preview2App() {
                 </div>
               ) : null}
             </div>
-            <IconButton icon="json" label="Export JSON" onClick={handleJsonExport} />
+            <IconButton icon="json" label="Export JSON" disabled={exportState === 'working'} onClick={handleJsonExport} />
           </div>
           <Preview2Icon name="separator" />
           <div className="preview2-toolbar-group align-end">
