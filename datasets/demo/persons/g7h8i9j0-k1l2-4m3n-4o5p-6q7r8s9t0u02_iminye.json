@@ -1,0 +1,28 @@
+{
+  "id": "g7h8i9j0-k1l2-4m3n-4o5p-6q7r8s9t0u02",
+  "name": "Iminyë",
+  "gender": "female",
+  "species": "Elf",
+  "birth": {
+    "era": "Years of the Trees",
+    "year": null
+  },
+  "death": null,
+  "houses": [
+    "Minyar",
+    "Vanyar"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Iminyë"
+    },
+    {
+      "label": "Fandom",
+      "url": "https://lotr.fandom.com/wiki/Iminyë"
+    }
+  ],
+  "metadata": {
+    "description": "Spouse of Imin, the first Elf-father. She was awakened by Imin at Cuiviénen during the Years of the Trees. Together with Imin and the 6 other couples they awakened, they became the Minyar ('Firsts') – the smallest clan with 14 members. Her descendants became the Vanyar, the 'Fair-elves' known for their golden hair. She is the ancestress of Ingwë, High King of all Elves."
+  }
+}

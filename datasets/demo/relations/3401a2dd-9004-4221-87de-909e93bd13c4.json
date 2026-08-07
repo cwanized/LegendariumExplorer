@@ -1,0 +1,12 @@
+{
+  "id": "3401a2dd-9004-4221-87de-909e93bd13c4",
+  "type": "biological_parent",
+  "from": "72236107-e623-45e4-8f90-9ce7ee81a9ba",
+  "to": "550e8400-e29b-41d4-a716-446655440019",
+  "attributes": {
+    "date": {
+      "era": "First Age",
+      "year": 355
+    }
+  }
+}

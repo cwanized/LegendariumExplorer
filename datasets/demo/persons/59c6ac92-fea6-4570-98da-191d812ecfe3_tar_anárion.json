@@ -1,0 +1,23 @@
+{
+  "id": "59c6ac92-fea6-4570-98da-191d812ecfe3",
+  "name": "Tar-Anárion",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Second Age",
+    "year": 1003
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Tar-Anárion"
+    }
+  ],
+  "metadata": {
+    "description": "King of the Dúnedain."
+  }
+}

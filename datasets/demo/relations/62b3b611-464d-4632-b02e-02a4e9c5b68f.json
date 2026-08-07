@@ -1,0 +1,12 @@
+{
+  "id": "62b3b611-464d-4632-b02e-02a4e9c5b68f",
+  "type": "marriage",
+  "from": "434b163f-ffd7-46dc-bfdd-3b324f522e48",
+  "to": "dfa7f4ad-85a3-4556-b119-67f80664f75d",
+  "attributes": {
+    "date": {
+      "era": "Second Age",
+      "year": 540
+    }
+  }
+}

@@ -28,5 +28,6 @@
   "portraitSourceUrl": "https://en.wikipedia.org/wiki/Aragorn",
   "metadata": {
     "description": "King Elessar"
-  }
+  },
+  "species": "Man"
 }

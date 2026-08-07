@@ -4,7 +4,7 @@
 
 Rebuild the **Preview UI** of Legendarium Explorer from scratch as a clean, production-ready interface.
 
-Treat the current implementation as a **behavior reference only** (POC), not as an architectural baseline.
+Treat the current implementation (/preview) as a **behavior reference only** (POC), not as an architectural baseline.
 
 The result must prioritize clarity, consistency, stability, and maintainability over patch compatibility.
 
@@ -28,25 +28,53 @@ The experience must feel deliberate and calm, not improvised.
 
 ## UX Contract (must be satisfied)
 
-### 1) Workspace hierarchy
+### 0) Main view
+Currently the main focus is on the family tree element / subpage. Nevertheless, the app should already take in consideration that additional pages will be added in the feature (timeline view, map focused view etc)
 
+To do so, the page already should have a main menu (hamburger menu) where the feature pages can be accessed. See drawio mock "rework.userinterface.drawio"; tab: "00 - main"
+
+Menu item (hamburger menu) (currently planned)
+- Family tree (main focus)
+- time line (currently greyed out)
+- map view (currently greyed out)
+- impressum (sub page needs to be created with basic text)
+- disclaimer (sub page needs to be created with basic text)
+- 
+Following chapters refer to the family tree page:
+
+### 1) Workspace hierarchy
+See drawio mock "rework.userinterface.drawio"; tab: "01 - family tree"
 The page must clearly communicate these layers:
 
 1. **Tree canvas** (primary workspace)
 2. **Primary interaction panels** (Filter, Search, Selection & LCA, Inspector)
+   1. Primary interaction panels are bound to the left / right side of the tree canvas
+   2. both panels have a minimize button, to give the user the full family tree
+   3. the panels minimize to the upper left / upper right
 3. **Tool controls** (view + theme controls)
+   1. tools controls are bound on the top of the tree cancas
+   2. reset view, use all horizontal space, use full screen within browser estate, use browser full screen (f11)
 4. **Legend** (compact interpretation aid)
+   1. legend is bound to the bottom and needs to be minimized, 
 
 No layer may feel detached, floating randomly, or visually accidental.
 
 ### 2) Primary panel positioning
+See drawio mock "rework.userinterface.drawio"; tab: "01 - family tree"
 
-Primary panels must form a reliable four-corner model around the tree workspace:
 
-- top-left: Filter
-- bottom-left: Search
-- bottom-right: Selection & LCA
-- top-right: Inspector
+Primary panels must form a reliable 2 section moodel around the tree workspace:
+
+- left: Filter & Search
+  -  filter for persons (basically all attributes should be filterable in data set (house, species, gender etc))
+  - search for person
+  - person can be added to selection (Add+ A person button, Add+ B person button) (as alternative to shift + select)
+  - 
+- right: details & statistics
+  - details of selected persons
+    - if only 1 person is selected use all vertical space of panel
+    - if 2 persons are selected split the estate equally for both persons
+
 
 Expected quality:
 
@@ -58,26 +86,30 @@ Expected quality:
 
 The rebuild must preserve these minimum content blocks per primary panel:
 
-- **Filter (top-left)**
-	- grouped categorical filters (at least: house, species, gender, era),
-	- quick clear/reset action,
-	- immediate effect on visible graph context.
+- **Filter & search (left)**
 
-- **Search (bottom-left)**
-	- search input,
-	- result list with compact context (name + short meta),
-	- selecting an entry focuses the corresponding person in the graph.
+  - grouped categorical filters (at least: house, species, gender, era),
+  - quick clear/reset action,
+  - immediate effect on visible graph context.
+- **Search (left)**
 
-- **Selection & LCA (bottom-right)**
-	- current selection counter/state,
-	- guidance for first/second selection,
-	- LCA result output when two persons are selected,
-	- analysis-related control (e.g., fade-unrelated toggle).
+  - search input,
+  - result list with compact context (name + short meta),
+  - selecting an entry focuses the corresponding person in the graph.
+- **Selection & LCA (left)**
 
-- **Inspector (top-right)**
-	- stable empty state when no person is selected,
-	- selected person summary,
-	- key person metadata useful for exploration decisions.
+  - current selection counter/state,
+  - guidance for first/second selection,
+
+  - analysis-related control (e.g., fade-unrelated toggle).
+- **Inspector (right)**
+
+  - stable empty state when no person is selected,
+  - selected person summary,
+  - key person metadata useful for exploration decisions.
+  - LCA result output when two persons are selected,
+  - statistics, show n generations between selection persons
+  -   - 
 
 The intent is functional parity with the current POC panel purpose, but with cleaner structure and better UX quality.
 
@@ -86,11 +118,11 @@ The intent is functional parity with the current POC panel purpose, but with cle
 Use this strict boundary:
 
 - **Primary panels** contain all core exploration interactions that users need continuously while reading the tree:
-	- filter,
-	- search/focus,
-	- selection + LCA analysis,
-	- person inspection.
 
+  - filter,
+  - search/focus,
+  - selection + LCA analysis,
+  - person inspection.
 - **Secondary panels** are supportive surfaces only (auxiliary context, diagnostics, optional helper information).
 
 Rules:

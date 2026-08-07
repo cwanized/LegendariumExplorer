@@ -1,0 +1,27 @@
+{
+  "id": "9dc7ca4d-ad55-489b-b242-e51cbd942243",
+  "name": "Galathil",
+  "gender": "male",
+  "species": "Elf",
+  "birth": {
+    "era": "First Age",
+    "year": 1
+  },
+  "death": {
+    "era": "First Age",
+    "year": null
+  },
+  "houses": [
+    "Teleri"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Galathil"
+    }
+  ],
+  "metadata": {
+    "description": "Son of Galadhon, brother of Celeborn. Father of Nimloth (wife of Dior).",
+    "canonicity": "unfinished_tales"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "401b63bf-6c08-475d-9c21-38b504b08280",
+  "type": "marriage",
+  "from": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e02",
+  "to": "108f83e6-26e2-4928-b234-41fe30921a7f",
+  "attributes": {
+    "date": {
+      "era": "Years of the Trees",
+      "year": 1450
+    }
+  }
+}

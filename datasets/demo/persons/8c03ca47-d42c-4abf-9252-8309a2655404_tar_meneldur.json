@@ -1,0 +1,23 @@
+{
+  "id": "8c03ca47-d42c-4abf-9252-8309a2655404",
+  "name": "Tar-Meneldur",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Second Age",
+    "year": 543
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Tar-Meneldur"
+    }
+  ],
+  "metadata": {
+    "description": "King of the Dúnedain."
+  }
+}

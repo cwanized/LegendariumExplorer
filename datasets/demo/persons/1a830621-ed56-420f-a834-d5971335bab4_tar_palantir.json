@@ -1,0 +1,23 @@
+{
+  "id": "1a830621-ed56-420f-a834-d5971335bab4",
+  "name": "Tar-Palantir",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Second Age",
+    "year": 2810
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Tar-Palantir"
+    }
+  ],
+  "metadata": {
+    "description": "King of the Dúnedain."
+  }
+}

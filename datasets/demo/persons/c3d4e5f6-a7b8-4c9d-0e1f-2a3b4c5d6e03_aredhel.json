@@ -1,0 +1,26 @@
+{
+  "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e03",
+  "name": "Aredhel",
+  "gender": "female",
+  "species": "Elf",
+  "birth": {
+    "era": "Years of the Trees",
+    "year": 1362
+  },
+  "death": {
+    "era": "First Age",
+    "year": 400
+  },
+  "houses": [
+    "Noldor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Aredhel"
+    }
+  ],
+  "metadata": {
+    "description": "Aredhel the White, daughter of Fingolfin and Anairë, sister of Fingon and Turgon. Mother of Maeglin by Eöl the Dark Elf. Known for her love of hunting and independence."
+  }
+}

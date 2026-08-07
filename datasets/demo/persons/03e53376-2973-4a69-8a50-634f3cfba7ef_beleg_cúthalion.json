@@ -1,0 +1,28 @@
+{
+  "id": "03e53376-2973-4a69-8a50-634f3cfba7ef",
+  "name": "Beleg Cúthalion",
+  "gender": "male",
+  "species": "Elf",
+  "birth": {
+    "era": "First Age",
+    "year": 450
+  },
+  "death": {
+    "era": null,
+    "year": null
+  },
+  "houses": [
+    "Sindar",
+    "Teleri"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Beleg"
+    }
+  ],
+  "metadata": {
+    "description": "Great bowman and captain of King Thingol's borders. Loyal friend of Túrin Turambar. Killed accidentally by Túrin with his own sword Anglachel.",
+    "canonicity": "canonical"
+  }
+}

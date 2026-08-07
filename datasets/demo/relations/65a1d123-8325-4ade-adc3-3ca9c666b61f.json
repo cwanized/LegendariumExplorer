@@ -1,0 +1,12 @@
+{
+  "id": "65a1d123-8325-4ade-adc3-3ca9c666b61f",
+  "type": "biological_parent",
+  "from": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a05",
+  "to": "8a568030-f95e-4d0b-881f-e1cfe8f5cb5d",
+  "attributes": {
+    "date": {
+      "era": "Years of the Trees",
+      "year": 1450
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "79d5355e-1de4-4be0-9b0c-794715427b17",
+  "name": "Tar-Súrion",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Second Age",
+    "year": 1128
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Tar-Súrion"
+    }
+  ],
+  "metadata": {
+    "description": "King of the Dúnedain."
+  }
+}
