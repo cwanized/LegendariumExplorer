@@ -44,10 +44,15 @@ jobs:
         working-directory: app
         run: npm run build
 
+      - name: Create SPA fallback page
+        shell: bash
+        run: cp app/dist/index.html app/dist/404.html
+
       - name: Smoke test build artifact
         shell: bash
         run: |
           test -f app/dist/index.html
+          test -f app/dist/404.html
           test -f app/dist/datasets/demo/persons/index.json
           grep -q '<div id="root"></div>' app/dist/index.html
           grep -q '/LegendariumExplorer/assets/' app/dist/index.html
