@@ -4,9 +4,7 @@ import { Rnd } from 'react-rnd'
 import './Preview3App.css'
 import {
   getGraphBounds,
-  layoutGraph,
   loadDataset,
-  validateDataset,
 } from './graph'
 import type {
   CameraView,
@@ -16,14 +14,12 @@ import type {
   UUID,
 } from './graph'
 import {
-  alignMarriagePairs,
-  alignSingleChildNodes,
-  buildBiologicalChildGroups,
-  buildHouseAnchors,
-  buildSpouseProjectionState,
   expandCameraBounds,
-  getSingleChildCenterTargets,
 } from './preview3/treeCore'
+import {
+  buildPreview3RenderedTree,
+  buildPreview3TreePipeline,
+} from './preview3/treePipeline'
 import { buildPreview3ViewState } from './preview3/analysis'
 import {
   defaultLeftPanel,
@@ -454,14 +450,14 @@ async function exportSvgWithViewBoxAsPng(svgElement: SVGSVGElement, filename: st
 function collectSvgThemeVariables(svgElement: SVGSVGElement) {
   const computed = window.getComputedStyle(svgElement)
   const names = [
-    '--preview2-tree-text',
-    '--preview2-tree-muted',
-    '--preview2-tree-border',
-    '--preview2-tree-node-fill',
-    '--preview2-tree-edge',
-    '--preview2-tree-overlay',
-    '--preview2-tree-accent',
-    '--preview2-tree-bg',
+    '--preview3-tree-text',
+    '--preview3-tree-muted',
+    '--preview3-tree-border',
+    '--preview3-tree-node-fill',
+    '--preview3-tree-edge',
+    '--preview3-tree-overlay',
+    '--preview3-tree-accent',
+    '--preview3-tree-bg',
   ]
 
   return names
@@ -531,24 +527,14 @@ export default function Preview3App() {
 
       try {
         const dataset = await loadDataset(datasetName)
-        const validation = validateDataset(dataset)
-        const rawLayout = await layoutGraph(validation.persons, validation.validBiologicalRelations)
-        const singleChildCenterTargets = getSingleChildCenterTargets(rawLayout, validation.validBiologicalRelations)
-        const childAlignedLayout = alignSingleChildNodes(rawLayout, singleChildCenterTargets)
-        const layout = alignMarriagePairs(
-          childAlignedLayout,
-          validation.validOverlayRelations,
-          new Set(singleChildCenterTargets.keys()),
-        )
-        const bounds = getGraphBounds(layout.nodes)
-        const expandedBounds = expandCameraBounds(bounds, [], buildHouseAnchors(validation, layout, dataset.houseDefinitions))
+        const { graphState: nextGraphState, initialCamera } = await buildPreview3TreePipeline(dataset)
 
         if (!isMounted) {
           return
         }
 
-        setGraphState({ dataset, validation, layout, contractScenario: null, contractEvaluation: null })
-        setCamera(expandedBounds)
+        setGraphState(nextGraphState)
+        setCamera(initialCamera)
         setIsLoading(false)
       } catch (error) {
         if (!isMounted) {
@@ -783,7 +769,7 @@ export default function Preview3App() {
         return false
       }
 
-      return Boolean(target.closest('.preview2-panel-body, .preview2-stats-panel, .preview2-theme-editor'))
+      return Boolean(target.closest('.preview3-panel-body, .preview3-stats-panel, .preview3-theme-editor'))
     }
 
     const isInsideTreeShell = (clientX: number, clientY: number) => {
@@ -874,29 +860,29 @@ export default function Preview3App() {
   const pagePalette = getActivePalette('page', pageTheme)
   const treePalette = getActivePalette('tree', treeTheme)
   const rootStyle = {
-    '--preview2-page-bg': pagePalette.background,
-    '--preview2-page-surface': pagePalette.surface,
-    '--preview2-page-surface-strong': pagePalette.surfaceStrong,
-    '--preview2-page-border': pagePalette.border,
-    '--preview2-page-text': pagePalette.text,
-    '--preview2-page-muted': pagePalette.muted,
-    '--preview2-page-accent': pagePalette.accent,
-    '--preview2-page-accent-soft': pagePalette.accentSoft,
-    '--preview2-page-shadow': pagePalette.shadow ?? 'rgba(0, 0, 0, 0.18)',
-    '--preview2-tree-bg': treePalette.background,
-    '--preview2-tree-surface': treePalette.surface,
-    '--preview2-tree-surface-strong': treePalette.surfaceStrong,
-    '--preview2-tree-border': treePalette.border,
-    '--preview2-tree-text': treePalette.text,
-    '--preview2-tree-muted': treePalette.muted,
-    '--preview2-tree-accent': treePalette.accent,
-    '--preview2-tree-accent-soft': treePalette.accentSoft,
-    '--preview2-tree-node-fill': treePalette.nodeFill ?? treePalette.surfaceStrong,
-    '--preview2-tree-edge': treePalette.edge ?? treePalette.accent,
-    '--preview2-tree-overlay': treePalette.overlay ?? treePalette.border,
-    '--preview2-tree-shadow': treePalette.shadow ?? 'rgba(0, 0, 0, 0.16)',
-    '--preview2-font-body': activePage === 'family-tree' ? treeTheme.fontBody : pageTheme.fontBody,
-    '--preview2-font-display': activePage === 'family-tree' ? treeTheme.fontDisplay : pageTheme.fontDisplay,
+    '--preview3-page-bg': pagePalette.background,
+    '--preview3-page-surface': pagePalette.surface,
+    '--preview3-page-surface-strong': pagePalette.surfaceStrong,
+    '--preview3-page-border': pagePalette.border,
+    '--preview3-page-text': pagePalette.text,
+    '--preview3-page-muted': pagePalette.muted,
+    '--preview3-page-accent': pagePalette.accent,
+    '--preview3-page-accent-soft': pagePalette.accentSoft,
+    '--preview3-page-shadow': pagePalette.shadow ?? 'rgba(0, 0, 0, 0.18)',
+    '--preview3-tree-bg': treePalette.background,
+    '--preview3-tree-surface': treePalette.surface,
+    '--preview3-tree-surface-strong': treePalette.surfaceStrong,
+    '--preview3-tree-border': treePalette.border,
+    '--preview3-tree-text': treePalette.text,
+    '--preview3-tree-muted': treePalette.muted,
+    '--preview3-tree-accent': treePalette.accent,
+    '--preview3-tree-accent-soft': treePalette.accentSoft,
+    '--preview3-tree-node-fill': treePalette.nodeFill ?? treePalette.surfaceStrong,
+    '--preview3-tree-edge': treePalette.edge ?? treePalette.accent,
+    '--preview3-tree-overlay': treePalette.overlay ?? treePalette.border,
+    '--preview3-tree-shadow': treePalette.shadow ?? 'rgba(0, 0, 0, 0.16)',
+    '--preview3-font-body': activePage === 'family-tree' ? treeTheme.fontBody : pageTheme.fontBody,
+    '--preview3-font-display': activePage === 'family-tree' ? treeTheme.fontDisplay : pageTheme.fontDisplay,
   } as CSSProperties
 
   useEffect(() => {
@@ -922,10 +908,10 @@ export default function Preview3App() {
 
   if (errorMessage) {
     return (
-      <main className="preview2-root preview2-loading" style={rootStyle}>
-        <section className="preview2-loading-card">
-          <p className="preview2-kicker">Legendarium Explorer</p>
-          <h1>Preview2 could not start</h1>
+      <main className="preview3-root preview3-loading" style={rootStyle}>
+        <section className="preview3-loading-card">
+          <p className="preview3-kicker">Legendarium Explorer</p>
+          <h1>Preview3 could not start</h1>
           <p>{errorMessage}</p>
         </section>
       </main>
@@ -934,9 +920,9 @@ export default function Preview3App() {
 
   if (isLoading || !graphState || !camera) {
     return (
-      <main className="preview2-root preview2-loading" style={rootStyle}>
-        <section className="preview2-loading-card">
-          <p className="preview2-kicker">Legendarium Explorer</p>
+      <main className="preview3-root preview3-loading" style={rootStyle}>
+        <section className="preview3-loading-card">
+          <p className="preview3-kicker">Legendarium Explorer</p>
           <h1>Preparing Preview3</h1>
           <p>Loading the dataset, validating biological relations, and building a deterministic first layout.</p>
         </section>
@@ -961,16 +947,20 @@ export default function Preview3App() {
     fadeMode,
   })
   const { filteredPeople, searchResults, matchingNodeIds, selectedIds, selectedSet, lcaAnalysis, highlightedEdgeIds, filteredOutNodeIds, shouldHideNode, shouldDimNode, hasBothSelections, lcaState } = viewState
-  const spouseProjection = buildSpouseProjectionState(validation, layout, selectedIds, spouseOwnerOverrides)
-  const houseAnchors = buildHouseAnchors(validation, layout, graphState.dataset.houseDefinitions)
-
-  const biologicalRelations = validation.validBiologicalRelations
-    .filter((relation) => !shouldHideNode(relation.from) && !shouldHideNode(relation.to))
-    .filter((relation) => !spouseProjection.hiddenChildEdgeKeys.has(`${relation.from}|${relation.to}`))
-  const overlayRelations = validation.validOverlayRelations
-    .filter((relation) => !shouldHideNode(relation.from) && !shouldHideNode(relation.to))
-    .filter((relation) => !spouseProjection.projectedMarriageIds.has(relation.id))
-  const biologicalChildGroups = buildBiologicalChildGroups(biologicalRelations, layout)
+  const renderedTree = buildPreview3RenderedTree({
+    validation,
+    layout,
+    houseDefinitions: graphState.dataset.houseDefinitions,
+    selectedIds,
+    spouseOwnerOverrides,
+    shouldHideNode,
+  })
+  const {
+    spouseProjection,
+    houseAnchors,
+    overlayRelations,
+    biologicalChildGroups,
+  } = renderedTree
   const selectedCount = selectedIds.length
   const rightPanelShift = !rightPanel.collapsed && !rightPanel.undocked && !wideMode && !compactLayout ? rightPanel.width + 28 : 0
   const personA = selectionA ? validation.personById.get(selectionA) ?? null : null
@@ -1011,7 +1001,7 @@ export default function Preview3App() {
 
   function renderThemeModeToggle(scope: ThemeScope, theme: ThemeState) {
     return (
-      <div className="preview2-mode-toggle" role="group" aria-label={`${scope} theme mode`}>
+      <div className="preview3-mode-toggle" role="group" aria-label={`${scope} theme mode`}>
         <IconButton icon="sun" label="Light" active={theme.mode === 'light'} onClick={() => updateThemeMode(scope, 'light')} />
         <IconButton icon="moon" label="Dark" active={theme.mode === 'dark'} onClick={() => updateThemeMode(scope, 'dark')} />
         <IconButton icon="sparkle" label="Thematic" active={theme.mode === 'thematic'} onClick={() => updateThemeMode(scope, 'thematic')} />
@@ -1311,14 +1301,14 @@ export default function Preview3App() {
 
   function renderFilterGroup(label: string, options: string[], active: string[], key: keyof FilterState) {
     return (
-      <div className="preview2-filter-group">
-        <div className="preview2-filter-label-row">
+      <div className="preview3-filter-group">
+        <div className="preview3-filter-label-row">
           <span>{label}</span>
           <strong>{active.length}</strong>
         </div>
-        <div className="preview2-chip-grid">
+        <div className="preview3-chip-grid">
           {options.map((option) => (
-            <button key={option} type="button" className={`preview2-chip ${active.includes(option) ? 'active' : ''}`} onClick={() => toggleFilterValue(key, option)}>
+            <button key={option} type="button" className={`preview3-chip ${active.includes(option) ? 'active' : ''}`} onClick={() => toggleFilterValue(key, option)}>
               {option}
             </button>
           ))}
@@ -1329,16 +1319,16 @@ export default function Preview3App() {
 
   function renderLeftPanel() {
     return (
-      <div className="preview2-panel-body">
-        <section className="preview2-card-block">
-          <div className="preview2-section-heading">
+      <div className="preview3-panel-body">
+        <section className="preview3-card-block preview3-lca-card">
+          <div className="preview3-section-heading">
             <h3>Filter</h3>
-            <button type="button" className="preview2-text-button" onClick={clearFilters}>Clear</button>
+            <button type="button" className="preview3-text-button" onClick={clearFilters}>Clear</button>
           </div>
-          <div className="preview2-inline-controls">
-            <button type="button" className={`preview2-chip ${filterLogic === 'and' ? 'active' : ''}`} onClick={() => setFilterLogic('and')}>AND</button>
-            <button type="button" className={`preview2-chip ${filterLogic === 'or' ? 'active' : ''}`} onClick={() => setFilterLogic('or')}>OR</button>
-            <label className="preview2-checkbox-row">
+          <div className="preview3-inline-controls">
+            <button type="button" className={`preview3-chip ${filterLogic === 'and' ? 'active' : ''}`} onClick={() => setFilterLogic('and')}>AND</button>
+            <button type="button" className={`preview3-chip ${filterLogic === 'or' ? 'active' : ''}`} onClick={() => setFilterLogic('or')}>OR</button>
+            <label className="preview3-checkbox-row">
               <input type="checkbox" checked={showInTree} onChange={(event) => setShowInTree(event.target.checked)} />
               Auto-fit matched nodes
             </label>
@@ -1347,70 +1337,70 @@ export default function Preview3App() {
           {renderFilterGroup('Species', speciesOptions, filters.species, 'species')}
           {renderFilterGroup('Gender', genderOptions, filters.genders, 'genders')}
           {renderFilterGroup('Era', eraOptions, filters.eras, 'eras')}
-          <p className="preview2-helper-text">{filteredPeople.length} matches in the current filter scope.</p>
+          <p className="preview3-helper-text">{filteredPeople.length} matches in the current filter scope.</p>
         </section>
 
-        <section className="preview2-card-block">
-          <div className="preview2-section-heading">
+        <section className="preview3-card-block">
+          <div className="preview3-section-heading">
             <h3>Search</h3>
             <span>{searchResults.length}</span>
           </div>
-          <input ref={searchInputRef} className="preview2-search-input" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by name, house, species, era..." />
-          <div className="preview2-search-results">
+          <input ref={searchInputRef} className="preview3-search-input" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by name, house, species, era..." />
+          <div className="preview3-search-results">
             {searchResults.map((person) => (
-              <article key={person.id} className="preview2-result-card">
-                <button type="button" className="preview2-result-main" onClick={() => centerPerson(person.id)}>
+              <article key={person.id} className="preview3-result-card">
+                <button type="button" className="preview3-result-main" onClick={() => centerPerson(person.id)}>
                   <strong>{person.name}</strong>
                   <span>{[person.species, person.gender, (person.houses ?? []).join(', ')].filter(Boolean).join(' • ') || 'No metadata'}</span>
                 </button>
-                <div className="preview2-result-actions preview2-result-actions-stack">
+                <div className="preview3-result-actions preview3-result-actions-stack">
                   <IconButton
                     icon={selectionA === person.id ? 'remove-a' : 'add-a'}
                     label={selectionA === person.id ? 'Remove A' : 'Add A'}
-                    className="preview2-search-action-button"
+                    className="preview3-search-action-button"
                     active={selectionA === person.id}
                     onClick={() => toggleSelection('a', person.id)}
                   />
                   <IconButton
                     icon={selectionB === person.id ? 'remove-b' : 'add-b'}
                     label={selectionB === person.id ? 'Remove B' : 'Add B'}
-                    className="preview2-search-action-button"
+                    className="preview3-search-action-button"
                     active={selectionB === person.id}
                     onClick={() => toggleSelection('b', person.id)}
                   />
                 </div>
               </article>
             ))}
-            {searchResults.length === 0 ? <p className="preview2-empty">No results in the current filter scope.</p> : null}
+            {searchResults.length === 0 ? <p className="preview3-empty">No results in the current filter scope.</p> : null}
           </div>
         </section>
 
-        <section className="preview2-card-block">
-          <div className="preview2-section-heading">
+        <section className="preview3-card-block">
+          <div className="preview3-section-heading">
             <h3>Selection</h3>
-            <span className="preview2-selection-summary">{selectedCount}/2 selected</span>
+            <span className="preview3-selection-summary">{selectedCount}/2 selected</span>
           </div>
-          <div className="preview2-selection-actions">
-            <button type="button" className="preview2-chip" onClick={swapSelections} disabled={!hasBothSelections}>Swap A/B</button>
-            <button type="button" className="preview2-chip" onClick={clearSelection} disabled={selectedCount === 0}>Clear</button>
+          <div className="preview3-selection-actions">
+            <button type="button" className="preview3-chip" onClick={swapSelections} disabled={!hasBothSelections}>Swap A/B</button>
+            <button type="button" className="preview3-chip" onClick={clearSelection} disabled={selectedCount === 0}>Clear</button>
           </div>
-          <p className="preview2-selection-row">
+          <p className="preview3-selection-row">
             <strong>A</strong>
             <span>{personA?.name ?? 'None selected'}</span>
-            <span className="preview2-selection-row-actions">
-              <button type="button" className="preview2-text-button" onClick={() => centerSelection('a')} disabled={!personA}>Focus</button>
-              <button type="button" className="preview2-text-button" onClick={() => removeSelection('a')} disabled={!personA}>Remove</button>
+            <span className="preview3-selection-row-actions">
+              <button type="button" className="preview3-text-button" onClick={() => centerSelection('a')} disabled={!personA}>Focus</button>
+              <button type="button" className="preview3-text-button" onClick={() => removeSelection('a')} disabled={!personA}>Remove</button>
             </span>
           </p>
-          <p className="preview2-selection-row">
+          <p className="preview3-selection-row">
             <strong>B</strong>
             <span>{personB?.name ?? 'Use Shift+Click or Add B'}</span>
-            <span className="preview2-selection-row-actions">
-              <button type="button" className="preview2-text-button" onClick={() => centerSelection('b')} disabled={!personB}>Focus</button>
-              <button type="button" className="preview2-text-button" onClick={() => removeSelection('b')} disabled={!personB}>Remove</button>
+            <span className="preview3-selection-row-actions">
+              <button type="button" className="preview3-text-button" onClick={() => centerSelection('b')} disabled={!personB}>Focus</button>
+              <button type="button" className="preview3-text-button" onClick={() => removeSelection('b')} disabled={!personB}>Remove</button>
             </span>
           </p>
-          <label className="preview2-field">
+          <label className="preview3-field">
             <span>Fade unrelated</span>
             <AppSelect
               value={fadeMode}
@@ -1419,10 +1409,10 @@ export default function Preview3App() {
                 { value: 'dim', label: 'Dim' },
                 { value: 'hide', label: 'Hide' },
               ]}
-              className="preview2-toolbar-select"
+              className="preview3-toolbar-select"
             />
           </label>
-          <p className="preview2-helper-text">Click selects A. Shift+Click assigns B. ESC clears selection or closes overlays.</p>
+          <p className="preview3-helper-text">Click selects A. Shift+Click assigns B. ESC clears selection or closes overlays.</p>
         </section>
       </div>
     )
@@ -1431,7 +1421,7 @@ export default function Preview3App() {
   function renderPersonSummary(person: Person | null, slotLabel: string) {
     if (!person) {
       return (
-        <div className="preview2-empty-card">
+        <div className="preview3-empty-card">
           <h3>{slotLabel}</h3>
           <p>No person selected.</p>
         </div>
@@ -1439,26 +1429,26 @@ export default function Preview3App() {
     }
 
     return (
-      <div className="preview2-person-card">
-        <div className="preview2-section-heading compact">
+      <div className="preview3-person-card">
+        <div className="preview3-section-heading compact">
           <h3>{slotLabel}</h3>
-          <div className="preview2-result-actions">
+          <div className="preview3-result-actions">
             <IconButton
               icon={selectionA === person.id ? 'remove-a' : 'add-a'}
               label={selectionA === person.id ? 'Remove from A' : 'Add as A'}
-              className="preview2-search-action-button"
+              className="preview3-search-action-button"
               onClick={() => toggleSelection('a', person.id)}
             />
             <IconButton
               icon={selectionB === person.id ? 'remove-b' : 'add-b'}
               label={selectionB === person.id ? 'Remove from B' : 'Add as B'}
-              className="preview2-search-action-button"
+              className="preview3-search-action-button"
               onClick={() => toggleSelection('b', person.id)}
             />
           </div>
         </div>
-        <strong className="preview2-person-name">{person.name}</strong>
-        <dl className="preview2-meta-grid">
+        <strong className="preview3-person-name">{person.name}</strong>
+        <dl className="preview3-meta-grid">
           <div><dt>Gender</dt><dd>{person.gender ?? 'Unknown'}</dd></div>
           <div><dt>Species</dt><dd>{person.species ?? 'Unknown'}</dd></div>
           <div><dt>Birth</dt><dd>{formatTimeLabel(person.birth)}</dd></div>
@@ -1475,31 +1465,31 @@ export default function Preview3App() {
     const singlePerson = personA ?? focusPerson
 
     return (
-      <div className="preview2-panel-body">
+      <div className="preview3-panel-body">
         {showSingleInspect ? renderPersonSummary(singlePerson, 'Inspector') : (
-          <div className="preview2-split-column">
+          <div className="preview3-split-column">
             {renderPersonSummary(personA, 'Person A')}
             {renderPersonSummary(personB, 'Person B')}
           </div>
         )}
-        <section className="preview2-card-block">
-          <div className="preview2-section-heading">
+        <section className="preview3-card-block">
+          <div className="preview3-section-heading">
             <h3>LCA</h3>
-            <div className="preview2-lca-heading-actions">
-              <span className={`preview2-lca-state ${lcaState}`}>{lcaState === 'connected' ? 'Connected' : lcaState === 'disconnected' ? 'No path' : 'Idle'}</span>
-              <button type="button" className="preview2-text-button" onClick={centerLcaAncestor} disabled={!lcaAnalysis}>Center ancestor</button>
+            <div className="preview3-lca-heading-actions">
+              <span className={`preview3-lca-state ${lcaState}`}>{lcaState === 'connected' ? 'Connected' : lcaState === 'disconnected' ? 'No path' : 'Idle'}</span>
+              <button type="button" className="preview3-text-button" onClick={centerLcaAncestor} disabled={!lcaAnalysis}>Center ancestor</button>
             </div>
           </div>
           {lcaAnalysis ? (
-            <div className="preview2-lca-block">
+            <div className="preview3-lca-block">
               <p><strong>Ancestor</strong><span>{validation.personById.get(lcaAnalysis.ancestorId)?.name ?? lcaAnalysis.ancestorId}</span></p>
               <p><strong>Generations</strong><span>{lcaAnalysis.edgeIds.size}</span></p>
               <p><strong>Path</strong><span>{lcaAnalysis.nodeIds.size} highlighted nodes</span></p>
             </div>
           ) : selectionA && selectionB ? (
-            <p className="preview2-empty preview2-no-lca">No biological connection between the current A/B selection.</p>
+            <p className="preview3-empty preview3-no-lca">No biological connection between the current A/B selection.</p>
           ) : (
-            <p className="preview2-empty">Select two people to compute the biological lowest common ancestor.</p>
+            <p className="preview3-empty">Select two people to compute the biological lowest common ancestor.</p>
           )}
         </section>
       </div>
@@ -1521,14 +1511,14 @@ export default function Preview3App() {
       return (
         <Rnd
           key={`undocked-${side}`}
-          bounds=".preview2-canvas-shell"
+          bounds=".preview3-canvas-shell"
           size={{ width: state.width, height: state.height }}
           position={{ x: state.x, y: state.y }}
           minWidth={280}
           maxWidth={640}
           minHeight={320}
           maxHeight={900}
-          dragHandleClassName="preview2-panel-header"
+          dragHandleClassName="preview3-panel-header"
           enableResizing
           onDragStop={(_, data) => {
             if (side === 'left') {
@@ -1547,13 +1537,13 @@ export default function Preview3App() {
             }
           }}
         >
-          <section className={`preview2-primary-panel preview2-primary-panel-${side} is-undocked`} style={{ width: state.width, height: state.height } as CSSProperties}>
-            <div className="preview2-panel-header">
-              <div className="preview2-panel-title">
-                <p className="preview2-panel-kicker">Primary Panel</p>
+          <section className={`preview3-primary-panel preview3-primary-panel-${side} is-undocked`} style={{ width: state.width, height: state.height } as CSSProperties}>
+            <div className="preview3-panel-header">
+              <div className="preview3-panel-title">
+                <p className="preview3-panel-kicker">Primary Panel</p>
                 <h2>{title}</h2>
               </div>
-              <div className="preview2-panel-actions">
+              <div className="preview3-panel-actions">
                 <IconButton icon="dock" label="Dock" subtle onClick={() => togglePanelDock(side)} />
                 <IconButton icon="minimize" label="Minimize" subtle onClick={() => togglePanelCollapse(side)} />
               </div>
@@ -1565,18 +1555,18 @@ export default function Preview3App() {
     }
 
     return (
-      <section className={`preview2-primary-panel preview2-primary-panel-${side}`} style={panelStyle}>
-        <div className="preview2-panel-header">
-          <div className="preview2-panel-title">
-            <p className="preview2-panel-kicker">Primary Panel</p>
+      <section className={`preview3-primary-panel preview3-primary-panel-${side}`} style={panelStyle}>
+        <div className="preview3-panel-header">
+          <div className="preview3-panel-title">
+            <p className="preview3-panel-kicker">Primary Panel</p>
             <h2>{title}</h2>
           </div>
-          <div className="preview2-panel-actions">
+          <div className="preview3-panel-actions">
             <IconButton icon="float" label="Float" subtle onClick={() => togglePanelDock(side)} />
             <IconButton icon="minimize" label="Minimize" subtle onClick={() => togglePanelCollapse(side)} />
           </div>
         </div>
-        <div className={`preview2-panel-resize-handle ${side}`} onPointerDown={(event) => startPanelResize(side, false, event)} role="presentation" />
+        <div className={`preview3-panel-resize-handle ${side}`} onPointerDown={(event) => startPanelResize(side, false, event)} role="presentation" />
         {side === 'left' ? renderLeftPanel() : renderRightPanel()}
       </section>
     )
@@ -1641,31 +1631,31 @@ export default function Preview3App() {
         ]
 
     return (
-      <aside className="preview2-theme-editor" aria-label={`${scope} theme editor`}>
-        <div className="preview2-theme-editor-header preview2-section-heading">
+      <aside className="preview3-theme-editor" aria-label={`${scope} theme editor`}>
+        <div className="preview3-theme-editor-header preview3-section-heading">
           <div>
-            <p className="preview2-panel-kicker">{scope === 'page' ? 'Page Theme Editor' : 'Tree Theme Editor'}</p>
+            <p className="preview3-panel-kicker">{scope === 'page' ? 'Page Theme Editor' : 'Tree Theme Editor'}</p>
             <h2>{scope === 'page' ? 'Global page chrome' : 'Family tree workspace'}</h2>
           </div>
           <IconButton icon="close" label="Close" subtle onClick={() => setThemeEditorScope(null)} iconOnly />
         </div>
-        <div className="preview2-theme-editor-grid">
+        <div className="preview3-theme-editor-grid">
           {fieldGroups.map((group) => (
-            <section key={group.title} className="preview2-theme-group">
-              <div className="preview2-section-heading compact">
+            <section key={group.title} className="preview3-theme-group">
+              <div className="preview3-section-heading compact">
                 <div>
                   <h3>{group.title}</h3>
-                  <p className="preview2-helper-text">{group.description}</p>
+                  <p className="preview3-helper-text">{group.description}</p>
                 </div>
               </div>
-              <div className="preview2-theme-fields">
+              <div className="preview3-theme-fields">
                 {group.fields.map((field) => {
                   const value = (palette[field.key] as string | undefined) ?? '#ffffff'
 
                   return (
-                    <label key={field.key} className="preview2-theme-field">
+                    <label key={field.key} className="preview3-theme-field">
                       <span>{field.label}</span>
-                      <div className="preview2-theme-field-row">
+                      <div className="preview3-theme-field-row">
                         <input
                           type="color"
                           value={value}
@@ -1681,30 +1671,30 @@ export default function Preview3App() {
             </section>
           ))}
         </div>
-        <section className="preview2-theme-group footer">
-          <div className="preview2-section-heading compact">
+        <section className="preview3-theme-group footer">
+          <div className="preview3-section-heading compact">
             <div>
               <h3>Typography</h3>
-              <p className="preview2-helper-text">Font pairs for chrome and content.</p>
+              <p className="preview3-helper-text">Font pairs for chrome and content.</p>
             </div>
           </div>
-          <div className="preview2-theme-fields typography">
-            <label className="preview2-field">
+          <div className="preview3-theme-fields typography">
+            <label className="preview3-field">
               <span>Body font</span>
               <AppSelect
                 value={theme.fontBody}
                 onValueChange={(value) => updateThemeFont(scope, 'fontBody', value)}
                 options={fontOptions.map((font) => ({ value: font, label: font.split(',')[0] }))}
-                className="preview2-toolbar-select"
+                className="preview3-toolbar-select"
               />
             </label>
-            <label className="preview2-field">
+            <label className="preview3-field">
               <span>Display font</span>
               <AppSelect
                 value={theme.fontDisplay}
                 onValueChange={(value) => updateThemeFont(scope, 'fontDisplay', value)}
                 options={fontOptions.map((font) => ({ value: font, label: font.split(',')[0] }))}
-                className="preview2-toolbar-select"
+                className="preview3-toolbar-select"
               />
             </label>
           </div>
@@ -1715,7 +1705,7 @@ export default function Preview3App() {
 
   function renderTreeCanvas() {
     if (!cameraView || !graphState) {
-      return <section className="preview2-workspace" />
+      return <section className="preview3-workspace" />
     }
 
     return (
@@ -1855,11 +1845,11 @@ export default function Preview3App() {
 
   function renderStaticPage(title: string, body: string, secondary: string) {
     return (
-      <section className="preview2-static-page">
-        <p className="preview2-kicker">Legendarium Explorer</p>
+      <section className="preview3-static-page">
+        <p className="preview3-kicker">Legendarium Explorer</p>
         <h1>{title}</h1>
         <p>{body}</p>
-        <article className="preview2-static-card">
+        <article className="preview3-static-card">
           <h2>Current intent</h2>
           <p>{secondary}</p>
           <p>Page theme remains active here to keep the separation between app chrome and tree workspace unambiguous.</p>
@@ -1869,7 +1859,7 @@ export default function Preview3App() {
   }
 
   return (
-    <main className={`preview2-root ${contentFullscreen && activePage === 'family-tree' ? 'hide-header' : ''}`} style={rootStyle}>
+    <main className={`preview3-root ${contentFullscreen && activePage === 'family-tree' ? 'hide-header' : ''}`} style={rootStyle}>
       <Preview3Header
         activePage={activePage}
         menuOpen={menuOpen}
@@ -1881,7 +1871,7 @@ export default function Preview3App() {
         onPageThemeEditorToggle={() => setThemeEditorScope(themeEditorScope === 'page' ? null : 'page')}
         renderThemeModeToggle={renderThemeModeToggle}
       />
-      <section className="preview2-content">
+      <section className="preview3-content">
         {activePage === 'family-tree' ? renderFamilyPage() : null}
         {activePage === 'impressum' ? renderStaticPage('Impressum', 'This preview rebuild is the controlled exploration surface for static genealogy datasets in Legendarium Explorer.', 'The page exists already so navigation, page theming, and long-term information architecture are exercised before future subpages arrive.') : null}
         {activePage === 'disclaimer' ? renderStaticPage('Disclaimer', 'Dataset quality may vary. Invalid biological relations are ignored deterministically and surfaced as warnings rather than crashing the explorer.', 'This page is intentionally simple in v1, but it already uses the final page shell and theme governance expected by the product contract.') : null}
@@ -1890,4 +1880,5 @@ export default function Preview3App() {
     </main>
   )
 }
+
 

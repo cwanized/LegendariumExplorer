@@ -121,38 +121,38 @@ export function Preview3TreeCanvas({
   ]
 
   return (
-    <section className={`preview2-workspace preview3-workspace ${contentFullscreen ? 'content-fullscreen' : ''}`}>
-      {!contentFullscreen ? null : <button type="button" className="preview2-close-fullscreen preview3-close-fullscreen preview2-close-fullscreen-compact preview3-close-fullscreen-compact" title="Close content fullscreen" aria-label="Close content fullscreen" onClick={onContentFullscreenClose}><Preview3Icon name="close" /></button>}
-      <div className="preview2-toolbar-row preview3-toolbar-row">
-        <div className="preview2-toolbar-group preview3-toolbar-group">
+    <section className={`preview3-workspace ${contentFullscreen ? 'content-fullscreen' : ''}`}>
+      {!contentFullscreen ? null : <button type="button" className="preview3-close-fullscreen preview3-close-fullscreen-compact" title="Close content fullscreen" aria-label="Close content fullscreen" onClick={onContentFullscreenClose}><Preview3Icon name="close" /></button>}
+      <div className="preview3-toolbar-row">
+        <div className="preview3-toolbar-group">
           <IconButton icon="reset" label="Reset View" onClick={onResetView} />
           <IconButton icon="horizontal" label="Horizontal Space" active={wideMode} onClick={onWideModeToggle} />
           <IconButton icon="content-fullscreen" label="Content Fullscreen" active={contentFullscreen} onClick={onContentFullscreenToggle} />
           <IconButton icon="browser-fullscreen" label="F11" active={browserFullscreen} title="Browser Fullscreen" onClick={onBrowserFullscreenToggle} />
         </div>
         <Preview3Icon name="separator" />
-        <div className="preview2-toolbar-group preview3-toolbar-group">
+        <div className="preview3-toolbar-group">
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
-              <button type="button" className="preview2-toolbar-button preview3-toolbar-button icon-only" disabled={exportState === 'working'} aria-label={exportState === 'working' ? 'Exporting PNG' : 'Export PNG'} title={exportState === 'working' ? 'Exporting PNG' : 'Export PNG'}>
+              <button type="button" className="preview3-toolbar-button preview3-toolbar-button icon-only" disabled={exportState === 'working'} aria-label={exportState === 'working' ? 'Exporting PNG' : 'Export PNG'} title={exportState === 'working' ? 'Exporting PNG' : 'Export PNG'}>
                 <Preview3Icon name="image" />
-                <span className="preview2-sr-only preview3-sr-only">{exportState === 'working' ? 'Exporting PNG' : 'Export PNG'}</span>
+                <span className="preview3-sr-only preview3-sr-only">{exportState === 'working' ? 'Exporting PNG' : 'Export PNG'}</span>
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
-              <DropdownMenu.Content className="preview2-menu-panel preview3-menu-panel" align="start" sideOffset={8}>
-                <DropdownMenu.Item className="preview2-menu-item preview3-menu-item" onSelect={() => onExportPng('current')}>Current view</DropdownMenu.Item>
-                <DropdownMenu.Item className="preview2-menu-item preview3-menu-item" onSelect={() => onExportPng('all')}>All filtered</DropdownMenu.Item>
+              <DropdownMenu.Content className="preview3-menu-panel" align="start" sideOffset={8}>
+                <DropdownMenu.Item className="preview3-menu-item" onSelect={() => onExportPng('current')}>Current view</DropdownMenu.Item>
+                <DropdownMenu.Item className="preview3-menu-item" onSelect={() => onExportPng('all')}>All filtered</DropdownMenu.Item>
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
           <IconButton icon="json" label="Export JSON" disabled={exportState === 'working'} onClick={onExportJson} />
         </div>
         <Preview3Icon name="separator" />
-        <div className="preview2-toolbar-group preview3-toolbar-group align-end">
+        <div className="preview3-toolbar-group align-end">
           {renderThemeModeToggle('tree', treeTheme)}
           <AppSelect
-            className="preview2-toolbar-select preview3-toolbar-select"
+            className="preview3-toolbar-select preview3-toolbar-select"
             value={treeTheme.preset}
             onValueChange={(value) => onTreeThemePresetChange(value as ThemePreset)}
             options={treeThemePresetOptions}
@@ -160,14 +160,14 @@ export function Preview3TreeCanvas({
           <IconButton icon="editor" label="Editor" disabled={treeTheme.preset !== 'custom'} onClick={onTreeThemeEditorToggle} />
         </div>
       </div>
-      <div ref={canvasViewportRef} className="preview2-canvas-shell preview3-canvas-shell">
-        {leftPanelCollapsed ? <button type="button" className="preview2-restore-button preview3-restore-button left" onClick={() => onPanelCollapse('left')}><Preview3Icon name="restore-left" /><span>Restore Filter</span></button> : null}
-        {rightPanelCollapsed ? <button type="button" className="preview2-restore-button preview3-restore-button right" onClick={() => onPanelCollapse('right')}><Preview3Icon name="restore-right" /><span>Restore Inspect</span></button> : null}
+      <div ref={canvasViewportRef} className="preview3-canvas-shell">
+        {leftPanelCollapsed ? <button type="button" className="preview3-restore-button left" onClick={() => onPanelCollapse('left')}><Preview3Icon name="restore-left" /><span>Restore Filter</span></button> : null}
+        {rightPanelCollapsed ? <button type="button" className="preview3-restore-button right" onClick={() => onPanelCollapse('right')}><Preview3Icon name="restore-right" /><span>Restore Inspect</span></button> : null}
         {renderPrimaryPanel('left')}
         {renderPrimaryPanel('right')}
         <svg
           ref={svgRef}
-          className="preview2-graph preview3-graph"
+          className="preview3-graph"
           viewBox={`${cameraView.x} ${cameraView.y} ${cameraView.width} ${cameraView.height}`}
           role="img"
           aria-label="Family tree graph"
@@ -179,7 +179,7 @@ export function Preview3TreeCanvas({
         >
           <defs>
             <pattern id={`${panelId}-grid`} width="80" height="80" patternUnits="userSpaceOnUse">
-              <path d="M 80 0 L 0 0 0 80" fill="none" stroke="var(--preview2-tree-border)" strokeOpacity="0.18" strokeWidth="1" />
+              <path d="M 80 0 L 0 0 0 80" fill="none" stroke="var(--preview3-tree-border)" strokeOpacity="0.18" strokeWidth="1" />
             </pattern>
           </defs>
           <rect x={cameraView.x - 800} y={cameraView.y - 800} width={cameraView.width + 1600} height={cameraView.height + 1600} fill={`url(#${panelId}-grid)`} />
@@ -199,14 +199,14 @@ export function Preview3TreeCanvas({
 
             return (
               <g key={anchor.houseId}>
-                <line x1={anchorCenterX} y1={anchorBottomY} x2={anchorCenterX} y2={junctionY} stroke="var(--preview2-tree-overlay)" strokeWidth={1.8} strokeOpacity={0.55} />
-                {rootNodes.length > 1 ? <line x1={minRootX} y1={junctionY} x2={maxRootX} y2={junctionY} stroke="var(--preview2-tree-overlay)" strokeWidth={1.8} strokeOpacity={0.55} /> : null}
+                <line x1={anchorCenterX} y1={anchorBottomY} x2={anchorCenterX} y2={junctionY} stroke="var(--preview3-tree-overlay)" strokeWidth={1.8} strokeOpacity={0.55} />
+                {rootNodes.length > 1 ? <line x1={minRootX} y1={junctionY} x2={maxRootX} y2={junctionY} stroke="var(--preview3-tree-overlay)" strokeWidth={1.8} strokeOpacity={0.55} /> : null}
                 {rootNodes.map((node) => (
-                  <line key={`${anchor.houseId}:${node.id}`} x1={node.x + node.width / 2} y1={junctionY} x2={node.x + node.width / 2} y2={node.y} stroke="var(--preview2-tree-overlay)" strokeWidth={1.8} strokeOpacity={0.55} />
+                  <line key={`${anchor.houseId}:${node.id}`} x1={node.x + node.width / 2} y1={junctionY} x2={node.x + node.width / 2} y2={node.y} stroke="var(--preview3-tree-overlay)" strokeWidth={1.8} strokeOpacity={0.55} />
                 ))}
                 <g transform={`translate(${anchor.x} ${anchor.y})`}>
-                  <rect width={anchor.width} height={anchor.height} rx="16" ry="16" fill="color-mix(in srgb, var(--preview2-tree-accent-soft) 68%, transparent)" stroke="var(--preview2-tree-border)" />
-                  <text x={anchor.width / 2} y={23} textAnchor="middle" className="preview2-svg-meta">{anchor.displayName}</text>
+                  <rect width={anchor.width} height={anchor.height} rx="16" ry="16" fill="color-mix(in srgb, var(--preview3-tree-accent-soft) 68%, transparent)" stroke="var(--preview3-tree-border)" />
+                  <text x={anchor.width / 2} y={23} textAnchor="middle" className="preview3-svg-meta">{anchor.displayName}</text>
                 </g>
               </g>
             )
@@ -228,7 +228,7 @@ export function Preview3TreeCanvas({
             const y2 = renderInlineMarriage ? rightNode.y + rightNode.height / 2 : toNode.y + toNode.height / 2
             const isDimmed = Boolean(lcaAnalysis && fadeMode === 'dim' && !highlightedEdgeIds.has(relation.id))
 
-            return <line key={relation.id} x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--preview2-tree-overlay)" strokeWidth={1.6} strokeDasharray="7 7" strokeOpacity={isDimmed ? 0.22 : 0.58} />
+            return <line key={relation.id} x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--preview3-tree-overlay)" strokeWidth={1.6} strokeDasharray="7 7" strokeOpacity={isDimmed ? 0.22 : 0.58} />
           })}
 
           {biologicalChildGroups.map((group) => {
@@ -255,21 +255,21 @@ export function Preview3TreeCanvas({
                       key={`${group.key}:${node.id}:parent`}
                       d={`M ${parentCenterX} ${parentBottomY} Q ${parentCenterX} ${controlY} ${targetX} ${targetY}`}
                       fill="none"
-                      stroke={highlighted ? 'var(--preview2-tree-accent)' : 'var(--preview2-tree-edge)'}
+                      stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'}
                       strokeWidth={highlighted ? 3.6 : 2.2}
                       strokeOpacity={faded ? 0.22 : 0.82}
                     />
                   )
                 })}
 
-                {!isSingleChildGroup && group.siblingY > group.junctionY ? <line x1={group.junctionX} y1={group.junctionY} x2={group.junctionX} y2={group.siblingY} stroke={highlighted ? 'var(--preview2-tree-accent)' : 'var(--preview2-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.82} /> : null}
+                {!isSingleChildGroup && group.siblingY > group.junctionY ? <line x1={group.junctionX} y1={group.junctionY} x2={group.junctionX} y2={group.siblingY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.82} /> : null}
 
-                {group.childNodes.length > 1 ? <line x1={siblingMinX} y1={group.siblingY} x2={siblingMaxX} y2={group.siblingY} stroke={highlighted ? 'var(--preview2-tree-accent)' : 'var(--preview2-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.82} /> : null}
+                {group.childNodes.length > 1 ? <line x1={siblingMinX} y1={group.siblingY} x2={siblingMaxX} y2={group.siblingY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.82} /> : null}
 
                 {!isSingleChildGroup ? group.childNodes.map((node) => {
                   const childCenterX = node.x + node.width / 2
                   const childTopY = node.y
-                  return <line key={`${group.key}:${node.id}:child`} x1={childCenterX} y1={group.childNodes.length > 1 ? group.siblingY : group.junctionY} x2={childCenterX} y2={childTopY} stroke={highlighted ? 'var(--preview2-tree-accent)' : 'var(--preview2-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.82} />
+                  return <line key={`${group.key}:${node.id}:child`} x1={childCenterX} y1={group.childNodes.length > 1 ? group.siblingY : group.junctionY} x2={childCenterX} y2={childTopY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.82} />
                 }) : null}
               </g>
             )
@@ -292,11 +292,11 @@ export function Preview3TreeCanvas({
 
             return (
               <g key={`${projection.relationId}:${projection.ownerId}:${projection.companionId}`} opacity={isFaded ? 0.28 : 1}>
-                <line x1={linkStartX} y1={linkY} x2={linkEndX} y2={projection.y + projection.height / 2} stroke="var(--preview2-tree-overlay)" strokeDasharray="6 6" strokeOpacity={0.82} />
+                <line x1={linkStartX} y1={linkY} x2={linkEndX} y2={projection.y + projection.height / 2} stroke="var(--preview3-tree-overlay)" strokeDasharray="6 6" strokeOpacity={0.82} />
                 <g transform={`translate(${projection.x} ${projection.y})`} onClick={() => onOpenSpouseContinuation(projection.relationId, projection.companionId)}>
-                  <rect width={projection.width} height={projection.height} rx="16" ry="16" fill="var(--preview2-tree-surface-strong)" stroke={isSelected ? 'var(--preview2-tree-accent)' : 'var(--preview2-tree-border)'} strokeWidth={isSelected ? 2.6 : 1.6} />
-                  <text x={14} y={22} className="preview2-svg-name">{companionPerson.name}</text>
-                  <text x={14} y={40} className="preview2-svg-meta">{companionPerson.species ?? companionPerson.houses?.[0] ?? 'Spouse branch'}</text>
+                  <rect width={projection.width} height={projection.height} rx="16" ry="16" fill="var(--preview3-tree-surface-strong)" stroke={isSelected ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-border)'} strokeWidth={isSelected ? 2.6 : 1.6} />
+                  <text x={14} y={22} className="preview3-svg-name">{companionPerson.name}</text>
+                  <text x={14} y={40} className="preview3-svg-meta">{companionPerson.species ?? companionPerson.houses?.[0] ?? 'Spouse branch'}</text>
                 </g>
               </g>
             )
@@ -316,35 +316,36 @@ export function Preview3TreeCanvas({
             const hasSources = (person.sourceLinks?.length ?? 0) > 0
 
             return (
-              <g key={person.id} onClick={(event) => onNodeSelect(event, person.id)} className="preview2-node-group">
-                {isMatched ? <rect x={node.x - 4} y={node.y - 4} rx={22} ry={22} width={node.width + 8} height={node.height + 8} fill="none" stroke="var(--preview2-tree-accent)" strokeOpacity={0.65} strokeWidth={2.4} /> : null}
-                <rect x={node.x} y={node.y} rx={18} ry={18} width={node.width} height={node.height} fill="var(--preview2-tree-node-fill)" stroke={isSelected ? 'var(--preview2-tree-accent)' : 'var(--preview2-tree-border)'} strokeWidth={isFocused || isSelected ? 3.5 : 1.6} opacity={isDimmed ? 0.28 : 1} />
-                <text x={node.x + 14} y={node.y + 24} className="preview2-svg-name">{person.name}</text>
-                <text x={node.x + 14} y={node.y + 44} className="preview2-svg-meta">{[person.species ?? 'unknown', (person.houses ?? [])[0] ?? 'no house'].join(' • ')}</text>
+              <g key={person.id} onClick={(event) => onNodeSelect(event, person.id)} className="preview3-node-group">
+                {isMatched ? <rect x={node.x - 4} y={node.y - 4} rx={22} ry={22} width={node.width + 8} height={node.height + 8} fill="none" stroke="var(--preview3-tree-accent)" strokeOpacity={0.65} strokeWidth={2.4} /> : null}
+                <rect x={node.x} y={node.y} rx={18} ry={18} width={node.width} height={node.height} fill="var(--preview3-tree-node-fill)" stroke={isSelected ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-border)'} strokeWidth={isFocused || isSelected ? 3.5 : 1.6} opacity={isDimmed ? 0.28 : 1} />
+                <text x={node.x + 14} y={node.y + 24} className="preview3-svg-name">{person.name}</text>
+                <text x={node.x + 14} y={node.y + 44} className="preview3-svg-meta">{[person.species ?? 'unknown', (person.houses ?? [])[0] ?? 'no house'].join(' • ')}</text>
                 {warningCount > 0 ? <circle cx={node.x + node.width - 18} cy={node.y + 18} r={6} fill="#cc7a2f" opacity={isDimmed ? 0.4 : 1} /> : null}
                 {hasSources ? <circle cx={node.x + node.width - 34} cy={node.y + 18} r={5} fill="#4975a0" opacity={isDimmed ? 0.4 : 1} /> : null}
               </g>
             )
           })}
         </svg>
-        <section className={`preview2-legend ${legendMinimized ? 'minimized' : ''}`} style={{ right: `${16 + rightPanelShift}px` }}>
-          <div className="preview2-section-heading compact">
+        <section className={`preview3-legend ${legendMinimized ? 'minimized' : ''}`} style={{ right: `${16 + rightPanelShift}px` }}>
+          <div className="preview3-section-heading compact">
             <h3>Legend</h3>
-            <button type="button" className="preview2-text-button" onClick={onLegendToggle}>{legendMinimized ? 'Open' : 'Min'}</button>
+            <button type="button" className="preview3-text-button" onClick={onLegendToggle}>{legendMinimized ? 'Open' : 'Min'}</button>
           </div>
           {legendMinimized ? null : (
-            <div className="preview2-legend-grid">
-              <p><span className="preview2-legend-swatch node" />Person node</p>
-              <p><span className="preview2-legend-swatch bio" />Biological parent edge</p>
-              <p><span className="preview2-legend-swatch overlay" />Social overlay edge</p>
-              <p><span className="preview2-legend-swatch warning" />Warning marker</p>
-              <p><span className="preview2-legend-swatch source" />Source available</p>
-              <p><span className="preview2-legend-swatch selected" />Selected or focused</p>
+            <div className="preview3-legend-grid">
+              <p><span className="preview3-legend-swatch node" />Person node</p>
+              <p><span className="preview3-legend-swatch bio" />Biological parent edge</p>
+              <p><span className="preview3-legend-swatch overlay" />Social overlay edge</p>
+              <p><span className="preview3-legend-swatch warning" />Warning marker</p>
+              <p><span className="preview3-legend-swatch source" />Source available</p>
+              <p><span className="preview3-legend-swatch selected" />Selected or focused</p>
             </div>
           )}
         </section>
       </div>
-      {exportState === 'error' ? <p className="preview2-export-error">{exportMessage}</p> : null}
+      {exportState === 'error' ? <p className="preview3-export-error">{exportMessage}</p> : null}
     </section>
   )
 }
+
