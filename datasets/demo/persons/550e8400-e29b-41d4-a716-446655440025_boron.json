@@ -5,7 +5,7 @@
   "birth": null,
   "death": null,
   "houses": [
-    "House of Beor"
+    "House of Bëor"
   ],
   "sourceLinks": [
     {
@@ -15,5 +15,6 @@
   ],
   "metadata": {
     "description": "Son of Baran"
-  }
+  },
+  "species": "Man"
 }

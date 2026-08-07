@@ -1,0 +1,23 @@
+{
+  "id": "a7c383a8-839e-4c6e-8aef-37c7a11dd3c8",
+  "name": "Ar-Zimrathôn",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Second Age",
+    "year": 2450
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Ar-Zimrathôn"
+    }
+  ],
+  "metadata": {
+    "description": "King of the Dúnedain."
+  }
+}

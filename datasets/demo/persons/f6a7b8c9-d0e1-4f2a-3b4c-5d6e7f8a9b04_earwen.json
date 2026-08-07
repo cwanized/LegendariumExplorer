@@ -1,0 +1,28 @@
+{
+  "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b04",
+  "name": "Eärwen",
+  "gender": "female",
+  "species": "Elf",
+  "birth": {
+    "era": "Years of the Trees",
+    "year": 1250
+  },
+  "death": null,
+  "houses": [
+    "Teleri",
+    "Alqualondë"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Eärwen"
+    },
+    {
+      "label": "Fandom",
+      "url": "https://lotr.fandom.com/wiki/Eärwen"
+    }
+  ],
+  "metadata": {
+    "description": "Daughter of Olwë, king of Alqualondë. A sea-elf (Falmar) of the Teleri. Married Finarfin, son of Finwë, in the year 1280 of the Years of the Trees. Mother of four children: Finrod Felagund, Angrod, Aegnor, and Galadriel. Through her marriage, she connected the Teleri and Noldor houses. Her golden-haired children inherited Vanyarin blood through their grandmother Indis."
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "id": "c3d4e5f6-a7b8-4c9d-0e1f-2a3b4c5d6e01",
+  "name": "Fingon",
+  "gender": "male",
+  "species": "Elf",
+  "birth": {
+    "era": "Years of the Trees",
+    "year": 1400
+  },
+  "death": {
+    "era": "First Age",
+    "year": 472
+  },
+  "houses": [
+    "Noldor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Fingon"
+    }
+  ],
+  "metadata": {
+    "description": "Eldest son of Fingolfin and Anairë. King of the Noldor after his father. Known for his rescue of Maedhros from Thangorodrim and his friendship with the House of Fëanor. Slain by Gothmog in the Nirnaeth Arnoediad."
+  }
+}

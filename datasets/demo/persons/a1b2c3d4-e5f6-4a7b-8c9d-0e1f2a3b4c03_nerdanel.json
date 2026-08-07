@@ -1,0 +1,20 @@
+{
+  "id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c03",
+  "name": "Nerdanel",
+  "gender": "female",
+  "species": "Elf",
+  "birth": null,
+  "death": null,
+  "houses": [
+    "Noldor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Nerdanel"
+    }
+  ],
+  "metadata": {
+    "description": "Nerdanel the Wise. Wife of Fëanor, mother of his seven sons. Daughter of the smith Mahtan."
+  }
+}

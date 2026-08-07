@@ -11,7 +11,7 @@
     "year": 472
   },
   "houses": [
-    "Hador"
+    "House of Hador"
   ],
   "sourceLinks": [
     {
@@ -21,5 +21,6 @@
   ],
   "metadata": {
     "description": "Father of Tuor"
-  }
+  },
+  "species": "Man"
 }
