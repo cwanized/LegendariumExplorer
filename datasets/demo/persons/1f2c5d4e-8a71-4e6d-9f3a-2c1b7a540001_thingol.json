@@ -1,6 +1,6 @@
 {
   "id": "1f2c5d4e-8a71-4e6d-9f3a-2c1b7a540001",
-  "name": "Elwë (Thingol)",
+  "name": "Thingol",
   "gender": "male",
   "birth": null,
   "death": null,
@@ -14,7 +14,6 @@
     }
   ],
   "metadata": {
-    "description": "King of Doriath, also known as Elwë Singollo. High King of the Teleri in Beleriand. King of Doriath"
-  },
-  "species": "Elf"
+    "description": "King of Doriath"
+  }
 }

@@ -4,7 +4,7 @@
   "gender": "female",
   "birth": {
     "era": "First Age",
-    "year": 1
+    "year": 1200
   },
   "death": null,
   "houses": [
@@ -18,6 +18,5 @@
   ],
   "metadata": {
     "description": null
-  },
-  "species": "Half-elf"
+  }
 }
