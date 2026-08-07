@@ -1,0 +1,26 @@
+{
+  "id": "e5f6a7b8-c9d0-4e1f-2a3b-4c5d6e7f8a05",
+  "name": "Curufin",
+  "gender": "male",
+  "species": "Elf",
+  "birth": {
+    "era": "Years of the Trees",
+    "year": 1495
+  },
+  "death": {
+    "era": "First Age",
+    "year": 506
+  },
+  "houses": [
+    "Noldor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Curufin"
+    }
+  ],
+  "metadata": {
+    "description": "Fifth son of Fëanor and Nerdanel. Known as 'the Crafty'. Most skilled in craft and lore of Fëanor's sons. Father of Celebrimbor. Ruled Himring with Celegorm. Tried to take Lúthien's wolf-hame. Slain in the Sack of Doriath."
+  }
+}

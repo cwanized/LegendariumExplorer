@@ -1,0 +1,28 @@
+{
+  "id": "g7h8i9j0-k1l2-4m3n-4o5p-6q7r8s9t0u05",
+  "name": "Ingwion",
+  "gender": "male",
+  "species": "Elf",
+  "birth": {
+    "era": "Years of the Trees",
+    "year": null
+  },
+  "death": null,
+  "houses": [
+    "Minyar",
+    "Vanyar"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Ingwion"
+    },
+    {
+      "label": "Fandom",
+      "url": "https://lotr.fandom.com/wiki/Ingwion"
+    }
+  ],
+  "metadata": {
+    "description": "Son of Ingwë, High King of the Vanyar, and Ilwen. Born in Cuiviénen during the Years of the Trees. He had one younger sibling and was a cousin of Indis (who married Finwë of the Noldor). After the Great Journey, he became the leader of the Vanyar host in the War of Wrath against Morgoth. His father Ingwë remained on Taniquetil, while Ingwion led the Vanyar army to victory in Middle-earth."
+  }
+}

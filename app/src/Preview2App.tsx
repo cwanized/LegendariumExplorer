@@ -53,6 +53,8 @@ type PanelState = {
   undocked: boolean
   x: number
   y: number
+  width: number
+  height: number
 }
 
 type FilterState = {
@@ -87,6 +89,15 @@ type DragState = {
   originY: number
 }
 
+type ResizeState = {
+  side: PanelSide
+  undocked: boolean
+  startX: number
+  startY: number
+  originWidth: number
+  originHeight: number
+}
+
 type PanState = {
   startX: number
   startY: number
@@ -112,6 +123,8 @@ type IconName =
   | 'close'
   | 'add-a'
   | 'add-b'
+  | 'remove-a'
+  | 'remove-b'
   | 'sun'
   | 'moon'
   | 'sparkle'
@@ -170,6 +183,8 @@ const defaultLeftPanel: PanelState = {
   undocked: false,
   x: 24,
   y: 84,
+  width: 336,
+  height: 640,
 }
 
 const defaultRightPanel: PanelState = {
@@ -177,6 +192,8 @@ const defaultRightPanel: PanelState = {
   undocked: false,
   x: 820,
   y: 84,
+  width: 336,
+  height: 640,
 }
 
 const emptyFilters: FilterState = {
@@ -237,8 +254,165 @@ function getPresetPalette(scope: ThemeScope, preset: Exclude<ThemePreset, 'custo
   return scope === 'page' ? pagePalettes[preset][normalizedMode] : treePalettes[preset][normalizedMode]
 }
 
+function getNeutralPalette(scope: ThemeScope, mode: Extract<ThemeMode, 'light' | 'dark'>): ThemePalette {
+  if (scope === 'page') {
+    return mode === 'dark'
+      ? {
+          background: '#1b1f24',
+          surface: '#252c34',
+          surfaceStrong: '#2f3842',
+          border: '#5f6a77',
+          text: '#edf1f5',
+          muted: '#c0c8d2',
+          accent: '#8fb2d1',
+          accentSoft: '#3c4a59',
+          shadow: 'rgba(0, 0, 0, 0.28)',
+        }
+      : {
+          background: '#e9edf2',
+          surface: '#f5f8fb',
+          surfaceStrong: '#ffffff',
+          border: '#95a2af',
+          text: '#1b2632',
+          muted: '#566473',
+          accent: '#365a78',
+          accentSoft: '#dce5ee',
+          shadow: 'rgba(27, 38, 50, 0.16)',
+        }
+  }
+
+  return mode === 'dark'
+    ? {
+        background: '#182028',
+        surface: '#242f3a',
+        surfaceStrong: '#2f3c49',
+        border: '#607080',
+        text: '#edf2f6',
+        muted: '#bfccd6',
+        accent: '#94b8d8',
+        accentSoft: '#3b4d60',
+        nodeFill: '#374657',
+        edge: '#90b8db',
+        overlay: '#b7cbe0',
+        shadow: 'rgba(0, 0, 0, 0.28)',
+      }
+    : {
+        background: '#edf2f7',
+        surface: '#f9fbfd',
+        surfaceStrong: '#ffffff',
+        border: '#97a7b6',
+        text: '#1c2b36',
+        muted: '#5a6e7f',
+        accent: '#3d6281',
+        accentSoft: '#dce7f2',
+        nodeFill: '#f6f9fc',
+        edge: '#4f6f8b',
+        overlay: '#7b93aa',
+        shadow: 'rgba(28, 43, 54, 0.16)',
+      }
+}
+
 function getActivePalette(scope: ThemeScope, theme: ThemeState) {
-  return theme.preset === 'custom' ? theme.custom : getPresetPalette(scope, theme.preset, theme.mode)
+  if (theme.preset === 'custom') {
+    return theme.custom
+  }
+
+  if (theme.mode === 'thematic') {
+    return getPresetPalette(scope, theme.preset, 'light')
+  }
+
+  return getNeutralPalette(scope, theme.mode)
+}
+
+function isThemeMode(value: unknown): value is ThemeMode {
+  return value === 'light' || value === 'dark' || value === 'thematic'
+}
+
+function isThemePreset(value: unknown): value is ThemePreset {
+  return value === 'tolkien' || value === 'gondor' || value === 'rohan' || value === 'mirkwood' || value === 'imladris' || value === 'custom'
+}
+
+function isFilterLogic(value: unknown): value is FilterLogic {
+  return value === 'and' || value === 'or'
+}
+
+function isFadeMode(value: unknown): value is FadeMode {
+  return value === 'dim' || value === 'hide'
+}
+
+function sanitizeThemeState(input: unknown, fallback: ThemeState): ThemeState {
+  if (!input || typeof input !== 'object') {
+    return fallback
+  }
+
+  const raw = input as Partial<ThemeState>
+  const mode = isThemeMode(raw.mode) ? raw.mode : fallback.mode
+  const preset = isThemePreset(raw.preset) ? raw.preset : fallback.preset
+  const custom = typeof raw.custom === 'object' && raw.custom
+    ? { ...fallback.custom, ...(raw.custom as Partial<ThemePalette>) }
+    : fallback.custom
+
+  return {
+    mode,
+    preset,
+    custom,
+    fontBody: typeof raw.fontBody === 'string' && raw.fontBody.length > 0 ? raw.fontBody : fallback.fontBody,
+    fontDisplay: typeof raw.fontDisplay === 'string' && raw.fontDisplay.length > 0 ? raw.fontDisplay : fallback.fontDisplay,
+  }
+}
+
+function sanitizePanelState(input: unknown, fallback: PanelState): PanelState {
+  if (!input || typeof input !== 'object') {
+    return fallback
+  }
+
+  const raw = input as Partial<PanelState>
+  return {
+    collapsed: typeof raw.collapsed === 'boolean' ? raw.collapsed : fallback.collapsed,
+    undocked: typeof raw.undocked === 'boolean' ? raw.undocked : fallback.undocked,
+    x: typeof raw.x === 'number' ? raw.x : fallback.x,
+    y: typeof raw.y === 'number' ? raw.y : fallback.y,
+    width: clamp(typeof raw.width === 'number' ? raw.width : fallback.width, 280, 640),
+    height: clamp(typeof raw.height === 'number' ? raw.height : fallback.height, 320, 900),
+  }
+}
+
+function sanitizeFilterState(input: unknown): FilterState {
+  if (!input || typeof input !== 'object') {
+    return emptyFilters
+  }
+
+  const raw = input as Partial<FilterState>
+  const pick = (value: unknown) => Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
+
+  return {
+    houses: pick(raw.houses),
+    species: pick(raw.species),
+    genders: pick(raw.genders),
+    eras: pick(raw.eras),
+  }
+}
+
+function normalizePersistedState(input: PersistedState): PersistedState {
+  const datasetName: DatasetName = input.datasetName === 'demo' || input.datasetName === 'testing' || input.datasetName === 'prod' ? input.datasetName : 'demo'
+  const activePage: PageKey = input.activePage === 'family-tree' || input.activePage === 'impressum' || input.activePage === 'disclaimer' ? input.activePage : 'family-tree'
+
+  return {
+    version: 1,
+    datasetName,
+    activePage,
+    pageTheme: sanitizeThemeState(input.pageTheme, defaultPageTheme),
+    treeTheme: sanitizeThemeState(input.treeTheme, defaultTreeTheme),
+    leftPanel: sanitizePanelState(input.leftPanel, defaultLeftPanel),
+    rightPanel: sanitizePanelState(input.rightPanel, defaultRightPanel),
+    legendMinimized: Boolean(input.legendMinimized),
+    wideMode: Boolean(input.wideMode),
+    filterLogic: isFilterLogic(input.filterLogic) ? input.filterLogic : 'and',
+    showInTree: typeof input.showInTree === 'boolean' ? input.showInTree : true,
+    fadeMode: isFadeMode(input.fadeMode) ? input.fadeMode : 'dim',
+    filters: sanitizeFilterState(input.filters),
+    searchQuery: typeof input.searchQuery === 'string' ? input.searchQuery : '',
+  }
 }
 
 function readStoredState(): PersistedState | null {
@@ -253,7 +427,7 @@ function readStoredState(): PersistedState | null {
     }
 
     const parsed = JSON.parse(rawValue) as PersistedState
-    return parsed.version === 1 ? parsed : null
+    return parsed.version === 1 ? normalizePersistedState(parsed) : null
   } catch {
     return null
   }
@@ -466,6 +640,10 @@ function Preview2Icon({ name }: { name: IconName }) {
       return <svg {...commonProps}><circle cx="9" cy="10" r="3" /><path d="M15 8h5" /><path d="M17.5 5.5v5" /><path d="M4 19c1.5-2.4 3.1-3.6 5-3.6 1.9 0 3.5 1.2 5 3.6" /></svg>
     case 'add-b':
       return <svg {...commonProps}><circle cx="9" cy="10" r="3" /><path d="M15 7.5c.8-.6 1.6-.9 2.5-.9 1.8 0 3 1.2 3 2.8S19.3 12 17.5 12c-.9 0-1.7-.3-2.5-.9" /><path d="M4 19c1.5-2.4 3.1-3.6 5-3.6 1.9 0 3.5 1.2 5 3.6" /></svg>
+    case 'remove-a':
+      return <svg {...commonProps}><circle cx="9" cy="10" r="3" /><path d="M15 8h5" /><path d="M4 19c1.5-2.4 3.1-3.6 5-3.6 1.9 0 3.5 1.2 5 3.6" /></svg>
+    case 'remove-b':
+      return <svg {...commonProps}><circle cx="9" cy="10" r="3" /><path d="M15 9.5h5" /><path d="M4 19c1.5-2.4 3.1-3.6 5-3.6 1.9 0 3.5 1.2 5 3.6" /></svg>
     case 'sun':
       return <svg {...commonProps}><circle cx="12" cy="12" r="4" /><path d="M12 2v3" /><path d="M12 19v3" /><path d="m4.9 4.9 2.1 2.1" /><path d="m17 17 2.1 2.1" /><path d="M2 12h3" /><path d="M19 12h3" /><path d="m4.9 19.1 2.1-2.1" /><path d="m17 7 2.1-2.1" /></svg>
     case 'moon':
@@ -514,11 +692,14 @@ export default function Preview2App() {
   const [compactLayout, setCompactLayout] = useState(typeof window !== 'undefined' ? window.innerWidth < COMPACT_BREAKPOINT : false)
   const [dragState, setDragState] = useState<DragState | null>(null)
   const [panState, setPanState] = useState<PanState | null>(null)
-  const [exportScope, setExportScope] = useState<ExportScope>('current')
+  const [resizeState, setResizeState] = useState<ResizeState | null>(null)
+  const [pngMenuOpen, setPngMenuOpen] = useState(false)
   const [exportState, setExportState] = useState<'idle' | 'working' | 'error'>('idle')
   const [exportMessage, setExportMessage] = useState('')
   const canvasViewportRef = useRef<HTMLDivElement | null>(null)
   const svgRef = useRef<SVGSVGElement | null>(null)
+  const pngMenuRef = useRef<HTMLDivElement | null>(null)
+  const pinchDistanceRef = useRef<number | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const panelId = useId().replace(/:/g, '-')
 
@@ -595,10 +776,32 @@ export default function Preview2App() {
   }, [])
 
   useEffect(() => {
+    if (!pngMenuOpen) {
+      return
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (pngMenuRef.current && target instanceof Node && pngMenuRef.current.contains(target)) {
+        return
+      }
+
+      setPngMenuOpen(false)
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown)
+
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown)
+    }
+  }, [pngMenuOpen])
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setMenuOpen(false)
         setThemeEditorScope(null)
+        setPngMenuOpen(false)
 
         if (selectionA || selectionB) {
           setSelectionA(null)
@@ -669,8 +872,9 @@ export default function Preview2App() {
         return
       }
 
-      const nextX = clamp(dragState.originX + (event.clientX - dragState.startX), 12, Math.max(12, shellRect.width - 332))
-      const nextY = clamp(dragState.originY + (event.clientY - dragState.startY), 64, Math.max(64, shellRect.height - 180))
+      const panel = dragState.side === 'left' ? leftPanel : rightPanel
+      const nextX = clamp(dragState.originX + (event.clientX - dragState.startX), 12, Math.max(12, shellRect.width - panel.width - 12))
+      const nextY = clamp(dragState.originY + (event.clientY - dragState.startY), 64, Math.max(64, shellRect.height - panel.height - 12))
 
       if (dragState.side === 'left') {
         setLeftPanel((current) => ({ ...current, x: nextX, y: nextY }))
@@ -690,7 +894,44 @@ export default function Preview2App() {
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerup', stopDragging)
     }
-  }, [dragState])
+  }, [dragState, leftPanel, rightPanel])
+
+  useEffect(() => {
+    if (!resizeState) {
+      return
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const deltaX = event.clientX - resizeState.startX
+      const deltaY = event.clientY - resizeState.startY
+
+      if (resizeState.side === 'left') {
+        setLeftPanel((current) => {
+          const width = clamp(resizeState.originWidth + deltaX, 280, resizeState.undocked ? 640 : 520)
+          const height = resizeState.undocked ? clamp(resizeState.originHeight + deltaY, 320, 900) : current.height
+          return { ...current, width, height }
+        })
+      } else {
+        setRightPanel((current) => {
+          const width = clamp(resizeState.originWidth - deltaX, 280, resizeState.undocked ? 640 : 520)
+          const height = resizeState.undocked ? clamp(resizeState.originHeight + deltaY, 320, 900) : current.height
+          return { ...current, width, height }
+        })
+      }
+    }
+
+    const stopResizing = () => {
+      setResizeState(null)
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', stopResizing)
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', stopResizing)
+    }
+  }, [resizeState])
 
   useEffect(() => {
     if (!panState) {
@@ -725,6 +966,126 @@ export default function Preview2App() {
       window.removeEventListener('pointerup', stopPanning)
     }
   }, [panState])
+
+  useEffect(() => {
+    if (isLoading || activePage !== 'family-tree') {
+      return
+    }
+
+    const shell = canvasViewportRef.current
+    if (!shell) {
+      return
+    }
+
+    const isPanelInteraction = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) {
+        return false
+      }
+
+      return Boolean(target.closest('.preview2-panel-body, .preview2-stats-panel, .preview2-theme-editor'))
+    }
+
+    const isInsideTreeShell = (clientX: number, clientY: number) => {
+      const rect = shell.getBoundingClientRect()
+      return clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom
+    }
+
+    const handleWheel = (event: WheelEvent) => {
+      if (isPanelInteraction(event.target) || !isInsideTreeShell(event.clientX, event.clientY)) {
+        return
+      }
+
+      event.preventDefault()
+      zoomCanvas(event.deltaY, event.clientX, event.clientY)
+    }
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (event.touches.length < 2 || isPanelInteraction(event.target)) {
+        return
+      }
+
+      const first = event.touches[0]
+      const second = event.touches[1]
+      const distance = Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY)
+      const centerX = (first.clientX + second.clientX) / 2
+      const centerY = (first.clientY + second.clientY) / 2
+
+      if (!isInsideTreeShell(centerX, centerY)) {
+        pinchDistanceRef.current = null
+        return
+      }
+
+      if (pinchDistanceRef.current === null) {
+        pinchDistanceRef.current = distance
+        event.preventDefault()
+        return
+      }
+
+      const previousDistance = pinchDistanceRef.current
+      const distanceDelta = Math.abs(distance - previousDistance)
+      pinchDistanceRef.current = distance
+      event.preventDefault()
+      if (distanceDelta < 1.5 || distance <= 0) {
+        return
+      }
+
+      const factor = clamp(previousDistance / distance, 0.92, 1.08)
+      zoomCanvasWithFactor(factor, centerX, centerY)
+    }
+
+    const resetPinch = () => {
+      pinchDistanceRef.current = null
+    }
+
+    window.addEventListener('wheel', handleWheel, { passive: false, capture: true })
+    shell.addEventListener('touchmove', handleTouchMove, { passive: false })
+    shell.addEventListener('touchend', resetPinch)
+    shell.addEventListener('touchcancel', resetPinch)
+
+    return () => {
+      window.removeEventListener('wheel', handleWheel, { capture: true })
+      shell.removeEventListener('touchmove', handleTouchMove)
+      shell.removeEventListener('touchend', resetPinch)
+      shell.removeEventListener('touchcancel', resetPinch)
+    }
+  }, [activePage, isLoading])
+
+  useEffect(() => {
+    if (!graphState || !showInTree || activePage !== 'family-tree') {
+      return
+    }
+
+    const searchValue = searchQuery.trim().toLocaleLowerCase()
+    const personMatchesFilters = (person: Person) => {
+      const matchesByCategory = [
+        filters.houses.length === 0 ? null : (person.houses ?? []).some((house) => filters.houses.includes(house)),
+        filters.species.length === 0 ? null : (person.species ? filters.species.includes(person.species) : false),
+        filters.genders.length === 0 ? null : (person.gender ? filters.genders.includes(person.gender) : false),
+        filters.eras.length === 0 ? null : filters.eras.some((era) => era === person.birth?.era || era === person.death?.era),
+      ].filter((value): value is boolean => value !== null)
+
+      if (matchesByCategory.length === 0) {
+        return true
+      }
+
+      return filterLogic === 'and' ? matchesByCategory.every(Boolean) : matchesByCategory.some(Boolean)
+    }
+
+    const matchedNodes = new Map(
+      graphState.validation.persons
+        .filter((person) => personMatchesFilters(person) && (searchValue.length === 0 || buildSearchText(person).includes(searchValue)))
+        .flatMap((person) => {
+          const node = graphState.layout.nodes.get(person.id)
+          return node ? [[person.id, node] as const] : []
+        }),
+    )
+
+    if (matchedNodes.size === 0) {
+      return
+    }
+
+    setCamera(getGraphBounds(matchedNodes))
+  }, [activePage, filterLogic, filters, graphState, searchQuery, showInTree])
 
   const pagePalette = getActivePalette('page', pageTheme)
   const treePalette = getActivePalette('tree', treeTheme)
@@ -812,7 +1173,8 @@ export default function Preview2App() {
 
   const filteredPeople = validation.persons.filter((person) => personMatchesFilters(person))
   const searchResults = filteredPeople.filter((person) => personMatchesSearch(person)).slice(0, 40)
-  const filteredOutNodeIds = new Set(validation.persons.filter((person) => !personMatchesFilters(person)).map((person) => person.id))
+  const matchingPeople = filteredPeople.filter((person) => personMatchesSearch(person))
+  const matchingNodeIds = new Set(matchingPeople.map((person) => person.id))
   const selectedIds = [selectionA, selectionB].filter((value): value is UUID => Boolean(value))
   const lcaAnalysis = selectionA && selectionB ? findLowestCommonAncestor(selectionA, selectionB, validation) : null
   const hiddenBySelection = new Set<UUID>()
@@ -826,39 +1188,33 @@ export default function Preview2App() {
   }
 
   const shouldHideNode = (personId: UUID) => {
-    if (showInTree && filteredOutNodeIds.has(personId)) {
-      return true
-    }
-
     return hiddenBySelection.has(personId)
   }
 
   const shouldDimNode = (personId: UUID) => {
-    if (showInTree && filteredOutNodeIds.has(personId)) {
-      return true
-    }
-
     return Boolean(lcaAnalysis && fadeMode === 'dim' && !lcaAnalysis.nodeIds.has(personId) && personId !== selectionA && personId !== selectionB)
   }
 
   const biologicalRelations = validation.validBiologicalRelations.filter((relation) => !shouldHideNode(relation.from) && !shouldHideNode(relation.to))
   const overlayRelations = validation.validOverlayRelations.filter((relation) => !shouldHideNode(relation.from) && !shouldHideNode(relation.to))
   const selectedCount = selectedIds.length
-  const rightPanelShift = !rightPanel.collapsed && !rightPanel.undocked && !wideMode && !compactLayout ? 364 : 0
+  const hasBothSelections = Boolean(selectionA && selectionB)
+  const rightPanelShift = !rightPanel.collapsed && !rightPanel.undocked && !wideMode && !compactLayout ? rightPanel.width + 28 : 0
   const personA = selectionA ? validation.personById.get(selectionA) ?? null : null
   const personB = selectionB ? validation.personById.get(selectionB) ?? null : null
   const focusPerson = inspectedPersonId ? validation.personById.get(inspectedPersonId) ?? null : null
   const statsHidden = wideMode || contentFullscreen || compactLayout
   const treeThemeLabel = `${treeTheme.mode} / ${treeTheme.preset}`
+  const lcaState: 'idle' | 'connected' | 'disconnected' = lcaAnalysis ? 'connected' : hasBothSelections ? 'disconnected' : 'idle'
 
   function updateThemePreset(scope: ThemeScope, preset: ThemePreset) {
     if (scope === 'page') {
-      setPageTheme((current) => ({ ...current, preset }))
+      setPageTheme((current) => ({ ...current, preset, mode: preset === 'custom' ? current.mode : 'thematic' }))
       if (preset !== 'custom' && themeEditorScope === 'page') {
         setThemeEditorScope(null)
       }
     } else {
-      setTreeTheme((current) => ({ ...current, preset }))
+      setTreeTheme((current) => ({ ...current, preset, mode: preset === 'custom' ? current.mode : 'thematic' }))
       if (preset !== 'custom' && themeEditorScope === 'tree') {
         setThemeEditorScope(null)
       }
@@ -867,9 +1223,9 @@ export default function Preview2App() {
 
   function updateThemeMode(scope: ThemeScope, mode: ThemeMode) {
     if (scope === 'page') {
-      setPageTheme((current) => ({ ...current, mode }))
+      setPageTheme((current) => ({ ...current, mode, preset: mode === 'thematic' && current.preset === 'custom' ? 'tolkien' : current.preset }))
     } else {
-      setTreeTheme((current) => ({ ...current, mode }))
+      setTreeTheme((current) => ({ ...current, mode, preset: mode === 'thematic' && current.preset === 'custom' ? 'tolkien' : current.preset }))
     }
   }
 
@@ -941,6 +1297,24 @@ export default function Preview2App() {
     })
   }
 
+  function removeSelection(slot: 'a' | 'b') {
+    if (slot === 'a') {
+      setSelectionA(null)
+    } else {
+      setSelectionB(null)
+    }
+  }
+
+  function toggleSelection(slot: 'a' | 'b', personId: UUID) {
+    const alreadySelected = slot === 'a' ? selectionA === personId : selectionB === personId
+    if (alreadySelected) {
+      removeSelection(slot)
+      return
+    }
+
+    assignSelection(slot, personId)
+  }
+
   function handleNodeSelect(event: ReactMouseEvent<SVGGElement>, personId: UUID) {
     event.stopPropagation()
     startTransition(() => {
@@ -962,6 +1336,32 @@ export default function Preview2App() {
     setSelectionB(null)
     setFocusedPersonId(null)
     setInspectedPersonId(null)
+  }
+
+  function centerSelection(slot: 'a' | 'b') {
+    const personId = slot === 'a' ? selectionA : selectionB
+    if (!personId) {
+      return
+    }
+
+    centerPerson(personId)
+  }
+
+  function swapSelections() {
+    if (!selectionA || !selectionB || selectionA === selectionB) {
+      return
+    }
+
+    setSelectionA(selectionB)
+    setSelectionB(selectionA)
+  }
+
+  function centerLcaAncestor() {
+    if (!lcaAnalysis) {
+      return
+    }
+
+    centerPerson(lcaAnalysis.ancestorId)
   }
 
   function togglePanelCollapse(side: PanelSide) {
@@ -986,28 +1386,73 @@ export default function Preview2App() {
       return
     }
 
+    if (!event.isPrimary || event.button !== 0) {
+      return
+    }
+
+    if (
+      event.target instanceof Element
+      && event.target.closest('.preview2-panel-actions, .preview2-panel-resize-handle, .preview2-panel-resize-corner, button, a, input, select, textarea, label')
+    ) {
+      return
+    }
+
     setDragState({ side, startX: event.clientX, startY: event.clientY, originX: panel.x, originY: panel.y })
   }
 
+  function startPanelResize(side: PanelSide, undocked: boolean, event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault()
+    event.stopPropagation()
+    const panel = side === 'left' ? leftPanel : rightPanel
+    setResizeState({
+      side,
+      undocked,
+      startX: event.clientX,
+      startY: event.clientY,
+      originWidth: panel.width,
+      originHeight: panel.height,
+    })
+  }
+
   function startCanvasPan(event: ReactPointerEvent<SVGRectElement>) {
+    if (event.pointerType === 'touch') {
+      return
+    }
+
     setPanState({ startX: event.clientX, startY: event.clientY, origin: cameraView })
   }
 
   function zoomCanvas(delta: number, clientX: number, clientY: number) {
+    const factor = delta > 0 ? 1.08 : 0.92
+    zoomCanvasWithFactor(factor, clientX, clientY)
+  }
+
+  function zoomCanvasWithFactor(factor: number, clientX: number, clientY: number) {
     const rect = canvasViewportRef.current?.getBoundingClientRect()
     if (!rect) {
       return
     }
 
-    const factor = delta > 0 ? 1.08 : 0.92
-    const nextWidth = clamp(cameraView.width * factor, 420, 5000)
-    const nextHeight = clamp(cameraView.height * factor, 320, 4200)
     const ratioX = (clientX - rect.left) / rect.width
     const ratioY = (clientY - rect.top) / rect.height
-    const focusX = cameraView.x + cameraView.width * ratioX
-    const focusY = cameraView.y + cameraView.height * ratioY
 
-    setCamera({ width: nextWidth, height: nextHeight, x: focusX - nextWidth * ratioX, y: focusY - nextHeight * ratioY })
+    setCamera((current) => {
+      if (!current) {
+        return current
+      }
+
+      const nextWidth = clamp(current.width * factor, 420, 5000)
+      const nextHeight = clamp(current.height * factor, 320, 4200)
+      const focusX = current.x + current.width * ratioX
+      const focusY = current.y + current.height * ratioY
+
+      return {
+        width: nextWidth,
+        height: nextHeight,
+        x: focusX - nextWidth * ratioX,
+        y: focusY - nextHeight * ratioY,
+      }
+    })
   }
 
   async function toggleBrowserFullscreen() {
@@ -1018,7 +1463,7 @@ export default function Preview2App() {
     }
   }
 
-  async function handlePngExport() {
+  async function handlePngExport(scope: ExportScope = 'current') {
     if (!svgRef.current) {
       return
     }
@@ -1026,7 +1471,7 @@ export default function Preview2App() {
     try {
       setExportState('working')
       setExportMessage('')
-      if (exportScope === 'current') {
+      if (scope === 'current') {
         await exportSvgAsPng(svgRef.current, `legendarium-preview2-${datasetName}-current.png`)
       } else {
         const visibleNodes = new Map(
@@ -1073,6 +1518,38 @@ export default function Preview2App() {
     setFilters(emptyFilters)
   }
 
+  function resetPreview2Settings() {
+    const confirmed = window.confirm('Reset all Preview2 settings? This only clears local Preview2 preferences.')
+    if (!confirmed) {
+      return
+    }
+
+    window.localStorage.removeItem(STORAGE_KEY)
+    setActivePage('family-tree')
+    setDatasetName('demo')
+    setPageTheme(defaultPageTheme)
+    setTreeTheme(defaultTreeTheme)
+    setLeftPanel(defaultLeftPanel)
+    setRightPanel(defaultRightPanel)
+    setLegendMinimized(false)
+    setWideMode(false)
+    setContentFullscreen(false)
+    setFilterLogic('and')
+    setShowInTree(true)
+    setFadeMode('dim')
+    setFilters(emptyFilters)
+    setSearchQuery('')
+    setSelectionA(null)
+    setSelectionB(null)
+    setFocusedPersonId(null)
+    setInspectedPersonId(null)
+    setThemeEditorScope(null)
+    setPngMenuOpen(false)
+    setExportState('idle')
+    setExportMessage('')
+    setCamera(getGraphBounds(layout.nodes))
+  }
+
   function renderFilterGroup(label: string, options: string[], active: string[], key: keyof FilterState) {
     return (
       <div className="preview2-filter-group">
@@ -1104,7 +1581,7 @@ export default function Preview2App() {
             <button type="button" className={`preview2-chip ${filterLogic === 'or' ? 'active' : ''}`} onClick={() => setFilterLogic('or')}>OR</button>
             <label className="preview2-checkbox-row">
               <input type="checkbox" checked={showInTree} onChange={(event) => setShowInTree(event.target.checked)} />
-              Show in tree
+              Auto-fit matched nodes
             </label>
           </div>
           {renderFilterGroup('House', houseOptions, filters.houses, 'houses')}
@@ -1128,8 +1605,20 @@ export default function Preview2App() {
                   <span>{[person.species, person.gender, (person.houses ?? []).join(', ')].filter(Boolean).join(' • ') || 'No metadata'}</span>
                 </button>
                 <div className="preview2-result-actions preview2-result-actions-stack">
-                  <IconButton icon="add-a" label="Add as A" className="preview2-search-action-button" onClick={() => assignSelection('a', person.id)} />
-                  <IconButton icon="add-b" label="Add as B" className="preview2-search-action-button" onClick={() => assignSelection('b', person.id)} />
+                  <IconButton
+                    icon={selectionA === person.id ? 'remove-a' : 'add-a'}
+                    label={selectionA === person.id ? 'Remove A' : 'Add A'}
+                    className="preview2-search-action-button"
+                    active={selectionA === person.id}
+                    onClick={() => toggleSelection('a', person.id)}
+                  />
+                  <IconButton
+                    icon={selectionB === person.id ? 'remove-b' : 'add-b'}
+                    label={selectionB === person.id ? 'Remove B' : 'Add B'}
+                    className="preview2-search-action-button"
+                    active={selectionB === person.id}
+                    onClick={() => toggleSelection('b', person.id)}
+                  />
                 </div>
               </article>
             ))}
@@ -1140,10 +1629,28 @@ export default function Preview2App() {
         <section className="preview2-card-block">
           <div className="preview2-section-heading">
             <h3>Selection</h3>
-            <button type="button" className="preview2-text-button" onClick={clearSelection}>Clear</button>
+            <span className="preview2-selection-summary">{selectedCount}/2 selected</span>
           </div>
-          <p className="preview2-selection-row"><strong>A</strong><span>{personA?.name ?? 'None selected'}</span></p>
-          <p className="preview2-selection-row"><strong>B</strong><span>{personB?.name ?? 'Use Shift+Click or Add B'}</span></p>
+          <div className="preview2-selection-actions">
+            <button type="button" className="preview2-chip" onClick={swapSelections} disabled={!hasBothSelections}>Swap A/B</button>
+            <button type="button" className="preview2-chip" onClick={clearSelection} disabled={selectedCount === 0}>Clear</button>
+          </div>
+          <p className="preview2-selection-row">
+            <strong>A</strong>
+            <span>{personA?.name ?? 'None selected'}</span>
+            <span className="preview2-selection-row-actions">
+              <button type="button" className="preview2-text-button" onClick={() => centerSelection('a')} disabled={!personA}>Focus</button>
+              <button type="button" className="preview2-text-button" onClick={() => removeSelection('a')} disabled={!personA}>Remove</button>
+            </span>
+          </p>
+          <p className="preview2-selection-row">
+            <strong>B</strong>
+            <span>{personB?.name ?? 'Use Shift+Click or Add B'}</span>
+            <span className="preview2-selection-row-actions">
+              <button type="button" className="preview2-text-button" onClick={() => centerSelection('b')} disabled={!personB}>Focus</button>
+              <button type="button" className="preview2-text-button" onClick={() => removeSelection('b')} disabled={!personB}>Remove</button>
+            </span>
+          </p>
           <label className="preview2-field">
             <span>Fade unrelated</span>
             <select value={fadeMode} onChange={(event) => setFadeMode(event.target.value as FadeMode)}>
@@ -1171,6 +1678,20 @@ export default function Preview2App() {
       <div className="preview2-person-card">
         <div className="preview2-section-heading compact">
           <h3>{slotLabel}</h3>
+          <div className="preview2-result-actions">
+            <IconButton
+              icon={selectionA === person.id ? 'remove-a' : 'add-a'}
+              label={selectionA === person.id ? 'Remove from A' : 'Add as A'}
+              className="preview2-search-action-button"
+              onClick={() => toggleSelection('a', person.id)}
+            />
+            <IconButton
+              icon={selectionB === person.id ? 'remove-b' : 'add-b'}
+              label={selectionB === person.id ? 'Remove from B' : 'Add as B'}
+              className="preview2-search-action-button"
+              onClick={() => toggleSelection('b', person.id)}
+            />
+          </div>
         </div>
         <strong className="preview2-person-name">{person.name}</strong>
         <dl className="preview2-meta-grid">
@@ -1200,7 +1721,10 @@ export default function Preview2App() {
         <section className="preview2-card-block">
           <div className="preview2-section-heading">
             <h3>LCA</h3>
-            <span>{selectionA && selectionB ? 'Active' : 'Idle'}</span>
+            <div className="preview2-lca-heading-actions">
+              <span className={`preview2-lca-state ${lcaState}`}>{lcaState === 'connected' ? 'Connected' : lcaState === 'disconnected' ? 'No path' : 'Idle'}</span>
+              <button type="button" className="preview2-text-button" onClick={centerLcaAncestor} disabled={!lcaAnalysis}>Center ancestor</button>
+            </div>
           </div>
           {lcaAnalysis ? (
             <div className="preview2-lca-block">
@@ -1208,6 +1732,8 @@ export default function Preview2App() {
               <p><strong>Generations</strong><span>{lcaAnalysis.edgeIds.size}</span></p>
               <p><strong>Path</strong><span>{lcaAnalysis.nodeIds.size} highlighted nodes</span></p>
             </div>
+          ) : selectionA && selectionB ? (
+            <p className="preview2-empty preview2-no-lca">No biological connection between the current A/B selection.</p>
           ) : (
             <p className="preview2-empty">Select two people to compute the biological lowest common ancestor.</p>
           )}
@@ -1219,7 +1745,9 @@ export default function Preview2App() {
   function renderPrimaryPanel(side: PanelSide) {
     const state = side === 'left' ? leftPanel : rightPanel
     const title = side === 'left' ? 'Filter, Search & Selection' : 'Inspector & LCA'
-    const panelStyle = state.undocked ? ({ left: state.x, top: state.y } as CSSProperties) : undefined
+    const panelStyle = state.undocked
+      ? ({ left: state.x, top: state.y, width: state.width, height: state.height } as CSSProperties)
+      : ({ width: state.width } as CSSProperties)
 
     if (state.collapsed) {
       return null
@@ -1228,7 +1756,7 @@ export default function Preview2App() {
     return (
       <section className={`preview2-primary-panel preview2-primary-panel-${side} ${state.undocked ? 'is-undocked' : ''}`} style={panelStyle}>
         <div className="preview2-panel-header" onPointerDown={(event) => startPanelDrag(side, event)}>
-          <div>
+          <div className="preview2-panel-title">
             <p className="preview2-panel-kicker">Primary Panel</p>
             <h2>{title}</h2>
           </div>
@@ -1237,6 +1765,8 @@ export default function Preview2App() {
             <IconButton icon="minimize" label="Minimize" subtle onClick={() => togglePanelCollapse(side)} />
           </div>
         </div>
+        <div className={`preview2-panel-resize-handle ${side}`} onPointerDown={(event) => startPanelResize(side, false, event)} role="presentation" />
+        {state.undocked ? <div className="preview2-panel-resize-corner" onPointerDown={(event) => startPanelResize(side, true, event)} role="presentation" /> : null}
         {side === 'left' ? renderLeftPanel() : renderRightPanel()}
       </section>
     )
@@ -1315,12 +1845,16 @@ export default function Preview2App() {
           </div>
           <Preview2Icon name="separator" />
           <div className="preview2-toolbar-group">
-            <select className="preview2-toolbar-select" value={exportScope} onChange={(event) => setExportScope(event.target.value as ExportScope)}>
-              <option value="current">PNG: current view</option>
-              <option value="all">PNG: all filtered</option>
-            </select>
-            <IconButton icon="image" label="Export PNG" onClick={() => void handlePngExport()} />
-            <IconButton icon="json" label="Export JSON" onClick={handleJsonExport} />
+            <div ref={pngMenuRef} className="preview2-inline-menu" onPointerDown={(event) => event.stopPropagation()}>
+              <IconButton icon="image" label={exportState === 'working' ? 'Exporting PNG' : 'Export PNG'} active={pngMenuOpen} disabled={exportState === 'working'} onClick={() => setPngMenuOpen((current) => !current)} />
+              {pngMenuOpen ? (
+                <div className="preview2-inline-menu-popover" role="menu" aria-label="PNG export scope">
+                  <button type="button" role="menuitem" onClick={() => { setPngMenuOpen(false); void handlePngExport('current') }}>Current view</button>
+                  <button type="button" role="menuitem" onClick={() => { setPngMenuOpen(false); void handlePngExport('all') }}>All filtered</button>
+                </div>
+              ) : null}
+            </div>
+            <IconButton icon="json" label="Export JSON" disabled={exportState === 'working'} onClick={handleJsonExport} />
           </div>
           <Preview2Icon name="separator" />
           <div className="preview2-toolbar-group align-end">
@@ -1333,7 +1867,7 @@ export default function Preview2App() {
               <option value="imladris">Imladris</option>
               <option value="custom">Custom</option>
             </select>
-            <IconButton icon="editor" label="Editor" disabled={treeTheme.preset !== 'custom'} className={treeTheme.preset !== 'custom' ? 'is-disabled' : ''} onClick={() => setThemeEditorScope(themeEditorScope === 'tree' ? null : 'tree')} />
+            <IconButton icon="editor" label="Editor" disabled={treeTheme.preset !== 'custom'} onClick={() => setThemeEditorScope(themeEditorScope === 'tree' ? null : 'tree')} />
           </div>
         </div>
         <div ref={canvasViewportRef} className="preview2-canvas-shell">
@@ -1347,10 +1881,6 @@ export default function Preview2App() {
             viewBox={`${cameraView.x} ${cameraView.y} ${cameraView.width} ${cameraView.height}`}
             role="img"
             aria-label="Family tree graph"
-            onWheel={(event) => {
-              event.preventDefault()
-              zoomCanvas(event.deltaY, event.clientX, event.clientY)
-            }}
             onClick={(event) => {
               if (event.target === event.currentTarget) {
                 clearSelection()
@@ -1420,11 +1950,13 @@ export default function Preview2App() {
               const isSelected = selectionA === person.id || selectionB === person.id
               const isFocused = focusedPersonId === person.id
               const isDimmed = shouldDimNode(person.id)
+              const isMatched = matchingNodeIds.has(person.id)
               const warningCount = validation.warnings.filter((warning) => warning.personId === person.id).length
               const hasSources = (person.sourceLinks?.length ?? 0) > 0
 
               return (
                 <g key={person.id} onClick={(event) => handleNodeSelect(event, person.id)} className="preview2-node-group">
+                  {isMatched ? <rect x={node.x - 4} y={node.y - 4} rx={22} ry={22} width={node.width + 8} height={node.height + 8} fill="none" stroke="var(--preview2-tree-accent)" strokeOpacity={0.65} strokeWidth={2.4} /> : null}
                   <rect x={node.x} y={node.y} rx={18} ry={18} width={node.width} height={node.height} fill="var(--preview2-tree-node-fill)" stroke={isSelected ? 'var(--preview2-tree-accent)' : 'var(--preview2-tree-border)'} strokeWidth={isFocused || isSelected ? 3.5 : 1.6} opacity={isDimmed ? 0.28 : 1} />
                   <text x={node.x + 14} y={node.y + 24} className="preview2-svg-name">{person.name}</text>
                   <text x={node.x + 14} y={node.y + 44} className="preview2-svg-meta">{[person.species ?? 'unknown', (person.houses ?? [])[0] ?? 'no house'].join(' • ')}</text>
@@ -1501,6 +2033,10 @@ export default function Preview2App() {
                 <li>{hasActiveFilters ? 'Filters active' : 'No active filters'}</li>
                 <li>{selectedCount} selected person{selectedCount === 1 ? '' : 's'}</li>
               </ul>
+              <button type="button" className="preview2-toolbar-button preview2-reset-settings" onClick={resetPreview2Settings}>
+                <Preview2Icon name="reset" />
+                <span>Reset settings</span>
+              </button>
             </section>
             <section className="preview2-card-block stats">
               <div className="preview2-section-heading">
@@ -1545,7 +2081,7 @@ export default function Preview2App() {
           <button type="button" className="preview2-hamburger preview2-hamburger-icon" title={menuOpen ? 'Close menu' : 'Open menu'} aria-label={menuOpen ? 'Close menu' : 'Open menu'} onClick={() => setMenuOpen((current) => !current)}><Preview2Icon name="menu" /></button>
           <div>
             <p className="preview2-kicker">Legendarium Explorer</p>
-            <strong className="preview2-brand-title">Preview2 UI Rebuild</strong>
+            <strong className="preview2-brand-title">Legendarium Explorer</strong>
           </div>
         </div>
         <div className="preview2-header-controls">
@@ -1558,7 +2094,7 @@ export default function Preview2App() {
             <option value="imladris">Imladris</option>
             <option value="custom">Custom</option>
           </select>
-          <IconButton icon="editor" label="Editor" disabled={pageTheme.preset !== 'custom'} className={pageTheme.preset !== 'custom' ? 'is-disabled' : ''} onClick={() => setThemeEditorScope(themeEditorScope === 'page' ? null : 'page')} />
+          <IconButton icon="editor" label="Editor" disabled={pageTheme.preset !== 'custom'} onClick={() => setThemeEditorScope(themeEditorScope === 'page' ? null : 'page')} />
         </div>
       </header>
       {menuOpen ? (

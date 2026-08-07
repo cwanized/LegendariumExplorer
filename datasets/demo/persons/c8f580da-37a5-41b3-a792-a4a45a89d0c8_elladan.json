@@ -1,0 +1,21 @@
+{
+  "id": "c8f580da-37a5-41b3-a792-a4a45a89d0c8",
+  "name": "Elladan",
+  "gender": "male",
+  "species": "Half-elf",
+  "birth": {
+    "era": "Third Age",
+    "year": 130
+  },
+  "death": null,
+  "houses": [],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Elladan"
+    }
+  ],
+  "metadata": {
+    "description": "Son of Elrond and Celebrian, twin brother of Elrohir."
+  }
+}

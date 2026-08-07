@@ -1,0 +1,28 @@
+{
+  "id": "g7h8i9j0-k1l2-4m3n-4o5p-6q7r8s9t0u03",
+  "name": "Ingwë",
+  "gender": "male",
+  "species": "Elf",
+  "birth": {
+    "era": "Years of the Trees",
+    "year": null
+  },
+  "death": null,
+  "houses": [
+    "Minyar",
+    "Vanyar"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Ingwë"
+    },
+    {
+      "label": "Fandom",
+      "url": "https://lotr.fandom.com/wiki/Ingwë"
+    }
+  ],
+  "metadata": {
+    "description": "High King of all Elves and King of the Vanyar. A direct male-line descendant of Imin (from eldest son to eldest son). He was invited to Aman as an ambassador of the Minyar and became their king. Known as 'Ingwë Ingweron' (Chief of Chieftains). He dwells on Taniquetil beneath the halls of Manwë. His people, the Vanyar, are known as the 'Fair-elves' for their golden hair. He married Ilwen and had at least one son, Ingwion, who led the Vanyar in the War of Wrath."
+  }
+}

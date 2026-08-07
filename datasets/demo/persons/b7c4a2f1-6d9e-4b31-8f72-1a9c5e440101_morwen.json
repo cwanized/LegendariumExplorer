@@ -8,7 +8,7 @@
   },
   "death": null,
   "houses": [
-    "Beor"
+    "House of Bëor"
   ],
   "sourceLinks": [
     {
@@ -18,5 +18,6 @@
   ],
   "metadata": {
     "description": "Morwen Eledhwen, wife of Hurin and mother of Turin and Nienor."
-  }
+  },
+  "species": "Man"
 }

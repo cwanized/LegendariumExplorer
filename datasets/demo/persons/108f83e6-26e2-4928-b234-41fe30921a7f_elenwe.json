@@ -1,0 +1,28 @@
+{
+  "id": "108f83e6-26e2-4928-b234-41fe30921a7f",
+  "name": "Elenwë",
+  "gender": "female",
+  "species": "Elf",
+  "birth": {
+    "era": "Years of the Trees",
+    "year": 1400
+  },
+  "death": {
+    "era": null,
+    "year": null
+  },
+  "houses": [
+    "Vanyar",
+    "Noldor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Elenwë"
+    }
+  ],
+  "metadata": {
+    "description": "Wife of Turgon, mother of Idril. One of the Vanyar who joined the Noldor exile. Died crossing the Helcaraxë (Grinding Ice) with her husband.",
+    "canonicity": "canonical"
+  }
+}

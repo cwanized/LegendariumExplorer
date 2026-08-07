@@ -1,0 +1,23 @@
+{
+  "id": "30d65b1b-289c-48d4-b90b-7c1a4e848fb7",
+  "name": "Ar-Sakalthôr",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Second Age",
+    "year": 2570
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Ar-Sakalthôr"
+    }
+  ],
+  "metadata": {
+    "description": "King of the Dúnedain."
+  }
+}

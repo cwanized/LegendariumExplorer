@@ -1,0 +1,12 @@
+{
+  "id": "b35baece-7568-47da-82ac-e051448aa125",
+  "type": "marriage",
+  "from": "12285381-b101-4bdb-8534-825508def1db",
+  "to": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f04",
+  "attributes": {
+    "date": {
+      "era": "First Age",
+      "year": 500
+    }
+  }
+}

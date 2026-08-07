@@ -1,0 +1,12 @@
+{
+  "id": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b08",
+  "type": "biological_parent",
+  "from": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b01",
+  "to": "f6a7b8c9-d0e1-4f2a-3b4c-5d6e7f8a9b03",
+  "attributes": {
+    "date": {
+      "era": "Years of the Trees",
+      "year": null
+    }
+  }
+}

@@ -4,7 +4,7 @@
   "gender": "female",
   "birth": {
     "era": "First Age",
-    "year": 506
+    "year": 485
   },
   "death": null,
   "houses": [
@@ -18,5 +18,6 @@
   ],
   "metadata": {
     "description": null
-  }
+  },
+  "species": "Elf"
 }

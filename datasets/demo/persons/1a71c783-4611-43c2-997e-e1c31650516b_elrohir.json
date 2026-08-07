@@ -1,0 +1,21 @@
+{
+  "id": "1a71c783-4611-43c2-997e-e1c31650516b",
+  "name": "Elrohir",
+  "gender": "male",
+  "species": "Half-elf",
+  "birth": {
+    "era": "Third Age",
+    "year": 130
+  },
+  "death": null,
+  "houses": [],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Elrohir"
+    }
+  ],
+  "metadata": {
+    "description": "Son of Elrond and Celebrian, twin brother of Elladan."
+  }
+}

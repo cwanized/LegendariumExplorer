@@ -1,0 +1,27 @@
+{
+  "id": "72236107-e623-45e4-8f90-9ce7ee81a9ba",
+  "name": "Haldad",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "First Age",
+    "year": 300
+  },
+  "death": {
+    "era": "First Age",
+    "year": 400
+  },
+  "houses": [
+    "House of Haleth"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Haldad"
+    }
+  ],
+  "metadata": {
+    "description": "First chieftain of the Haladin. Led his people against Orc raids. Slain in battle, succeeded by his daughter Haleth.",
+    "canonicity": "canonical"
+  }
+}

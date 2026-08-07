@@ -2,7 +2,7 @@
   "id": "550e8400-e29b-41d4-a716-446655440006",
   "name": "Elrond",
   "gender": "male",
-  "species": "Half-elven",
+  "species": "Half-elf",
   "birth": {
     "era": "First Age",
     "year": 532
@@ -23,5 +23,8 @@
   "portraitSourceUrl": "https://en.wikipedia.org/wiki/Elrond",
   "metadata": {
     "description": "Loremaster of Rivendell"
-  }
+  },
+  "houses": [
+    "Dunedain"
+  ]
 }

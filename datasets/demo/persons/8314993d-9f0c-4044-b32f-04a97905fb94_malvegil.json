@@ -1,0 +1,23 @@
+{
+  "id": "8314993d-9f0c-4044-b32f-04a97905fb94",
+  "name": "Malvegil",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 930
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Malvegil"
+    }
+  ],
+  "metadata": {
+    "description": "Chieftain of the Dúnedain."
+  }
+}

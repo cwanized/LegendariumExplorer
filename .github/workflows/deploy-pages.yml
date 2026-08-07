@@ -21,10 +21,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
@@ -44,10 +44,15 @@ jobs:
         working-directory: app
         run: npm run build
 
+      - name: Create SPA fallback page
+        shell: bash
+        run: cp app/dist/index.html app/dist/404.html
+
       - name: Smoke test build artifact
         shell: bash
         run: |
           test -f app/dist/index.html
+          test -f app/dist/404.html
           test -f app/dist/datasets/demo/persons/index.json
           grep -q '<div id="root"></div>' app/dist/index.html
           grep -q '/LegendariumExplorer/assets/' app/dist/index.html
@@ -67,4 +72,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,23 @@
+{
+  "id": "e7e6f508-979a-4c74-b108-4a402b86b7dc",
+  "name": "Araphor",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 1170
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Araphor"
+    }
+  ],
+  "metadata": {
+    "description": "Chieftain of the Dúnedain."
+  }
+}

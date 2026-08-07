@@ -85,7 +85,8 @@ function createLegendariumMiddleware(datasetRoots: Map<string, string>, basePath
 
     if (requestUrl.startsWith('/datasets/')) {
       const sanitizedPath = requestUrl.split('?')[0]
-      const [, , datasetName, ...restSegments] = sanitizedPath.split('/')
+      const [, , datasetName, ...encodedSegments] = sanitizedPath.split('/')
+      const restSegments = encodedSegments.map((segment) => decodeURIComponent(segment))
       const datasetRoot = datasetRoots.get(datasetName)
 
       if (!datasetRoot || restSegments.length === 0) {
