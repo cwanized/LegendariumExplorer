@@ -2,7 +2,10 @@
   "id": "550e8400-e29b-41d4-a716-446655440015",
   "name": "Hador",
   "gender": "male",
-  "birth": null,
+  "birth": {
+    "era": "First Age",
+    "year": 410
+  },
   "death": null,
   "houses": [
     "House of Hador"

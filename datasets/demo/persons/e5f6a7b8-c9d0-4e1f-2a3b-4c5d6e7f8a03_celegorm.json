@@ -21,6 +21,7 @@
     }
   ],
   "metadata": {
-    "description": "Third son of Fëanor and Nerdanel. Known as a great hunter and friend of beasts. Ruled Himring with Curufin. Captured Beren and Lúthien but was thwarted by Huan. Slain by Dior in the Sack of Doriath."
+    "description": "Third son of Fëanor and Nerdanel. Known as a great hunter and friend of beasts. Ruled Himring with Curufin. Captured Beren and Lúthien but was thwarted by Huan. Slain by Dior in the Sack of Doriath.",
+    "order": 300
   }
 }

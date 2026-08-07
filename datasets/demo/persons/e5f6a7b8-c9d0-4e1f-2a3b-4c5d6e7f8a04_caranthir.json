@@ -21,6 +21,7 @@
     }
   ],
   "metadata": {
-    "description": "Fourth son of Fëanor and Nerdanel. Known as 'Caranthir the Dark' for his stern mood. Ruled Thargelion. Met Haleth and offered her land. Wealthiest of the Noldor. Slain in the Sack of Doriath."
+    "description": "Fourth son of Fëanor and Nerdanel. Known as 'Caranthir the Dark' for his stern mood. Ruled Thargelion. Met Haleth and offered her land. Wealthiest of the Noldor. Slain in the Sack of Doriath.",
+    "order": 400
   }
 }

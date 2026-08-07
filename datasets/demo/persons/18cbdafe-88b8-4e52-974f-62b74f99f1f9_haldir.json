@@ -5,7 +5,7 @@
   "species": "Man",
   "birth": {
     "era": "First Age",
-    "year": null
+    "year": 410
   },
   "death": {
     "era": "First Age",
@@ -25,6 +25,7 @@
     }
   ],
   "metadata": {
-    "description": "Son of Halmir and chieftain of the House of Haleth. Father of Hareth (wife of Galdor of the House of Hador) and Hundar. He fell in the Battle of Tumhalad during the War of Wrath, defending Brethil against the forces of Morgoth."
+    "description": "Son of Halmir and chieftain of the House of Haleth. Father of Hareth (wife of Galdor of the House of Hador) and Hundar. He fell in the Battle of Tumhalad during the War of Wrath, defending Brethil against the forces of Morgoth.",
+    "order": 100
   }
 }

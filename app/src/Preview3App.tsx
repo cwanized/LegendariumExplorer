@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useId, useRef, useState } from 'react'
+import { startTransition, useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { Rnd } from 'react-rnd'
 import './Preview3App.css'
@@ -10,6 +10,7 @@ import type {
   CameraView,
   DatasetName,
   GraphMvpState,
+  LoadedDataset,
   Person,
   UUID,
 } from './graph'
@@ -34,6 +35,7 @@ import {
   type PanelSide,
   type PanelState,
   type PersistedState,
+  type PreviewTreeMode,
   type ThemeMode,
   type ThemePalette,
   type ThemePreset,
@@ -238,6 +240,10 @@ function isFadeMode(value: unknown): value is FadeMode {
   return value === 'dim' || value === 'hide'
 }
 
+function isPreviewTreeMode(value: unknown): value is PreviewTreeMode {
+  return value === 'mode0' || value === 'mode1' || value === 'mode2'
+}
+
 function sanitizeThemeState(input: unknown, fallback: ThemeState): ThemeState {
   if (!input || typeof input !== 'object') {
     return fallback
@@ -299,6 +305,7 @@ function normalizePersistedState(input: PersistedState): PersistedState {
     version: 1,
     datasetName,
     activePage,
+    treeMode: isPreviewTreeMode(input.treeMode) ? input.treeMode : 'mode0',
     pageTheme: sanitizeThemeState(input.pageTheme, defaultPageTheme),
     treeTheme: sanitizeThemeState(input.treeTheme, defaultTreeTheme),
     leftPanel: sanitizePanelState(input.leftPanel, defaultLeftPanel),
@@ -469,6 +476,60 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
+function clampCameraToBounds(camera: CameraView, bounds: CameraView): CameraView {
+  const x = bounds.width <= camera.width
+    ? bounds.x + (bounds.width - camera.width) / 2
+    : clamp(camera.x, bounds.x, bounds.x + bounds.width - camera.width)
+  const y = bounds.height <= camera.height
+    ? bounds.y + (bounds.height - camera.height) / 2
+    : clamp(camera.y, bounds.y, bounds.y + bounds.height - camera.height)
+
+  return {
+    ...camera,
+    x,
+    y,
+  }
+}
+
+function preserveCameraForTreeRebuild({
+  previousCamera,
+  preferredPersonId,
+  nextLayout,
+  bounds,
+}: {
+  previousCamera: CameraView | null
+  preferredPersonId: UUID | null
+  nextLayout: GraphMvpState['layout']
+  bounds: CameraView
+}): CameraView {
+  if (!previousCamera) {
+    return bounds
+  }
+
+  if (preferredPersonId) {
+    const focusedNode = nextLayout.nodes.get(preferredPersonId)
+
+    if (focusedNode) {
+      return clampCameraToBounds({
+        x: focusedNode.x + focusedNode.width / 2 - previousCamera.width / 2,
+        y: focusedNode.y + focusedNode.height / 2 - previousCamera.height / 2,
+        width: previousCamera.width,
+        height: previousCamera.height,
+      }, bounds)
+    }
+  }
+
+  const previousCenterX = previousCamera.x + previousCamera.width / 2
+  const previousCenterY = previousCamera.y + previousCamera.height / 2
+
+  return clampCameraToBounds({
+    x: previousCenterX - previousCamera.width / 2,
+    y: previousCenterY - previousCamera.height / 2,
+    width: previousCamera.width,
+    height: previousCamera.height,
+  }, bounds)
+}
+
 function isFilterActive(filters: FilterState) {
   return filters.houses.length > 0 || filters.species.length > 0 || filters.genders.length > 0 || filters.eras.length > 0
 }
@@ -478,6 +539,7 @@ export default function Preview3App() {
   const [activePage, setActivePage] = useState<PageKey>(storedState?.activePage ?? 'family-tree')
   const [menuOpen, setMenuOpen] = useState(false)
   const [datasetName, setDatasetName] = useState<DatasetName>(storedState?.datasetName ?? 'demo')
+  const [treeMode, setTreeMode] = useState<PreviewTreeMode>(storedState?.treeMode ?? 'mode0')
   const [pageTheme, setPageTheme] = useState<ThemeState>(storedState?.pageTheme ?? defaultPageTheme)
   const [treeTheme, setTreeTheme] = useState<ThemeState>(storedState?.treeTheme ?? defaultTreeTheme)
   const [leftPanel, setLeftPanel] = useState<PanelState>(storedState?.leftPanel ?? defaultLeftPanel)
@@ -491,6 +553,7 @@ export default function Preview3App() {
   const [fadeMode, setFadeMode] = useState<FadeMode>(storedState?.fadeMode ?? 'dim')
   const [filters, setFilters] = useState<FilterState>(storedState?.filters ?? emptyFilters)
   const [searchQuery, setSearchQuery] = useState(storedState?.searchQuery ?? '')
+  const [loadedDataset, setLoadedDataset] = useState<LoadedDataset | null>(null)
   const [graphState, setGraphState] = useState<GraphMvpState | null>(null)
   const [camera, setCamera] = useState<CameraView | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -511,12 +574,37 @@ export default function Preview3App() {
   const svgRef = useRef<SVGSVGElement | null>(null)
   const pinchDistanceRef = useRef<number | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const latestCameraRef = useRef<CameraView | null>(null)
+  const preferredFocusIdRef = useRef<UUID | null>(null)
   const panelId = useId().replace(/:/g, '-')
+  const viewState = useMemo(() => {
+    if (!graphState) {
+      return null
+    }
+
+    return buildPreview3ViewState({
+      validation: graphState.validation,
+      filters,
+      filterLogic,
+      searchQuery,
+      selectionA,
+      selectionB,
+      fadeMode,
+    })
+  }, [fadeMode, filterLogic, filters, graphState, searchQuery, selectionA, selectionB])
+
+  useEffect(() => {
+    latestCameraRef.current = camera
+  }, [camera])
+
+  useEffect(() => {
+    preferredFocusIdRef.current = focusedPersonId ?? inspectedPersonId ?? selectionA ?? selectionB
+  }, [focusedPersonId, inspectedPersonId, selectionA, selectionB])
 
   useEffect(() => {
     let isMounted = true
 
-    async function initialize() {
+    async function loadCurrentDataset() {
       setIsLoading(true)
       setErrorMessage(null)
       setSelectionA(null)
@@ -527,14 +615,55 @@ export default function Preview3App() {
 
       try {
         const dataset = await loadDataset(datasetName)
-        const { graphState: nextGraphState, initialCamera } = await buildPreview3TreePipeline(dataset)
+
+        if (!isMounted) {
+          return
+        }
+
+        setLoadedDataset(dataset)
+      } catch (error) {
+        if (!isMounted) {
+          return
+        }
+
+        setErrorMessage(error instanceof Error ? error.message : String(error))
+        setIsLoading(false)
+      }
+    }
+
+    void loadCurrentDataset()
+
+    return () => {
+      isMounted = false
+    }
+  }, [datasetName])
+
+  useEffect(() => {
+    let isMounted = true
+
+    async function rebuildTree() {
+      if (!loadedDataset) {
+        return
+      }
+
+      setErrorMessage(null)
+
+      try {
+        const { graphState: nextGraphState, initialCamera } = await buildPreview3TreePipeline(loadedDataset, treeMode)
 
         if (!isMounted) {
           return
         }
 
         setGraphState(nextGraphState)
-        setCamera(initialCamera)
+        setCamera(
+          preserveCameraForTreeRebuild({
+            previousCamera: latestCameraRef.current,
+            preferredPersonId: preferredFocusIdRef.current,
+            nextLayout: nextGraphState.layout,
+            bounds: initialCamera,
+          }),
+        )
         setIsLoading(false)
       } catch (error) {
         if (!isMounted) {
@@ -546,12 +675,12 @@ export default function Preview3App() {
       }
     }
 
-    void initialize()
+    void rebuildTree()
 
     return () => {
       isMounted = false
     }
-  }, [datasetName])
+  }, [loadedDataset, treeMode])
 
   useEffect(() => {
     const handleResize = () => {
@@ -633,6 +762,7 @@ export default function Preview3App() {
         version: 1,
         datasetName,
         activePage,
+        treeMode,
         pageTheme,
         treeTheme,
         leftPanel,
@@ -646,7 +776,7 @@ export default function Preview3App() {
         searchQuery,
       } satisfies PersistedState),
     )
-  }, [activePage, datasetName, fadeMode, filterLogic, filters, leftPanel, legendMinimized, pageTheme, rightPanel, searchQuery, showInTree, treeTheme, wideMode])
+  }, [activePage, datasetName, fadeMode, filterLogic, filters, leftPanel, legendMinimized, pageTheme, rightPanel, searchQuery, showInTree, treeMode, treeTheme, wideMode])
 
   useEffect(() => {
     if (!dragState) {
@@ -837,29 +967,9 @@ export default function Preview3App() {
     }
   }, [activePage, isLoading])
 
-  useEffect(() => {
-    if (!graphState || !showInTree || activePage !== 'family-tree') {
-      return
-    }
-
-    const matchedNodes = new Map(
-      searchResults
-        .flatMap((person) => {
-          const node = graphState.layout.nodes.get(person.id)
-          return node ? [[person.id, node] as const] : []
-        }),
-    )
-
-    if (matchedNodes.size === 0) {
-      return
-    }
-
-    setCamera(getGraphBounds(matchedNodes))
-  }, [activePage, filterLogic, filters, graphState, searchQuery, showInTree])
-
   const pagePalette = getActivePalette('page', pageTheme)
   const treePalette = getActivePalette('tree', treeTheme)
-  const rootStyle = {
+  const rootStyle = useMemo(() => ({
     '--preview3-page-bg': pagePalette.background,
     '--preview3-page-surface': pagePalette.surface,
     '--preview3-page-surface-strong': pagePalette.surfaceStrong,
@@ -883,7 +993,7 @@ export default function Preview3App() {
     '--preview3-tree-shadow': treePalette.shadow ?? 'rgba(0, 0, 0, 0.16)',
     '--preview3-font-body': activePage === 'family-tree' ? treeTheme.fontBody : pageTheme.fontBody,
     '--preview3-font-display': activePage === 'family-tree' ? treeTheme.fontDisplay : pageTheme.fontDisplay,
-  } as CSSProperties
+  } as CSSProperties), [activePage, pagePalette.accent, pagePalette.accentSoft, pagePalette.background, pagePalette.border, pagePalette.muted, pagePalette.shadow, pagePalette.surface, pagePalette.surfaceStrong, pagePalette.text, pageTheme.fontBody, pageTheme.fontDisplay, treePalette.accent, treePalette.accentSoft, treePalette.background, treePalette.border, treePalette.edge, treePalette.muted, treePalette.nodeFill, treePalette.overlay, treePalette.shadow, treePalette.surface, treePalette.surfaceStrong, treePalette.text, treeTheme.fontBody, treeTheme.fontDisplay])
 
   useEffect(() => {
     const root = document.documentElement
@@ -905,6 +1015,26 @@ export default function Preview3App() {
       })
     }
   }, [rootStyle])
+
+  useEffect(() => {
+    if (!graphState || !viewState || !showInTree || activePage !== 'family-tree') {
+      return
+    }
+
+    const matchedNodes = new Map(
+      viewState.searchResults
+        .flatMap((person) => {
+          const node = graphState.layout.nodes.get(person.id)
+          return node ? [[person.id, node] as const] : []
+        }),
+    )
+
+    if (matchedNodes.size === 0) {
+      return
+    }
+
+    setCamera(getGraphBounds(matchedNodes))
+  }, [activePage, graphState, showInTree, viewState])
 
   if (errorMessage) {
     return (
@@ -932,21 +1062,14 @@ export default function Preview3App() {
 
   const cameraView = camera
   const { validation, layout } = graphState
+  const resolvedViewState = viewState!
   const houseOptions = Array.from(new Set(validation.persons.flatMap((person) => person.houses ?? []))).sort((left, right) => left.localeCompare(right))
   const speciesOptions = Array.from(new Set(validation.persons.map((person) => person.species).filter((value): value is string => Boolean(value)))).sort((left, right) => left.localeCompare(right))
   const genderOptions = Array.from(new Set(validation.persons.map((person) => person.gender).filter((value): value is string => Boolean(value)))).sort((left, right) => left.localeCompare(right))
   const eraOptions = Array.from(new Set(validation.persons.flatMap((person) => [person.birth?.era, person.death?.era].filter((value): value is string => Boolean(value))))).sort((left, right) => left.localeCompare(right))
   const hasActiveFilters = isFilterActive(filters)
-  const viewState = buildPreview3ViewState({
-    validation,
-    filters,
-    filterLogic,
-    searchQuery,
-    selectionA,
-    selectionB,
-    fadeMode,
-  })
-  const { filteredPeople, searchResults, matchingNodeIds, selectedIds, selectedSet, lcaAnalysis, highlightedEdgeIds, filteredOutNodeIds, shouldHideNode, shouldDimNode, hasBothSelections, lcaState } = viewState
+  const { filteredPeople, searchResults, matchingNodeIds, selectedIds, selectedSet, lcaAnalysis, highlightedEdgeIds, filteredOutNodeIds, shouldHideNode, shouldDimNode, hasBothSelections, lcaState } = resolvedViewState
+
   const renderedTree = buildPreview3RenderedTree({
     validation,
     layout,
@@ -954,6 +1077,7 @@ export default function Preview3App() {
     selectedIds,
     spouseOwnerOverrides,
     shouldHideNode,
+    renderMode: treeMode,
   })
   const {
     spouseProjection,
@@ -1277,6 +1401,7 @@ export default function Preview3App() {
     window.localStorage.removeItem(STORAGE_KEY)
     setActivePage('family-tree')
     setDatasetName('demo')
+    setTreeMode('mode0')
     setPageTheme(defaultPageTheme)
     setTreeTheme(defaultTreeTheme)
     setLeftPanel(defaultLeftPanel)
@@ -1735,6 +1860,7 @@ export default function Preview3App() {
         shouldHideNode={shouldHideNode}
         startCanvasPan={startCanvasPan}
         treeTheme={treeTheme}
+        treeMode={treeMode}
         validation={validation}
         wideMode={wideMode}
         canvasViewportRef={canvasViewportRef}
@@ -1755,6 +1881,7 @@ export default function Preview3App() {
         onPanelCollapse={togglePanelCollapse}
         onTreeThemeEditorToggle={() => setThemeEditorScope(themeEditorScope === 'tree' ? null : 'tree')}
         onTreeThemePresetChange={(preset: ThemePreset) => updateThemePreset('tree', preset)}
+        onTreeModeChange={setTreeMode}
         onWideModeToggle={() => setWideMode((current) => !current)}
         onClearSelection={clearSelection}
         onNodeSelect={handleNodeSelect}

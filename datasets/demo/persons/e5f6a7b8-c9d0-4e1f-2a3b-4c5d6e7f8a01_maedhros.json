@@ -25,6 +25,7 @@
     }
   ],
   "metadata": {
-    "description": "Maedhros the Tall, eldest son of Fëanor and Nerdanel. Lord of the House of Fëanor after his father's death. Known for his rescue by Fingon and his friendship with Fingon. Captured by Morgoth and hung from Thangorodrim. Led the Union of Maedhros. Took his own life with a Silmaril."
+    "description": "Maedhros the Tall, eldest son of Fëanor and Nerdanel. Lord of the House of Fëanor after his father's death. Known for his rescue by Fingon and his friendship with Fingon. Captured by Morgoth and hung from Thangorodrim. Led the Union of Maedhros. Took his own life with a Silmaril.",
+    "order": 100
   }
 }

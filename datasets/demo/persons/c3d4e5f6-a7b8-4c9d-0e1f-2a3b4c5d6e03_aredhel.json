@@ -21,6 +21,7 @@
     }
   ],
   "metadata": {
-    "description": "Aredhel the White, daughter of Fingolfin and Anairë, sister of Fingon and Turgon. Mother of Maeglin by Eöl the Dark Elf. Known for her love of hunting and independence."
+    "description": "Aredhel the White, daughter of Fingolfin and Anairë, sister of Fingon and Turgon. Mother of Maeglin by Eöl the Dark Elf. Known for her love of hunting and independence.",
+    "order": 300
   }
 }

@@ -22,6 +22,7 @@
   ],
   "metadata": {
     "description": "Daughter of Halmir, sister of Haldir, Hundar, and Hareth. Little is known of her life.",
-    "canonicity": "secondary"
+    "canonicity": "secondary",
+    "order": 400
   }
 }

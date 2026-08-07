@@ -21,6 +21,7 @@
     }
   ],
   "metadata": {
-    "description": "Second son of Finarfin and Eärwen. Ruled Dorthonion with his brother Aegnor as vassal of Finrod. Father of Orodreth. Messenger between the Noldor and Thingol."
+    "description": "Second son of Finarfin and Eärwen. Ruled Dorthonion with his brother Aegnor as vassal of Finrod. Father of Orodreth. Messenger between the Noldor and Thingol.",
+    "order": 200
   }
 }

@@ -78,6 +78,26 @@ Leitplanke:
 
 ## 3. Root-Haeuser und spaetere Haeuser
 
+### 3.0 House-Cluster-Modell
+
+Root-Haeuser werden im erweiterten Renderpfad nicht nur als Label-Anchor behandelt, sondern als echte House-Cluster.
+
+Ein House-Cluster repraesentiert:
+
+- den Root-Haus-Kontext als zusammenhaengende Layout-Einheit
+- den Platzbedarf dieses Kontextes ueber den gesamten Folgebaum
+- den sichtbaren Anchor als Repräsentation dieses Clusters
+
+Fachliche Regeln:
+
+- Der biologische Graph bleibt die primaere Layout-Wahrheit.
+- Darueber wird eine House-Cluster-Ebene gelegt.
+- Der Anchor ist die sichtbare Repräsentation des Clusters, nicht der Cluster selbst.
+- Cluster-Abstand und Cluster-Offset wirken auf den ganzen Root-Haus-Kontext, nicht nur auf das Label.
+- Root-House-Cluster duerfen sich nicht ueberlappen.
+- Fuer die Platzreservierung reicht ein Root-House-Cluster ueber den gesamten Folgebaum bis zum letzten Abkoemmling.
+- Bei Personen mit mehreren Haeusern bestimmt weiterhin das Primärhaus den Cluster; weitere Haeuser bleiben Metadaten.
+
 ### 3.1 Root-Haeuser
 
 Root-Haeuser sind die Haeuser, die fuer den globalen Baumeinstieg als Anker verwendet werden duerfen.
@@ -586,6 +606,13 @@ Stand dieser FRS:
 - Die Position muss die erwartete Baumbreite des jeweiligen Root-Haus-Kontexts beruecksichtigen.
 - Ziel ist eine geringere Ueberlappung und weniger verwirrende Relationen.
 - Die Vorabschaetzung der Hausbreite erfolgt fachlich auf Basis aller sichtbaren Nachkommen des Root-Haus-Kontexts.
+- Root-Haeuser werden dazu als House-Cluster behandelt; die Platzierung reserviert Raum fuer den gesamten Cluster und nicht nur fuer die Anchor-Beschriftung.
+
+Erweiterte fachliche Folge:
+
+- Horizontaler Abstand wird auf Cluster-Bounds statt nur auf Label-Breite berechnet.
+- Vertikaler `house.layout.yOffset` verschiebt den gesamten Root-Haus-Cluster statt nur den Anchor.
+- Der sichtbare Anchor wird erst nach der Cluster-Platzierung aus der finalen Cluster-Geometrie abgeleitet.
 
 Fachliche Folge:
 

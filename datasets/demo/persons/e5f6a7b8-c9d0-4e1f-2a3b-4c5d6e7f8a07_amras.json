@@ -21,6 +21,7 @@
     }
   ],
   "metadata": {
-    "description": "Youngest son of Fëanor and Nerdanel. Twin of Amrod. Known as a great hunter and woodsman. Ruled the lands east of Beleriand with his brother. Perished in the War of Wrath."
+    "description": "Youngest son of Fëanor and Nerdanel. Twin of Amrod. Known as a great hunter and woodsman. Ruled the lands east of Beleriand with his brother. Perished in the War of Wrath.",
+    "order": 700
   }
 }

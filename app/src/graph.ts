@@ -12,6 +12,8 @@ export type SourceLink = {
   url: string
 }
 
+export type LayoutStrategy = 'legacy' | 'enhanced'
+
 export type HouseTier = 'start' | 'later'
 
 export type HouseDefinition = {
@@ -19,6 +21,9 @@ export type HouseDefinition = {
   displayName: string
   aliases?: string[]
   tier: HouseTier
+  layout?: {
+    yOffset?: number
+  }
   anchor: {
     enabled: boolean
     order: number
@@ -44,6 +49,10 @@ export type Person = {
   portraitSourceUrl?: string | null
   metadata?: {
     description?: string
+    order?: number
+    layout?: {
+      yOffset?: number
+    }
   }
 }
 
@@ -52,7 +61,6 @@ export type RelationType =
   | 'marriage'
   | 'mentor'
   | 'step_parent'
-  | 'adoption'
   | 'member_of'
   | 'custom'
 
@@ -515,8 +523,8 @@ function countDisconnectedComponents(persons: Person[], relations: Relation[]) {
   return components
 }
 
-export async function layoutGraph(persons: Person[], relations: Relation[]): Promise<LayoutResult> {
-  const sortedPersons = sortById(persons)
+export async function layoutGraph(persons: Person[], relations: Relation[], strategy: LayoutStrategy = 'enhanced'): Promise<LayoutResult> {
+  const sortedPersons = strategy === 'legacy' ? sortById(persons) : sortPersonsForLayout(persons)
   const sortedRelations = sortById(relations)
 
   try {
@@ -561,10 +569,10 @@ export async function layoutGraph(persons: Person[], relations: Relation[]): Pro
     console.warn('ELK layout failed, using deterministic fallback layout.', error)
   }
 
-  return { nodes: fallbackLayout(sortedPersons, sortedRelations) }
+  return { nodes: fallbackLayout(sortedPersons, sortedRelations, strategy) }
 }
 
-function fallbackLayout(persons: Person[], relations: Relation[]) {
+function fallbackLayout(persons: Person[], relations: Relation[], strategy: LayoutStrategy) {
   const childIdsByParent = buildChildrenByParent(relations)
   const inDegree = new Map<UUID, number>(persons.map((person) => [person.id, 0]))
 
@@ -575,7 +583,7 @@ function fallbackLayout(persons: Person[], relations: Relation[]) {
   const queue = persons
     .filter((person) => (inDegree.get(person.id) ?? 0) === 0)
     .map((person) => person.id)
-    .sort((left, right) => left.localeCompare(right))
+    .sort((left, right) => strategy === 'legacy' ? left.localeCompare(right) : comparePersonIdsForLayout(left, right, persons))
   const generationByPerson = new Map<UUID, number>()
 
   for (const rootId of queue) {
@@ -602,7 +610,7 @@ function fallbackLayout(persons: Person[], relations: Relation[]) {
 
       if (nextInDegree === 0) {
         queue.push(childId)
-        queue.sort((left, right) => left.localeCompare(right))
+        queue.sort((left, right) => strategy === 'legacy' ? left.localeCompare(right) : comparePersonIdsForLayout(left, right, persons))
       }
     }
   }
@@ -619,7 +627,11 @@ function fallbackLayout(persons: Person[], relations: Relation[]) {
     const generation = generationByPerson.get(person.id) ?? 0
     const people = peopleByGeneration.get(generation) ?? []
     people.push(person)
-    people.sort((left, right) => `${left.name}|${left.id}`.localeCompare(`${right.name}|${right.id}`))
+    if (strategy === 'legacy') {
+      people.sort((left, right) => `${left.name}|${left.id}`.localeCompare(`${right.name}|${right.id}`))
+    } else {
+      people.sort(comparePersonsForLayout)
+    }
     peopleByGeneration.set(generation, people)
   }
 
@@ -829,4 +841,36 @@ export function evaluateScenario(
 
 function sortById<T extends { id: UUID }>(items: T[]) {
   return [...items].sort((left, right) => left.id.localeCompare(right.id))
+}
+
+export function comparePersonsForLayout(left: Person, right: Person) {
+  const leftOrder = left.metadata?.order ?? Number.MAX_SAFE_INTEGER
+  const rightOrder = right.metadata?.order ?? Number.MAX_SAFE_INTEGER
+
+  if (leftOrder !== rightOrder) {
+    return leftOrder - rightOrder
+  }
+
+  const nameComparison = left.name.localeCompare(right.name)
+  if (nameComparison !== 0) {
+    return nameComparison
+  }
+
+  return left.id.localeCompare(right.id)
+}
+
+function sortPersonsForLayout(persons: Person[]) {
+  return [...persons].sort(comparePersonsForLayout)
+}
+
+function comparePersonIdsForLayout(leftId: UUID, rightId: UUID, persons: Person[]) {
+  const personById = new Map(persons.map((person) => [person.id, person]))
+  const left = personById.get(leftId)
+  const right = personById.get(rightId)
+
+  if (!left || !right) {
+    return leftId.localeCompare(rightId)
+  }
+
+  return comparePersonsForLayout(left, right)
 }

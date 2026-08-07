@@ -21,6 +21,7 @@
     }
   ],
   "metadata": {
-    "description": "Fifth son of Fëanor and Nerdanel. Known as 'the Crafty'. Most skilled in craft and lore of Fëanor's sons. Father of Celebrimbor. Ruled Himring with Celegorm. Tried to take Lúthien's wolf-hame. Slain in the Sack of Doriath."
+    "description": "Fifth son of Fëanor and Nerdanel. Known as 'the Crafty'. Most skilled in craft and lore of Fëanor's sons. Father of Celebrimbor. Ruled Himring with Celegorm. Tried to take Lúthien's wolf-hame. Slain in the Sack of Doriath.",
+    "order": 500
   }
 }

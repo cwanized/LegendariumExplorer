@@ -21,6 +21,7 @@
     }
   ],
   "metadata": {
-    "description": "Second son of Fëanor and Nerdanel. Known as a great poet and musician. Led the second assault in the Nirnaeth Arnoediad. Captured Elrond and Elros. Took a Silmaril but could not bear its pain and cast it into the sea. Wandered the shores singing in sorrow."
+    "description": "Second son of Fëanor and Nerdanel. Known as a great poet and musician. Led the second assault in the Nirnaeth Arnoediad. Captured Elrond and Elros. Took a Silmaril but could not bear its pain and cast it into the sea. Wandered the shores singing in sorrow.",
+    "order": 200
   }
 }

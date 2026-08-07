@@ -21,6 +21,7 @@
     }
   ],
   "metadata": {
-    "description": "Son of Halmir and younger brother of Hareth. Little is known of his life. He remained in Brethil with the House of Haleth while his sister Hareth married Galdor of the House of Hador, uniting the two houses."
+    "description": "Son of Halmir and younger brother of Hareth. Little is known of his life. He remained in Brethil with the House of Haleth while his sister Hareth married Galdor of the House of Hador, uniting the two houses.",
+    "order": 200
   }
 }

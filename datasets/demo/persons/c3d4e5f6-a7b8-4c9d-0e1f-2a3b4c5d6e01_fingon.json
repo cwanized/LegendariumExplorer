@@ -21,6 +21,7 @@
     }
   ],
   "metadata": {
-    "description": "Eldest son of Fingolfin and Anairë. King of the Noldor after his father. Known for his rescue of Maedhros from Thangorodrim and his friendship with the House of Fëanor. Slain by Gothmog in the Nirnaeth Arnoediad."
+    "description": "Eldest son of Fingolfin and Anairë. King of the Noldor after his father. Known for his rescue of Maedhros from Thangorodrim and his friendship with the House of Fëanor. Slain by Gothmog in the Nirnaeth Arnoediad.",
+    "order": 100
   }
 }

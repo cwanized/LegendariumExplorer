@@ -25,6 +25,10 @@
     }
   ],
   "metadata": {
-    "description": "Eldest son of Finarfin and Eärwen. King of Nargothrond. Known as Felagund ('Cavern-hewer'). Friend of Men and Beren. Died saving Beren from a werewolf. Renowned for his wisdom, nobility, and golden hair."
+    "description": "Eldest son of Finarfin and Eärwen. King of Nargothrond. Known as Felagund ('Cavern-hewer'). Friend of Men and Beren. Died saving Beren from a werewolf. Renowned for his wisdom, nobility, and golden hair.",
+    "order": 100,
+    "layout": {
+      "yOffset": 0
+    }
   }
 }

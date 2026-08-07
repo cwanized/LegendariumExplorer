@@ -22,6 +22,7 @@
     }
   ],
   "metadata": {
-    "description": "Daughter of Finarfin and Eärwen, sister of Finrod, Angrod, and Aegnor. One of the greatest Elves of the Noldor. Went to Middle-earth and became Lady of Lothlórien. Known for her wisdom, beauty, and possession of Nenya, the Ring of Water."
+    "description": "Daughter of Finarfin and Eärwen, sister of Finrod, Angrod, and Aegnor. One of the greatest Elves of the Noldor. Went to Middle-earth and became Lady of Lothlórien. Known for her wisdom, beauty, and possession of Nenya, the Ring of Water.",
+    "order": 400
   }
 }

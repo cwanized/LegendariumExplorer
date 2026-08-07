@@ -21,6 +21,7 @@
     }
   ],
   "metadata": {
-    "description": "Second son of Fingolfin and Anairë. King of Gondolin, the hidden city he built. Father of Idril. Led his people from Nevrast to Gondolin. Perished in the Fall of Gondolin."
+    "description": "Second son of Fingolfin and Anairë. King of Gondolin, the hidden city he built. Father of Idril. Led his people from Nevrast to Gondolin. Perished in the Fall of Gondolin.",
+    "order": 200
   }
 }

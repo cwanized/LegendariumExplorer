@@ -14,7 +14,8 @@
     }
   ],
   "metadata": {
-    "description": "Mother of Huor and Hurin"
+    "description": "Mother of Huor and Hurin",
+    "order": 300
   },
   "species": "Man"
 }

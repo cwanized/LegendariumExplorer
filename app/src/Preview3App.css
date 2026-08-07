@@ -412,6 +412,21 @@
   border-bottom: 1px solid var(--preview3-tree-border);
   background: color-mix(in srgb, var(--preview3-tree-surface) 90%, transparent);
 }
+.preview3-mode-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 0 2px;
+  color: var(--preview3-tree-text);
+}
+.preview3-mode-summary strong {
+  font-size: 0.95rem;
+}
+.preview3-mode-summary span {
+  font-size: 0.82rem;
+  color: var(--preview3-tree-muted);
+}
 
 .preview3-toolbar-separator {
   width: 1px;

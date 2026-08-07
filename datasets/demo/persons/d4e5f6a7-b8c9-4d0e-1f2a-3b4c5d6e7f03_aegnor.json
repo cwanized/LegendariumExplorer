@@ -21,6 +21,7 @@
     }
   ],
   "metadata": {
-    "description": "Third son of Finarfin and Eärwen. Ruled Dorthonion with his brother Angrod. Known for his fiery spirit and love for the mortal Andreth. Slain in the Dagor Bragollach."
+    "description": "Third son of Finarfin and Eärwen. Ruled Dorthonion with his brother Angrod. Known for his fiery spirit and love for the mortal Andreth. Slain in the Dagor Bragollach.",
+    "order": 300
   }
 }

@@ -21,6 +21,7 @@
     }
   ],
   "metadata": {
-    "description": "Sixth son of Fëanor and Nerdanel. Twin of Amras. Known as a great hunter. Ruled the lands east of Beleriand. Perished in the War of Wrath, though some tales say he was accidentally burned by Fëanor's ships."
+    "description": "Sixth son of Fëanor and Nerdanel. Twin of Amras. Known as a great hunter. Ruled the lands east of Beleriand. Perished in the War of Wrath, though some tales say he was accidentally burned by Fëanor's ships.",
+    "order": 600
   }
 }
