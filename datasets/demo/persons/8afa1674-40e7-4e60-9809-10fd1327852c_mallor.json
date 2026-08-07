@@ -1,0 +1,23 @@
+{
+  "id": "8afa1674-40e7-4e60-9809-10fd1327852c",
+  "name": "Mallor",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 690
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Mallor"
+    }
+  ],
+  "metadata": {
+    "description": "Chieftain of the Dúnedain."
+  }
+}

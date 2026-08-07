@@ -1,0 +1,26 @@
+{
+  "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f03",
+  "name": "Aegnor",
+  "gender": "male",
+  "species": "Elf",
+  "birth": {
+    "era": "Years of the Trees",
+    "year": 1340
+  },
+  "death": {
+    "era": "First Age",
+    "year": 455
+  },
+  "houses": [
+    "Noldor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Aegnor"
+    }
+  ],
+  "metadata": {
+    "description": "Third son of Finarfin and Eärwen. Ruled Dorthonion with his brother Angrod. Known for his fiery spirit and love for the mortal Andreth. Slain in the Dagor Bragollach."
+  }
+}

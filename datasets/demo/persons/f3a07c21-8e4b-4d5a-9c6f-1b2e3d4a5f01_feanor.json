@@ -1,0 +1,26 @@
+{
+  "id": "f3a07c21-8e4b-4d5a-9c6f-1b2e3d4a5f01",
+  "name": "Fëanor",
+  "gender": "male",
+  "species": "Elf",
+  "birth": {
+    "era": "Years of the Trees",
+    "year": 1169
+  },
+  "death": {
+    "era": "First Age",
+    "year": 1
+  },
+  "houses": [
+    "Noldor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Fëanor"
+    }
+  ],
+  "metadata": {
+    "description": "Curufinwë Fëanáro. Greatest of the Noldor, creator of the Silmarils and the Tengwar script. Led the rebellion of the Noldor and the Flight from Valinor."
+  }
+}

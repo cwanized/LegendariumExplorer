@@ -5,7 +5,7 @@
   "birth": null,
   "death": null,
   "houses": [
-    "Hador"
+    "House of Hador"
   ],
   "sourceLinks": [
     {
@@ -15,5 +15,6 @@
   ],
   "metadata": {
     "description": "Start of the House of Hador"
-  }
+  },
+  "species": "Man"
 }

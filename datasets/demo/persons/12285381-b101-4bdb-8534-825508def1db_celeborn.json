@@ -1,0 +1,28 @@
+{
+  "id": "12285381-b101-4bdb-8534-825508def1db",
+  "name": "Celeborn",
+  "gender": "male",
+  "species": "Elf",
+  "birth": {
+    "era": "Years of the Trees",
+    "year": 1150
+  },
+  "death": {
+    "era": "Fourth Age",
+    "year": null
+  },
+  "houses": [
+    "Teleri",
+    "Noldor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Celeborn"
+    }
+  ],
+  "metadata": {
+    "description": "Son of Galadhon, grandson of Elmo. Husband of Galadriel, co-ruler of Lothlórien. Known as 'Lord of Lothlórien' and 'Treebeard's friend'.",
+    "canonicity": "canonical"
+  }
+}

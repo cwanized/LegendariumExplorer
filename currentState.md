@@ -1,6 +1,102 @@
 # Current State
 
-**Last Updated: 12. Juli 2026**
+**Last Updated: 05. August 2026**
+
+## Step 5 Closure (05. August 2026)
+
+The requested "step 5" continuation (final QA loop + state update + commit-readiness check) is now completed.
+
+What was validated in this closure pass:
+
+- Preview2 shell and core controls are present and interactive (Reset View, Export PNG, dataset select).
+- Tree interaction path is still stable after the recent touch adjustments:
+	- wheel/trackpad-style zoom over the tree changes SVG `viewBox`,
+	- page zoom is prevented in-tree (`defaultPrevented: true`).
+- Build remains green (`npm run build` in `app/`) with no new diagnostics in touched files.
+
+Current assessment:
+
+- Items previously listed as steps 1-4 are currently functioning well based on the latest checks and user confirmation.
+- Workspace is in a practical commit-ready state for the recent Preview2 stabilization changes.
+
+## Feedback Batches Completed (05. August 2026)
+
+Following user-prioritized feedback order was implemented in this session:
+
+- Batch 1 (Panel Usability & Spacing):
+	- safer undocked-panel drag initiation,
+	- improved panel header/title/action layout,
+	- larger and clearer resize affordances.
+- Batch 2 (Selection/LCA UX):
+	- explicit selection count (`x/2 selected`),
+	- quick actions (`Swap A/B`, per-slot `Focus`, clear flow),
+	- explicit LCA state label (`Idle`, `Connected`, `No path`) plus `Center ancestor` action.
+- Batch 3 (Theme/Contrast Tuning):
+	- active controls inside tree panels now follow tree accent semantics,
+	- improved hover/readability in search and LCA state chips.
+- Batch 4 (Export/Toolbar Polish):
+	- PNG menu outside-click behavior hardened via dedicated menu ref,
+	- export actions now lock while PNG export is running to avoid conflicting interactions.
+
+Validation for these batches:
+
+- `npm run build` in `app/` passes after all four feedback batches.
+- No new diagnostics reported in touched Preview2 files.
+
+## Current Preview2 Status (04. August 2026)
+
+The Preview2 rebuild slice has now moved from planning into implemented state for the core UX phases agreed in-session.
+
+What was implemented in this slice:
+
+- Persisted Preview2 preferences are now normalized defensively on read (`legendarium.preview2.preferences.v1`) to avoid partial/legacy state breakage.
+- Theme semantics are now explicitly separated as agreed:
+	- `light` and `dark` map to neutral default palettes.
+	- `thematic` maps to the selected preset palette.
+	- `custom` stays explicit via preset selection plus editor.
+- `Reset settings` is now implemented with confirmation and resets only Preview2-local UI state.
+- Show-in-tree interaction was adjusted to current intent: matched nodes are visibly emphasized, and optional auto-fit behavior is tied to the corresponding toggle.
+- A/B selection UX was extended with explicit add/remove toggles in Search, Selection, and Inspector surfaces.
+- LCA empty-state clarity was improved with a specific no-connection message when A and B are both set but not biologically connected.
+- PNG export interaction was changed from select-dropdown flow to click-menu flow (`Current view` / `All filtered`).
+- Header title and multiple spacing/padding/panel interaction details were refined according to the recent feedback batch.
+- Primary panel resizing behavior is now extended:
+	- docked: width resize
+	- undocked: width + height resize
+
+Critical runtime fix completed after implementation:
+
+- A React hook-order runtime failure (`Rendered more hooks than during the previous render`) was fixed by moving the newly introduced auto-fit effect out of a conditional render path and ensuring stable top-level hook registration order.
+
+Validation in this slice:
+
+- `npm run build` in `app/` passes after Preview2 implementation and after the hook-order runtime fix.
+- TypeScript diagnostics for touched Preview2 files report no current errors.
+
+## QA Session Results (05. August 2026)
+
+A structured manual+interactive QA session was executed against a fresh dev instance at `http://127.0.0.1:5181/preview2` (to avoid stale processes on previously occupied ports).
+
+Validated and passing:
+
+- Header/title + current Preview2 shell renders as expected (new state, no hook-order crash during tested flows).
+- PNG export uses click-menu interaction and shows both options: `Current view` and `All filtered`.
+- A/B selection toggles work in search results:
+	- `Add A/B` transitions correctly to `Remove A/B`.
+	- Selection summary and Inspector actions remain consistent with current state.
+- LCA no-connection state message appears correctly when two biologically disconnected persons are selected.
+- Reset settings flow works with confirmation prompt and returns UI state to defaults.
+- Theme gating behaves correctly:
+	- Editor is disabled outside `custom` preset.
+	- Editor becomes enabled when preset is switched to `custom`.
+- Dataset switching works across `demo`, `testing`, and `prod` without runtime failure; `prod` empty-state surfaces behave correctly.
+- Panel resize behavior verified interactively:
+	- docked panel width can be resized,
+	- undocked panel width and height can both be resized.
+
+Observed residual issue (known, non-blocking for this slice):
+
+- Browser console still logs passive wheel-listener warnings during zoom interaction (`Unable to preventDefault inside passive event listener invocation`). This aligns with the existing pending todo and is not introduced by the recent Preview2 slice.
 
 ## Repository Status
 
@@ -165,6 +261,13 @@ Implemented:
 ## Immediate Next Slice
 
 The next implementation slice should cover:
+
+**Preview2 Stabilization & QA (Now Highest Priority):**
+1. Browser validation pass for the completed Preview2 phases (theme semantics, reset flow, selection toggles, LCA states, PNG click-menu, panel resize behavior).
+2. Targeted regression checks on dataset switching (`demo/testing/prod`) with persisted state enabled.
+3. Verify no reintroduction of hook-order or render-loop issues under rapid interactions (search typing, filter toggles, repeated page/theme mode switches).
+4. Add/expand focused tests where practical for state normalization and selection/LCA behavior.
+5. Final UI polish pass only after functional QA sign-off.
 
 **Preview UI Rebuild (Highest Priority):**
 1. Rebuild Preview page layout cleanly from scratch using current UX intent as the source of truth.

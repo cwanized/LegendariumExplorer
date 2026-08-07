@@ -1,0 +1,23 @@
+{
+  "id": "43b77c33-4c97-4be2-bd54-4b3dcdd3cebb",
+  "name": "Tar-Telperiën",
+  "gender": "female",
+  "species": "Man",
+  "birth": {
+    "era": "Second Age",
+    "year": 1250
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Tar-Telperiën"
+    }
+  ],
+  "metadata": {
+    "description": "King of the Dúnedain."
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "e3565104-6e97-4650-b231-8751ce3e2a67",
+  "name": "Tar-Amandil",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Second Age",
+    "year": 192
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Tar-Amandil"
+    }
+  ],
+  "metadata": {
+    "description": "King of the Dúnedain."
+  }
+}

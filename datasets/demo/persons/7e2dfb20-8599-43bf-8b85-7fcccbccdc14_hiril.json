@@ -1,0 +1,27 @@
+{
+  "id": "7e2dfb20-8599-43bf-8b85-7fcccbccdc14",
+  "name": "Hiril",
+  "gender": "female",
+  "species": "Man",
+  "birth": {
+    "era": "First Age",
+    "year": 420
+  },
+  "death": {
+    "era": "First Age",
+    "year": null
+  },
+  "houses": [
+    "House of Haleth"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Hiril"
+    }
+  ],
+  "metadata": {
+    "description": "Daughter of Halmir, sister of Haldir, Hundar, and Hareth. Little is known of her life.",
+    "canonicity": "secondary"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "65975225-99b3-45ac-a997-183c6b05e246",
+  "name": "Argonui",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 1730
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Argonui"
+    }
+  ],
+  "metadata": {
+    "description": "Chieftain of the Dúnedain."
+  }
+}

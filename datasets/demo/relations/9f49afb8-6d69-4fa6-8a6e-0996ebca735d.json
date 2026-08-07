@@ -1,0 +1,12 @@
+{
+  "id": "9f49afb8-6d69-4fa6-8a6e-0996ebca735d",
+  "type": "biological_parent",
+  "from": "a7c383a8-839e-4c6e-8aef-37c7a11dd3c8",
+  "to": "30d65b1b-289c-48d4-b90b-7c1a4e848fb7",
+  "attributes": {
+    "date": {
+      "era": "Second Age",
+      "year": 2570
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "id": "d4e5f6a7-b8c9-4d0e-1f2a-3b4c5d6e7f01",
+  "name": "Finrod Felagund",
+  "gender": "male",
+  "species": "Elf",
+  "birth": {
+    "era": "Years of the Trees",
+    "year": 1300
+  },
+  "death": {
+    "era": "First Age",
+    "year": 465
+  },
+  "houses": [
+    "Noldor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Finrod"
+    },
+    {
+      "label": "Wikipedia",
+      "url": "https://en.wikipedia.org/wiki/Finrod_Felagund"
+    }
+  ],
+  "metadata": {
+    "description": "Eldest son of Finarfin and Eärwen. King of Nargothrond. Known as Felagund ('Cavern-hewer'). Friend of Men and Beren. Died saving Beren from a werewolf. Renowned for his wisdom, nobility, and golden hair."
+  }
+}

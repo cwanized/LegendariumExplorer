@@ -1,0 +1,23 @@
+{
+  "id": "6ec6ec2c-fb0f-4724-bb7a-eb2aab4e085f",
+  "name": "Tar-Vanimeldë",
+  "gender": "female",
+  "species": "Man",
+  "birth": {
+    "era": "Second Age",
+    "year": 1970
+  },
+  "death": null,
+  "houses": [
+    "Dunedain"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Tar-Vanimeldë"
+    }
+  ],
+  "metadata": {
+    "description": "King of the Dúnedain."
+  }
+}

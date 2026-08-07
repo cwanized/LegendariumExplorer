@@ -1,0 +1,28 @@
+{
+  "id": "5e21812a-5784-4579-a362-9914675657e4",
+  "name": "Glóredhel",
+  "gender": "female",
+  "species": "Man",
+  "birth": {
+    "era": "First Age",
+    "year": 410
+  },
+  "death": {
+    "era": "First Age",
+    "year": null
+  },
+  "houses": [
+    "House of Hador",
+    "House of Haleth"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Gl%C3%B3redhel"
+    }
+  ],
+  "metadata": {
+    "description": "Daughter of Hador, sister of Galdor. Married Haldir of the House of Haleth, uniting the two houses.",
+    "canonicity": "secondary"
+  }
+}
