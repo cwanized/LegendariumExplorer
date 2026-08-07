@@ -2,7 +2,7 @@
   "id": "8cf5f5c9-3d67-4311-8d85-a9a9ff76ef11",
   "name": "Elros",
   "gender": "male",
-  "species": "Half-elf",
+  "species": "Half-elven",
   "birth": {
     "era": "First Age",
     "year": 532
@@ -16,8 +16,5 @@
   ],
   "metadata": {
     "description": "Brother of Elrond"
-  },
-  "houses": [
-    "Dunedain"
-  ]
+  }
 }

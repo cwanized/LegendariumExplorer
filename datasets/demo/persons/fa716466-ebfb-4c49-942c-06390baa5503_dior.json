@@ -2,7 +2,7 @@
   "id": "fa716466-ebfb-4c49-942c-06390baa5503",
   "name": "Dior",
   "gender": "male",
-  "species": "Half-elf",
+  "species": "Half-elven",
   "birth": {
     "era": "First Age",
     "year": 470
@@ -16,9 +16,5 @@
   ],
   "metadata": {
     "description": null
-  },
-  "houses": [
-    "House of Bëor",
-    "Teleri"
-  ]
+  }
 }

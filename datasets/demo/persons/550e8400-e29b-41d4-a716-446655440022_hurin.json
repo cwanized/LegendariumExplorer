@@ -5,7 +5,7 @@
   "birth": null,
   "death": null,
   "houses": [
-    "House of Hador"
+    "Hador"
   ],
   "sourceLinks": [
     {
@@ -15,6 +15,5 @@
   ],
   "metadata": {
     "description": "Brother of Huor"
-  },
-  "species": "Man"
+  }
 }

@@ -2,7 +2,6 @@ import { startTransition, useDeferredValue, useEffect, useRef, useState } from '
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import './App.css'
 import Preview2App from './Preview2App'
-import Preview3App from './Preview3App'
 import {
   evaluateScenario,
   findLowestCommonAncestor,
@@ -117,13 +116,8 @@ function getAppRequestPath(relativePath: string): string {
 
 function App() {
   const currentPath = typeof window === 'undefined' ? '/' : window.location.pathname.toLocaleLowerCase()
-  const isPreview3Page = /\/preview3(?:\/|$)/.test(currentPath)
   const isPreview2Page = /\/preview2(?:\/|$)/.test(currentPath)
   const isPreviewPage = /\/preview(?:\/|$)/.test(currentPath)
-
-  if (isPreview3Page) {
-    return <Preview3App />
-  }
 
   if (isPreview2Page) {
     return <Preview2App />

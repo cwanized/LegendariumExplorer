@@ -5,7 +5,7 @@
   "birth": null,
   "death": null,
   "houses": [
-    "House of Bëor"
+    "House of Beor"
   ],
   "sourceLinks": [
     {
@@ -15,6 +15,5 @@
   ],
   "metadata": {
     "description": "Son of Boron and grandfather of Beren son of Barahir"
-  },
-  "species": "Man"
+  }
 }

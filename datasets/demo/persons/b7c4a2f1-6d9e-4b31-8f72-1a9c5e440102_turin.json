@@ -11,7 +11,7 @@
     "year": 499
   },
   "houses": [
-    "House of Hador"
+    "Hador"
   ],
   "sourceLinks": [
     {
@@ -21,6 +21,5 @@
   ],
   "metadata": {
     "description": "Turin Turambar, son of Hurin and Morwen."
-  },
-  "species": "Man"
+  }
 }
