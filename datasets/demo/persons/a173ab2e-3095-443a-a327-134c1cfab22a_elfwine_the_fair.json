@@ -1,0 +1,27 @@
+{
+  "id": "a173ab2e-3095-443a-a327-134c1cfab22a",
+  "name": "Elfwine the Fair",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 3019
+  },
+  "death": {
+    "era": "Fourth Age",
+    "year": 85
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Elfwine_the_Fair"
+    }
+  ],
+  "metadata": {
+    "description": "Nineteenth King of Rohan, son of Éomer",
+    "canonicity": "canonical"
+  }
+}

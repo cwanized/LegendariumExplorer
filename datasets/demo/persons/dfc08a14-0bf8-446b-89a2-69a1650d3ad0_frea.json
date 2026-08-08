@@ -1,0 +1,27 @@
+{
+  "id": "dfc08a14-0bf8-446b-89a2-69a1650d3ad0",
+  "name": "Fréa",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2570
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2659
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Fréa"
+    }
+  ],
+  "metadata": {
+    "description": "Fourth King of Rohan, eldest son of Aldor",
+    "canonicity": "canonical"
+  }
+}

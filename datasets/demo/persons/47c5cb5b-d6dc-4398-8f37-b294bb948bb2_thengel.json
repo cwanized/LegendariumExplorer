@@ -1,0 +1,27 @@
+{
+  "id": "47c5cb5b-d6dc-4398-8f37-b294bb948bb2",
+  "name": "Thengel",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2905
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2980
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Thengel"
+    }
+  ],
+  "metadata": {
+    "description": "Sixteenth King of Rohan. Father of Théoden. Lived in Gondor for many years",
+    "canonicity": "canonical"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "664f4f0f-5438-400d-b98f-484707de71b1",
+  "name": "Brytta",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2764
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2842
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Brytta"
+    }
+  ],
+  "metadata": {
+    "description": "Eleventh King of Rohan, called 'Léofa' (beloved)",
+    "canonicity": "canonical"
+  }
+}

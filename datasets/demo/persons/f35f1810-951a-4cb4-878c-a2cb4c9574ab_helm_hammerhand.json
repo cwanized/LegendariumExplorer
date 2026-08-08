@@ -1,0 +1,27 @@
+{
+  "id": "f35f1810-951a-4cb4-878c-a2cb4c9574ab",
+  "name": "Helm Hammerhand",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2691
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2759
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Helm_Hammerhand"
+    }
+  ],
+  "metadata": {
+    "description": "Ninth King of Rohan. Famous for the Long Winter and the siege of the Hornburg",
+    "canonicity": "canonical"
+  }
+}

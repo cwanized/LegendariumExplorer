@@ -1,0 +1,27 @@
+{
+  "id": "9ba183e9-817e-48ae-86f3-afb247113cc8",
+  "name": "Éomer",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2989
+  },
+  "death": {
+    "era": "Fourth Age",
+    "year": 63
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Éomer"
+    }
+  ],
+  "metadata": {
+    "description": "Eighteenth King of Rohan, called 'Éadig' (the blessed). Nephew of Théoden",
+    "canonicity": "canonical"
+  }
+}

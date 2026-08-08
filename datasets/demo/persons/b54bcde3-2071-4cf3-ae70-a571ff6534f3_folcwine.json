@@ -1,0 +1,27 @@
+{
+  "id": "b54bcde3-2071-4cf3-ae70-a571ff6534f3",
+  "name": "Folcwine",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2846
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2903
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Folcwine"
+    }
+  ],
+  "metadata": {
+    "description": "Fourteenth King of Rohan. Regained the West March from Dunlendings",
+    "canonicity": "canonical"
+  }
+}

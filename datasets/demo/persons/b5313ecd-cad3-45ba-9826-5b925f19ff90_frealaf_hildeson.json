@@ -1,0 +1,27 @@
+{
+  "id": "b5313ecd-cad3-45ba-9826-5b925f19ff90",
+  "name": "Fréaláf Hildeson",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2740
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2798
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Fréaláf_Hildeson"
+    }
+  ],
+  "metadata": {
+    "description": "Tenth King of Rohan, nephew of Helm. Founded the Second Line",
+    "canonicity": "canonical"
+  }
+}

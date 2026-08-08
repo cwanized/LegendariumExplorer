@@ -1,0 +1,27 @@
+{
+  "id": "9efc60a5-54dc-485d-a9a6-ef66ba963d2f",
+  "name": "Hama",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2715
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2759
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Hama"
+    }
+  ],
+  "metadata": {
+    "description": "Second son of Helm. Died during the Long Winter",
+    "canonicity": "canonical"
+  }
+}

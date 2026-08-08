@@ -1,0 +1,27 @@
+{
+  "id": "cb30b22e-a782-42f8-bb1c-38f7dd8bec29",
+  "name": "Hild",
+  "gender": "female",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2720
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2800
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Hild"
+    }
+  ],
+  "metadata": {
+    "description": "Sister of Helm. Mother of Fréaláf Hildeson",
+    "canonicity": "canonical"
+  }
+}

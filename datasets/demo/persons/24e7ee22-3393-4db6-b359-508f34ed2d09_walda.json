@@ -1,0 +1,27 @@
+{
+  "id": "24e7ee22-3393-4db6-b359-508f34ed2d09",
+  "name": "Walda",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2794
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2851
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Walda"
+    }
+  ],
+  "metadata": {
+    "description": "Twelfth King of Rohan. Slain by Orcs",
+    "canonicity": "canonical"
+  }
+}

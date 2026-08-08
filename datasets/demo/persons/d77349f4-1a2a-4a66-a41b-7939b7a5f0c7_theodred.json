@@ -1,0 +1,27 @@
+{
+  "id": "d77349f4-1a2a-4a66-a41b-7939b7a5f0c7",
+  "name": "Théodred",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2978
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 3019
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Théodred"
+    }
+  ],
+  "metadata": {
+    "description": "Only son of Théoden. Killed at the First Battle of the Fords of Isen",
+    "canonicity": "canonical"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "a76b9b82-af85-4252-9646-f180748a0e3d",
+  "name": "Folca",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2822
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2864
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Folca"
+    }
+  ],
+  "metadata": {
+    "description": "Thirteenth King of Rohan. Great hunter, died from a boar wound",
+    "canonicity": "canonical"
+  }
+}

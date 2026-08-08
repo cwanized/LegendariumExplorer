@@ -1,0 +1,27 @@
+{
+  "id": "350b6990-51f9-4f67-abde-f186c65dc62f",
+  "name": "Fréawine",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2594
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2680
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Fréawine"
+    }
+  ],
+  "metadata": {
+    "description": "Fifth King of Rohan, son of Fréa",
+    "canonicity": "canonical"
+  }
+}

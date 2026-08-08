@@ -1,0 +1,27 @@
+{
+  "id": "396eb28d-a8c1-4946-8391-d052aa8407da",
+  "name": "Déor",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2644
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2718
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Déor"
+    }
+  ],
+  "metadata": {
+    "description": "Seventh King of Rohan, son of Goldwine",
+    "canonicity": "canonical"
+  }
+}

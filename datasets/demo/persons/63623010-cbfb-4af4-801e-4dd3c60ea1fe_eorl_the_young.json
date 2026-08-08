@@ -1,0 +1,27 @@
+{
+  "id": "63623010-cbfb-4af4-801e-4dd3c60ea1fe",
+  "name": "Éorl the Young",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2485
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2545
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Éorl_the_Young"
+    }
+  ],
+  "metadata": {
+    "description": "First King of Rohan, founder of the House of Eorl",
+    "canonicity": "canonical"
+  }
+}

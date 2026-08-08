@@ -1,0 +1,27 @@
+{
+  "id": "ef550922-3991-4803-8a96-f3951dd8ebbc",
+  "name": "Fengel",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2870
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2953
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Fengel"
+    }
+  ],
+  "metadata": {
+    "description": "Fifteenth King of Rohan. Father of Thengel",
+    "canonicity": "canonical"
+  }
+}

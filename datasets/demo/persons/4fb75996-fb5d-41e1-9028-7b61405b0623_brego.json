@@ -1,0 +1,27 @@
+{
+  "id": "4fb75996-fb5d-41e1-9028-7b61405b0623",
+  "name": "Brego",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2512
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2570
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Brego"
+    }
+  ],
+  "metadata": {
+    "description": "Second King of Rohan, built the Golden Hall of Meduseld",
+    "canonicity": "canonical"
+  }
+}

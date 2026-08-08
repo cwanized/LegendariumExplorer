@@ -1,0 +1,27 @@
+{
+  "id": "dc27e613-00f5-42e4-95c6-8a3c96d1adf1",
+  "name": "Théoden",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2948
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 3019
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Théoden"
+    }
+  ],
+  "metadata": {
+    "description": "Seventeenth King of Rohan. Died at the Battle of the Pelennor Fields",
+    "canonicity": "canonical"
+  }
+}

@@ -109,6 +109,19 @@
         "enabled": false,
         "order": 100
       }
+    },
+    {
+      "id": "house-of-eorl",
+      "displayName": "House of Eorl",
+      "aliases": ["House of Eorl", "Rohan"],
+      "tier": "start",
+      "layout": {
+        "yOffset": 144
+      },
+      "anchor": {
+        "enabled": true,
+        "order": 70
+      }
     }
   ]
 }

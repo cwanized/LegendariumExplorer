@@ -1,0 +1,27 @@
+{
+  "id": "ba5544bd-018d-4ea8-a104-09112ccc96c0",
+  "name": "Goldwine",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2619
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2699
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Goldwine"
+    }
+  ],
+  "metadata": {
+    "description": "Sixth King of Rohan, son of Fréawine",
+    "canonicity": "canonical"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "1139b1c3-7d00-48f7-9fe4-9b3b711cf853",
+  "name": "Haleth",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2711
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2758
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Haleth"
+    }
+  ],
+  "metadata": {
+    "description": "Eldest son of Helm. Died defending the gates of Edoras",
+    "canonicity": "canonical"
+  }
+}

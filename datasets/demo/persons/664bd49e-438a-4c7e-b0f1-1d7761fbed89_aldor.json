@@ -1,0 +1,27 @@
+{
+  "id": "664bd49e-438a-4c7e-b0f1-1d7761fbed89",
+  "name": "Aldor",
+  "gender": "male",
+  "species": "Man",
+  "birth": {
+    "era": "Third Age",
+    "year": 2544
+  },
+  "death": {
+    "era": "Third Age",
+    "year": 2645
+  },
+  "houses": [
+    "House of Eorl"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Aldor"
+    }
+  ],
+  "metadata": {
+    "description": "Third King of Rohan, called 'Aldor the Old'. Reigned 75 years",
+    "canonicity": "canonical"
+  }
+}
