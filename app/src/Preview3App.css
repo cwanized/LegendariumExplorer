@@ -646,6 +646,42 @@
   padding-left: 8px;
 }
 
+.preview3-debug-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.preview3-debug-toggle input {
+  margin: 0;
+}
+
+.preview3-debug-summary,
+.preview3-debug-group {
+  display: grid;
+  gap: 6px;
+}
+
+.preview3-debug-summary p,
+.preview3-debug-group p,
+.preview3-debug-group h4 {
+  margin: 0;
+}
+
+.preview3-debug-house-list {
+  display: grid;
+  gap: 8px;
+}
+
+.preview3-debug-house-card {
+  border: 1px solid var(--preview3-page-border);
+  border-radius: 12px;
+  padding: 8px;
+  background: color-mix(in srgb, var(--preview3-page-surface-strong) 90%, transparent);
+  display: grid;
+  gap: 4px;
+}
+
 .preview3-result-card,
 .preview3-result-card,
 .preview3-person-card,

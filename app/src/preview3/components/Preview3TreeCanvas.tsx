@@ -2,6 +2,8 @@ import type { ReactElement, RefObject } from 'react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 
 import type { CameraView, LayoutResult, UUID, ValidationResult, PositionedNode } from '../../graph'
+import type { Preview3ModeDefinition, Preview3ModeOption } from '../modes'
+import type { Preview3TreeDebugData } from '../treePipeline'
 import { AppSelect, IconButton, Preview3Icon } from '../ui'
 import type { ExportScope, FadeMode, PreviewTreeMode, ThemePreset, ThemeScope, ThemeState } from '../state'
 import { canRenderInlineMarriage, type BiologicalChildGroup, type HouseAnchor, type SpouseProjectionNode } from '../treeCore'
@@ -20,6 +22,8 @@ type Preview3TreeCanvasProps = {
   filteredOutNodeIds: Set<UUID>
   highlightedEdgeIds: Set<UUID>
   houseAnchors: HouseAnchor[]
+  debugData: Preview3TreeDebugData | null
+  debugOverlaysEnabled: boolean
   cameraView: CameraView
   layout: LayoutResult
   lcaAnalysis: LcaAnalysis
@@ -37,6 +41,8 @@ type Preview3TreeCanvasProps = {
   startCanvasPan: (event: React.PointerEvent<SVGRectElement>) => void
   treeTheme: ThemeState
   treeMode: PreviewTreeMode
+  modeDefinition: Preview3ModeDefinition
+  modeOptions: Preview3ModeOption[]
   validation: ValidationResult
   wideMode: boolean
   canvasViewportRef: RefObject<HTMLDivElement | null>
@@ -73,6 +79,8 @@ export function Preview3TreeCanvas({
   filteredOutNodeIds,
   highlightedEdgeIds,
   houseAnchors,
+  debugData,
+  debugOverlaysEnabled,
   cameraView,
   layout,
   lcaAnalysis,
@@ -90,6 +98,8 @@ export function Preview3TreeCanvas({
   startCanvasPan,
   treeTheme,
   treeMode,
+  modeDefinition,
+  modeOptions,
   validation,
   wideMode,
   canvasViewportRef,
@@ -115,20 +125,6 @@ export function Preview3TreeCanvas({
   onClearSelection,
   onNodeSelect,
 }: Preview3TreeCanvasProps) {
-  const modeMeta: Record<PreviewTreeMode, { label: string; summary: string }> = {
-    mode0: {
-      label: 'Mode 0: Frozen Reference',
-      summary: 'Legacy reference path for comparison only.',
-    },
-    mode1: {
-      label: 'Mode 1: Partner Projection',
-      summary: 'Biological main path with spouse projection behavior.',
-    },
-    mode2: {
-      label: 'Mode 2: Bloodline Rigid',
-      summary: 'Marriage shown as direct overlay without reflow.',
-    },
-  }
   const treeThemePresetOptions = [
     { value: 'tolkien', label: 'Tolkien' },
     { value: 'gondor', label: 'Gondor' },
@@ -136,11 +132,6 @@ export function Preview3TreeCanvas({
     { value: 'mirkwood', label: 'Mirkwood' },
     { value: 'imladris', label: 'Imladris' },
     { value: 'custom', label: 'Custom' },
-  ]
-  const treeModeOptions = [
-    { value: 'mode0', label: 'Mode 0' },
-    { value: 'mode1', label: 'Mode 1' },
-    { value: 'mode2', label: 'Mode 2' },
   ]
 
   return (
@@ -177,7 +168,7 @@ export function Preview3TreeCanvas({
             className="preview3-toolbar-select preview3-toolbar-select"
             value={treeMode}
             onValueChange={(value) => onTreeModeChange(value as PreviewTreeMode)}
-            options={treeModeOptions}
+            options={modeOptions}
           />
         </div>
         <Preview3Icon name="separator" />
@@ -193,8 +184,8 @@ export function Preview3TreeCanvas({
         </div>
       </div>
       <div className="preview3-mode-summary" role="status" aria-live="polite">
-        <strong>{modeMeta[treeMode].label}</strong>
-        <span>{modeMeta[treeMode].summary}</span>
+        <strong>{modeDefinition.label}</strong>
+        <span>{modeDefinition.summary}</span>
       </div>
       <div ref={canvasViewportRef} className="preview3-canvas-shell">
         {leftPanelCollapsed ? <button type="button" className="preview3-restore-button left" onClick={() => onPanelCollapse('left')}><Preview3Icon name="restore-left" /><span>Restore Filter</span></button> : null}
@@ -220,15 +211,47 @@ export function Preview3TreeCanvas({
           </defs>
           <rect x={cameraView.x - 800} y={cameraView.y - 800} width={cameraView.width + 1600} height={cameraView.height + 1600} fill={`url(#${panelId}-grid)`} />
           <rect x={cameraView.x - 800} y={cameraView.y - 800} width={cameraView.width + 1600} height={cameraView.height + 1600} fill="transparent" onPointerDown={startCanvasPan} />
-          {houseAnchors.map((anchor) => {
+          {debugOverlaysEnabled && debugData ? debugData.houseAnchors.map((entry) => {
+            const rootNodes = entry.rootNodeIds
+              .map((nodeId) => layout.nodes.get(nodeId))
+              .filter((node): node is PositionedNode => node !== undefined)
+
+            if (rootNodes.length === 0) {
+              return null
+            }
+
+            const topY = entry.anchorY - 28
+            const bottomY = entry.anchorY + entry.anchorHeight + 24
+            const corridorX = entry.idealCenterX - entry.reservedSpan / 2
+
+            return (
+              <g key={`debug:${entry.houseId}`} opacity={0.85}>
+                <rect x={corridorX} y={topY} width={entry.reservedSpan} height="14" fill="none" stroke="#d08a25" strokeDasharray="4 3" strokeWidth="1.4" />
+                <line x1={entry.idealCenterX} y1={topY - 8} x2={entry.idealCenterX} y2={bottomY} stroke="#d08a25" strokeDasharray="6 4" strokeWidth="1.4" />
+                <line x1={entry.placedCenterX} y1={topY - 8} x2={entry.placedCenterX} y2={bottomY} stroke="#2d6fa3" strokeDasharray="2 3" strokeWidth="1.4" />
+                {rootNodes.map((node) => (
+                  <circle key={`debug:${entry.houseId}:${node.id}`} cx={node.x + node.width / 2} cy={node.y - 8} r="4" fill="#d08a25" />
+                ))}
+              </g>
+            )
+          }) : null}
+          {modeDefinition.render.showHouseAnchors ? houseAnchors.map((anchor) => {
             const rootNodes = anchor.connectorNodeIds.map((memberId) => layout.nodes.get(memberId)).filter((node): node is PositionedNode => node !== undefined)
 
             if (rootNodes.length === 0) {
               return null
             }
 
-            const anchorCenterX = anchor.x + anchor.width / 2
-            const anchorBottomY = anchor.y + anchor.height
+            const renderAnchorAsNode = modeDefinition.id === 'modeR' || modeDefinition.id === 'modeR2'
+            const anchorRenderWidth = renderAnchorAsNode ? Math.max(anchor.width, 176) : anchor.width
+            const anchorRenderHeight = renderAnchorAsNode ? 64 : anchor.height
+            const anchorRenderX = renderAnchorAsNode
+              ? anchor.x + anchor.width / 2 - anchorRenderWidth / 2
+              : anchor.x
+            const anchorRenderY = anchor.y
+
+            const anchorCenterX = anchorRenderX + anchorRenderWidth / 2
+            const anchorBottomY = anchorRenderY + anchorRenderHeight
             const junctionY = anchorBottomY + 18
             const rootCenters = rootNodes.map((node) => node.x + node.width / 2)
             const connectorLineMinX = Math.min(anchorCenterX, ...rootCenters)
@@ -241,13 +264,28 @@ export function Preview3TreeCanvas({
                 {rootNodes.map((node) => (
                   <line key={`${anchor.houseId}:${node.id}`} x1={node.x + node.width / 2} y1={junctionY} x2={node.x + node.width / 2} y2={node.y} stroke="var(--preview3-tree-overlay)" strokeWidth={1.8} strokeOpacity={0.55} />
                 ))}
-                <g transform={`translate(${anchor.x} ${anchor.y})`}>
-                  <rect width={anchor.width} height={anchor.height} rx="16" ry="16" fill="color-mix(in srgb, var(--preview3-tree-accent-soft) 68%, transparent)" stroke="var(--preview3-tree-border)" />
-                  <text x={anchor.width / 2} y={23} textAnchor="middle" className="preview3-svg-meta">{anchor.displayName}</text>
+                <g transform={`translate(${anchorRenderX} ${anchorRenderY})`}>
+                  <rect
+                    width={anchorRenderWidth}
+                    height={anchorRenderHeight}
+                    rx={renderAnchorAsNode ? 18 : 16}
+                    ry={renderAnchorAsNode ? 18 : 16}
+                    fill={renderAnchorAsNode ? 'var(--preview3-tree-node-fill)' : 'color-mix(in srgb, var(--preview3-tree-accent-soft) 68%, transparent)'}
+                    stroke="var(--preview3-tree-border)"
+                    strokeWidth={renderAnchorAsNode ? 1.8 : 1.2}
+                  />
+                  {renderAnchorAsNode ? (
+                    <>
+                      <text x={14} y={24} className="preview3-svg-name">{anchor.displayName}</text>
+                      <text x={14} y={44} className="preview3-svg-meta">House Anchor (Person 0)</text>
+                    </>
+                  ) : (
+                    <text x={anchorRenderWidth / 2} y={23} textAnchor="middle" className="preview3-svg-meta">{anchor.displayName}</text>
+                  )}
                 </g>
               </g>
             )
-          })}
+          }) : null}
 
           {overlayRelations.map((relation) => {
             const fromNode = layout.nodes.get(relation.from)
@@ -264,7 +302,7 @@ export function Preview3TreeCanvas({
             const x2 = renderInlineMarriage ? rightNode.x : toNode.x + toNode.width / 2
             const y2 = renderInlineMarriage ? rightNode.y + rightNode.height / 2 : toNode.y + toNode.height / 2
             const isDimmed = Boolean(lcaAnalysis && fadeMode === 'dim' && !highlightedEdgeIds.has(relation.id))
-            const isMode2Marriage = treeMode === 'mode2' && relation.type === 'marriage'
+            const isRigidMarriage = modeDefinition.render.marriageOverlayStyle === 'rigid' && relation.type === 'marriage'
 
             return (
               <line
@@ -274,9 +312,9 @@ export function Preview3TreeCanvas({
                 x2={x2}
                 y2={y2}
                 stroke="var(--preview3-tree-overlay)"
-                strokeWidth={isMode2Marriage ? 2.2 : 1.6}
-                strokeDasharray={isMode2Marriage ? undefined : '7 7'}
-                strokeOpacity={isDimmed ? 0.22 : isMode2Marriage ? 0.78 : 0.58}
+                strokeWidth={isRigidMarriage ? 2.2 : 1.6}
+                strokeDasharray={isRigidMarriage ? undefined : '7 7'}
+                strokeOpacity={isDimmed ? 0.22 : isRigidMarriage ? 0.78 : 0.58}
               />
             )
           })}
@@ -290,6 +328,7 @@ export function Preview3TreeCanvas({
             const siblingMaxX = Math.max(...childCenters)
             const isSingleChildGroup = group.childNodes.length === 1
             const singleChildNode = isSingleChildGroup ? group.childNodes[0] : null
+            const isStrictSingleParentSingleChild = isSingleChildGroup && group.parentNodes.length === 1
 
             return (
               <g key={group.key}>
@@ -299,6 +338,23 @@ export function Preview3TreeCanvas({
                   const targetX = singleChildNode ? singleChildNode.x + singleChildNode.width / 2 : group.junctionX
                   const targetY = singleChildNode ? singleChildNode.y : group.junctionY
                   const controlY = singleChildNode ? parentBottomY + Math.max((targetY - parentBottomY) * 0.45, 18) : parentBottomY + Math.max((group.junctionY - parentBottomY) * 0.7, 16)
+
+                  if (isStrictSingleParentSingleChild && singleChildNode) {
+                    const childCenterX = singleChildNode.x + singleChildNode.width / 2
+
+                    return (
+                      <line
+                        key={`${group.key}:${node.id}:parent`}
+                        x1={parentCenterX}
+                        y1={parentBottomY}
+                        x2={childCenterX}
+                        y2={singleChildNode.y}
+                        stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'}
+                        strokeWidth={highlighted ? 3.6 : 2.2}
+                        strokeOpacity={faded ? 0.22 : 0.82}
+                      />
+                    )
+                  }
 
                   return (
                     <path

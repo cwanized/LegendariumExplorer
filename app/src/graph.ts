@@ -71,6 +71,9 @@ export type Relation = {
   to: UUID
   attributes?: {
     date?: TimeValue
+    layout?: {
+      continuationOwner?: 'from' | 'to'
+    }
   }
 }
 
@@ -523,9 +526,21 @@ function countDisconnectedComponents(persons: Person[], relations: Relation[]) {
   return components
 }
 
-export async function layoutGraph(persons: Person[], relations: Relation[], strategy: LayoutStrategy = 'enhanced'): Promise<LayoutResult> {
+export async function layoutGraph(
+  persons: Person[],
+  relations: Relation[],
+  strategy: LayoutStrategy = 'enhanced',
+  options?: {
+    componentSpacing?: number
+    nodeSpacing?: number
+    layerSpacing?: number
+  },
+): Promise<LayoutResult> {
   const sortedPersons = strategy === 'legacy' ? sortById(persons) : sortPersonsForLayout(persons)
   const sortedRelations = sortById(relations)
+  const componentSpacing = options?.componentSpacing ?? 220
+  const nodeSpacing = options?.nodeSpacing ?? 78
+  const layerSpacing = options?.layerSpacing ?? 110
 
   try {
     const layout = await elk.layout({
@@ -533,9 +548,9 @@ export async function layoutGraph(persons: Person[], relations: Relation[], stra
       layoutOptions: {
         'elk.algorithm': 'layered',
         'elk.direction': 'DOWN',
-        'elk.layered.spacing.nodeNodeBetweenLayers': '110',
-        'elk.spacing.nodeNode': '78',
-        'elk.spacing.componentComponent': '220',
+        'elk.layered.spacing.nodeNodeBetweenLayers': String(layerSpacing),
+        'elk.spacing.nodeNode': String(nodeSpacing),
+        'elk.spacing.componentComponent': String(componentSpacing),
         'elk.edgeRouting': 'ORTHOGONAL',
       },
       children: sortedPersons.map((person) => ({

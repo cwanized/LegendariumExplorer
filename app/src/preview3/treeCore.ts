@@ -9,11 +9,12 @@ import type {
   UUID,
   ValidationResult,
 } from '../graph'
+import type { Preview3HouseAnchorVerticalAlignment } from './modes'
 import { comparePersonsForLayout } from '../graph'
 
 const PERSON_Y_OFFSET_UNIT = 72
 const HOUSE_Y_OFFSET_UNIT = 170
-const HOUSE_CLUSTER_GAP = 64
+const HOUSE_CLUSTER_GAP = 28
 
 type RootHouseContext = {
   house: HouseDefinition
@@ -75,6 +76,23 @@ export type HouseAnchor = {
   height: number
 }
 
+export type HouseAnchorDebugEntry = {
+  houseId: string
+  displayName: string
+  rootNodeIds: UUID[]
+  connectorNodeIds: UUID[]
+  idealCenterX: number
+  placedCenterX: number
+  driftX: number
+  reservedSpan: number
+  clusterWidth: number
+  houseYOffset: number
+  anchorX: number
+  anchorY: number
+  anchorWidth: number
+  anchorHeight: number
+}
+
 export type BiologicalChildGroup = {
   key: string
   parentIds: UUID[]
@@ -93,14 +111,30 @@ export function buildHouseAnchors(
   houseDefinitions: HouseDefinitions,
   options?: {
     strategy?: 'legacy' | 'enhanced'
+    applyHouseLayoutYOffset?: boolean
+    houseYOffsetUnit?: number
+    preserveIdealCenterX?: boolean
+    verticalAlignment?: Preview3HouseAnchorVerticalAlignment
+    includeLaterTiers?: boolean
   },
 ): HouseAnchor[] {
   const strategy = options?.strategy ?? 'enhanced'
+  const applyHouseLayoutYOffset = options?.applyHouseLayoutYOffset ?? false
+  const houseYOffsetUnit = options?.houseYOffsetUnit ?? PERSON_Y_OFFSET_UNIT
+  const preserveIdealCenterX = options?.preserveIdealCenterX ?? false
+  const verticalAlignment = options?.verticalAlignment ?? 'global-top-row'
+  const includeLaterTiers = options?.includeLaterTiers ?? false
   if (strategy === 'legacy') {
-    return buildLegacyHouseAnchors(validation, layout, houseDefinitions)
+    return buildLegacyHouseAnchors(validation, layout, houseDefinitions, {
+      applyHouseLayoutYOffset,
+      houseYOffsetUnit,
+      preserveIdealCenterX,
+      verticalAlignment,
+      includeLaterTiers,
+    })
   }
 
-  return getRootHouseContexts(validation, layout, houseDefinitions, strategy)
+  return getRootHouseContexts(validation, layout, houseDefinitions, strategy, includeLaterTiers)
     .map(({ house, topNodes, contextNodes }) => {
       const minX = Math.min(...contextNodes.map((node) => node.x))
       const maxX = Math.max(...contextNodes.map((node) => node.x + node.width))
@@ -111,21 +145,87 @@ export function buildHouseAnchors(
         houseId: house.id,
         displayName: house.displayName,
         memberIds: topNodes.map((node) => node.id).sort((left, right) => left.localeCompare(right)),
-        connectorNodeIds: contextNodes.map((node) => node.id).sort((left, right) => left.localeCompare(right)),
+        connectorNodeIds: topNodes.map((node) => node.id).sort((left, right) => left.localeCompare(right)),
         x: centerX - width / 2,
-        y: Math.min(...topNodes.map((node) => node.y)) - 86,
+        y: Math.min(...topNodes.map((node) => node.y)) - 86 + (applyHouseLayoutYOffset ? (house.layout?.yOffset ?? 0) * houseYOffsetUnit : 0),
         width,
         height: 34,
       }
     })
 }
 
+export function buildHouseAnchorDebugEntries(
+  validation: ValidationResult,
+  layout: LayoutResult,
+  houseDefinitions: HouseDefinitions,
+  houseAnchors: HouseAnchor[],
+  options?: {
+    strategy?: 'legacy' | 'enhanced'
+    applyHouseLayoutYOffset?: boolean
+    houseYOffsetUnit?: number
+    includeLaterTiers?: boolean
+  },
+): HouseAnchorDebugEntry[] {
+  const strategy = options?.strategy ?? 'enhanced'
+  const applyHouseLayoutYOffset = options?.applyHouseLayoutYOffset ?? false
+  const houseYOffsetUnit = options?.houseYOffsetUnit ?? PERSON_Y_OFFSET_UNIT
+  const includeLaterTiers = options?.includeLaterTiers ?? false
+  const houseAnchorById = new Map(houseAnchors.map((anchor) => [anchor.houseId, anchor]))
+
+  return getRootHouseContexts(validation, layout, houseDefinitions, strategy, includeLaterTiers)
+    .map(({ house, topNodes, contextNodes }) => {
+      const minX = Math.min(...contextNodes.map((node) => node.x))
+      const maxX = Math.max(...contextNodes.map((node) => node.x + node.width))
+      const width = Math.max(140, house.displayName.length * 8 + 42)
+      const idealCenterX = (minX + maxX) / 2
+      const clusterWidth = maxX - minX
+      const reservedSpan = Math.max(width, clusterWidth)
+      const placedAnchor = houseAnchorById.get(house.id)
+
+      if (!placedAnchor) {
+        return null
+      }
+
+      const placedCenterX = placedAnchor.x + placedAnchor.width / 2
+
+      return {
+        houseId: house.id,
+        displayName: house.displayName,
+        rootNodeIds: topNodes.map((node) => node.id).sort((left, right) => left.localeCompare(right)),
+        connectorNodeIds: contextNodes.map((node) => node.id).sort((left, right) => left.localeCompare(right)),
+        idealCenterX,
+        placedCenterX,
+        driftX: placedCenterX - idealCenterX,
+        reservedSpan,
+        clusterWidth,
+        houseYOffset: applyHouseLayoutYOffset ? (house.layout?.yOffset ?? 0) * houseYOffsetUnit : 0,
+        anchorX: placedAnchor.x,
+        anchorY: placedAnchor.y,
+        anchorWidth: placedAnchor.width,
+        anchorHeight: placedAnchor.height,
+      }
+    })
+    .filter((entry): entry is HouseAnchorDebugEntry => entry !== null)
+}
+
 function buildLegacyHouseAnchors(
   validation: ValidationResult,
   layout: LayoutResult,
   houseDefinitions: HouseDefinitions,
+  options?: {
+    applyHouseLayoutYOffset?: boolean
+    houseYOffsetUnit?: number
+    preserveIdealCenterX?: boolean
+    verticalAlignment?: Preview3HouseAnchorVerticalAlignment
+    includeLaterTiers?: boolean
+  },
 ): HouseAnchor[] {
-  const groupedAnchors = getRootHouseContexts(validation, layout, houseDefinitions, 'legacy')
+  const applyHouseLayoutYOffset = options?.applyHouseLayoutYOffset ?? false
+  const houseYOffsetUnit = options?.houseYOffsetUnit ?? PERSON_Y_OFFSET_UNIT
+  const preserveIdealCenterX = options?.preserveIdealCenterX ?? false
+  const verticalAlignment = options?.verticalAlignment ?? 'global-top-row'
+  const includeLaterTiers = options?.includeLaterTiers ?? false
+  const groupedAnchors = getRootHouseContexts(validation, layout, houseDefinitions, 'legacy', includeLaterTiers)
     .map(({ house, topNodes, contextNodes }) => {
       const minX = Math.min(...contextNodes.map((node) => node.x))
       const maxX = Math.max(...contextNodes.map((node) => node.x + node.width))
@@ -137,9 +237,10 @@ function buildLegacyHouseAnchors(
         houseId: house.id,
         displayName: house.displayName,
         memberIds: topNodes.map((node) => node.id).sort((left, right) => left.localeCompare(right)),
-        connectorNodeIds: contextNodes.map((node) => node.id).sort((left, right) => left.localeCompare(right)),
+        connectorNodeIds: topNodes.map((node) => node.id).sort((left, right) => left.localeCompare(right)),
         centerX,
         minY: Math.min(...topNodes.map((node) => node.y)),
+        houseYOffset: applyHouseLayoutYOffset ? (house.layout?.yOffset ?? 0) * houseYOffsetUnit : 0,
         width,
         contextSpan,
         order: house.anchor.order,
@@ -152,9 +253,9 @@ function buildLegacyHouseAnchors(
 
   const topRowY = Math.min(...groupedAnchors.map((entry) => entry.minY)) - 86
   const anchorGap = 18
-  const placedAnchors: Array<{ houseId: string; displayName: string; memberIds: UUID[]; connectorNodeIds: UUID[]; centerX: number; minY: number; width: number; contextSpan: number; order: number; x: number; placedCenterX: number }> = []
+  const placedAnchors: Array<{ houseId: string; displayName: string; memberIds: UUID[]; connectorNodeIds: UUID[]; centerX: number; minY: number; houseYOffset: number; width: number; contextSpan: number; order: number; x: number; placedCenterX: number }> = []
 
-  for (const entry of groupedAnchors.slice().sort((left, right) => left.centerX - right.centerX || left.order - right.order || left.displayName.localeCompare(right.displayName))) {
+  for (const entry of groupedAnchors.slice().sort((left, right) => left.order - right.order || left.houseId.localeCompare(right.houseId) || left.centerX - right.centerX)) {
     const idealCenterX = entry.centerX
     const previous = placedAnchors.at(-1)
     const previousReservedHalfSpan = previous ? Math.max(previous.width / 2, previous.contextSpan / 2) : 0
@@ -162,7 +263,7 @@ function buildLegacyHouseAnchors(
     const minCenterX = previous
       ? previous.placedCenterX + previousReservedHalfSpan + currentReservedHalfSpan + anchorGap
       : idealCenterX
-    const placedCenterX = Math.max(idealCenterX, minCenterX)
+    const placedCenterX = preserveIdealCenterX ? idealCenterX : Math.max(idealCenterX, minCenterX)
 
     placedAnchors.push({
       ...entry,
@@ -177,7 +278,7 @@ function buildLegacyHouseAnchors(
     memberIds: entry.memberIds,
     connectorNodeIds: entry.connectorNodeIds,
     x: entry.x,
-    y: topRowY,
+    y: (verticalAlignment === 'founder-top-row' ? entry.minY - 86 : topRowY) + entry.houseYOffset,
     width: entry.width,
     height: 34,
   }))
@@ -189,15 +290,19 @@ export function applyHouseSubtreeOffsets(
   houseDefinitions: HouseDefinitions,
   options?: {
     strategy?: 'legacy' | 'enhanced'
+    applyHouseLayoutYOffset?: boolean
+    houseYOffsetUnit?: number
   },
 ): LayoutResult {
   const strategy = options?.strategy ?? 'enhanced'
+  const applyHouseLayoutYOffset = options?.applyHouseLayoutYOffset ?? true
+  const houseYOffsetUnit = options?.houseYOffsetUnit ?? HOUSE_Y_OFFSET_UNIT
 
-  if (strategy === 'legacy') {
-    return layout
-  }
-
-  const clusters = buildPlacedHouseClusters(validation, layout, houseDefinitions)
+  const clusters = buildPlacedHouseClusters(validation, layout, houseDefinitions, {
+    strategy,
+    applyHouseLayoutYOffset,
+    houseYOffsetUnit,
+  })
   const adjustedNodes = new Map(layout.nodes)
   const shiftedNodeIds = new Set<UUID>()
 
@@ -220,6 +325,85 @@ export function applyHouseSubtreeOffsets(
         y: node.y + cluster.shiftY,
       })
     }
+  }
+
+  return {
+    nodes: adjustedNodes,
+  }
+}
+
+export function resolveHouseOrderXConflicts(
+  validation: ValidationResult,
+  layout: LayoutResult,
+  houseDefinitions: HouseDefinitions,
+  options?: {
+    strategy?: 'legacy' | 'enhanced'
+    clusterGap?: number
+  },
+): LayoutResult {
+  const strategy = options?.strategy ?? 'enhanced'
+  const clusterGap = options?.clusterGap ?? HOUSE_CLUSTER_GAP
+  const rootContexts = getRootHouseContexts(validation, layout, houseDefinitions, strategy)
+  const definitionLookup = buildHouseDefinitionLookup(houseDefinitions)
+
+  if (rootContexts.length < 2) {
+    return layout
+  }
+
+  const orderedContexts = rootContexts
+    .map(({ house, topNodes, contextNodes }) => {
+      const shiftNodes = getVisibleHouseContextNodes(topNodes.map((node) => node.id), layout, validation)
+      const houseScopedShiftNodes = shiftNodes.filter((node) => {
+        const person = validation.personById.get(node.id)
+
+        if (!person) {
+          return false
+        }
+
+        const primaryHouse = getPrimaryHouse(person.houses, definitionLookup)
+        return primaryHouse?.id === house.id
+      })
+      const effectiveShiftNodes = houseScopedShiftNodes.length > 0 ? houseScopedShiftNodes : shiftNodes
+      const orderBandNodes = strategy === 'legacy' ? topNodes : contextNodes
+
+      return {
+        house,
+        nodeIds: effectiveShiftNodes.map((node) => node.id).sort((left, right) => left.localeCompare(right)),
+        minX: Math.min(...orderBandNodes.map((node) => node.x)),
+        maxX: Math.max(...orderBandNodes.map((node) => node.x + node.width)),
+      }
+    })
+    .sort((left, right) => left.house.anchor.order - right.house.anchor.order || left.house.id.localeCompare(right.house.id))
+
+  const adjustedNodes = new Map(layout.nodes)
+  const shiftedNodeIds = new Set<UUID>()
+  let previousRightEdge = Number.NEGATIVE_INFINITY
+
+  for (const context of orderedContexts) {
+    const requiredMinX = Number.isFinite(previousRightEdge)
+      ? previousRightEdge + clusterGap
+      : context.minX
+    const shiftX = Math.max(0, requiredMinX - context.minX)
+
+    for (const nodeId of context.nodeIds) {
+      if (shiftedNodeIds.has(nodeId)) {
+        continue
+      }
+
+      const currentNode = adjustedNodes.get(nodeId)
+
+      if (!currentNode) {
+        continue
+      }
+
+      shiftedNodeIds.add(nodeId)
+      adjustedNodes.set(nodeId, {
+        ...currentNode,
+        x: currentNode.x + shiftX,
+      })
+    }
+
+    previousRightEdge = context.maxX + shiftX
   }
 
   return {
@@ -282,18 +466,19 @@ function getRootHouseContexts(
   layout: LayoutResult,
   houseDefinitions: HouseDefinitions,
   strategy: 'legacy' | 'enhanced',
+  includeLaterTiers: boolean = false,
 ): RootHouseContext[] {
   const definitionLookup = buildHouseDefinitionLookup(houseDefinitions)
   const anchorableDefinitions = houseDefinitions.houses
-    .filter((house) => house.anchor.enabled && house.tier === 'start')
-    .sort((left, right) => left.anchor.order - right.anchor.order || left.displayName.localeCompare(right.displayName) || left.id.localeCompare(right.id))
+    .filter((house) => house.anchor.enabled && (house.tier === 'start' || includeLaterTiers))
+    .sort((left, right) => left.anchor.order - right.anchor.order || left.id.localeCompare(right.id))
 
   const houseMembers = new Map<string, UUID[]>()
 
   for (const person of validation.persons) {
     const primaryHouse = getPrimaryHouse(person.houses, definitionLookup)
 
-    if (!primaryHouse || !primaryHouse.anchor.enabled || primaryHouse.tier !== 'start') {
+    if (!primaryHouse || !primaryHouse.anchor.enabled || (primaryHouse.tier !== 'start' && !includeLaterTiers)) {
       continue
     }
 
@@ -333,17 +518,31 @@ function buildPlacedHouseClusters(
   validation: ValidationResult,
   layout: LayoutResult,
   houseDefinitions: HouseDefinitions,
+  options?: {
+    strategy?: 'legacy' | 'enhanced'
+    applyHouseLayoutYOffset?: boolean
+    houseYOffsetUnit?: number
+  },
 ): HouseCluster[] {
-  const rootContexts = getRootHouseContexts(validation, layout, houseDefinitions, 'enhanced')
-  const globalRootBandY = Math.min(...rootContexts.map(({ topNodes }) => Math.min(...topNodes.map((node) => node.y))))
+  const strategy = options?.strategy ?? 'enhanced'
+  const rootContexts = getRootHouseContexts(validation, layout, houseDefinitions, strategy)
+  const applyHouseLayoutYOffset = options?.applyHouseLayoutYOffset ?? true
+  const houseYOffsetUnit = options?.houseYOffsetUnit ?? HOUSE_Y_OFFSET_UNIT
+  const sharedRootBaselineY = rootContexts.length > 0
+    ? Math.min(...rootContexts.map(({ topNodes }) => Math.min(...topNodes.map((node) => node.y))))
+    : 0
 
   const clusters = rootContexts
     .map(({ house, topNodes, contextNodes }) => {
       const placementNodes = HOUSE_CLUSTER_PLACEMENT_SCOPE === 'exclusive-root-corridor'
         ? topNodes
         : contextNodes
+      const minY = Math.min(...topNodes.map((node) => node.y))
 
-      const targetRootBandY = globalRootBandY + (house.layout?.yOffset ?? 0) * HOUSE_Y_OFFSET_UNIT
+      const baselineY = strategy === 'enhanced' ? sharedRootBaselineY : minY
+      const targetRootBandY = applyHouseLayoutYOffset
+        ? baselineY + (house.layout?.yOffset ?? 0) * houseYOffsetUnit
+        : baselineY
 
       return {
       houseId: house.id,
@@ -354,9 +553,9 @@ function buildPlacedHouseClusters(
       order: house.anchor.order,
       minX: Math.min(...placementNodes.map((node) => node.x)),
       maxX: Math.max(...placementNodes.map((node) => node.x + node.width)),
-      minY: Math.min(...topNodes.map((node) => node.y)),
+      minY,
       shiftX: 0,
-        shiftY: targetRootBandY - Math.min(...topNodes.map((node) => node.y)),
+        shiftY: targetRootBandY - minY,
       }
     })
     .sort((left, right) => ((left.minX + left.maxX) / 2) - ((right.minX + right.maxX) / 2) || left.order - right.order || left.displayName.localeCompare(right.displayName))
@@ -523,6 +722,234 @@ export function applyCuratedPersonOffsets(layout: LayoutResult, persons: Person[
   return { nodes: adjustedNodes }
 }
 
+export function resolveHorizontalNodeOverlaps(
+  layout: LayoutResult,
+  options?: {
+    minimumGap?: number
+    rowQuantization?: number
+  },
+): LayoutResult {
+  const minimumGap = options?.minimumGap ?? 20
+  const rowQuantization = options?.rowQuantization ?? 8
+  const adjustedNodes = new Map(layout.nodes)
+  const rows = new Map<number, PositionedNode[]>()
+
+  for (const node of layout.nodes.values()) {
+    const rowKey = Math.round(node.y / rowQuantization)
+    const row = rows.get(rowKey) ?? []
+    row.push(node)
+    rows.set(rowKey, row)
+  }
+
+  for (const rowNodes of rows.values()) {
+    const sorted = [...rowNodes].sort((left, right) => left.x - right.x || left.id.localeCompare(right.id))
+    let previousRight = Number.NEGATIVE_INFINITY
+
+    for (const node of sorted) {
+      const current = adjustedNodes.get(node.id)
+
+      if (!current) {
+        continue
+      }
+
+      const requiredX = previousRight + minimumGap
+      const nextX = Math.max(current.x, requiredX)
+
+      adjustedNodes.set(node.id, {
+        ...current,
+        x: nextX,
+      })
+
+      previousRight = nextX + current.width
+    }
+  }
+
+  return { nodes: adjustedNodes }
+}
+
+export function scaleLayoutX(layout: LayoutResult, factor: number): LayoutResult {
+  if (!Number.isFinite(factor) || Math.abs(factor - 1) < 0.001) {
+    return layout
+  }
+
+  const nodes = Array.from(layout.nodes.values())
+
+  if (nodes.length === 0) {
+    return layout
+  }
+
+  const minX = Math.min(...nodes.map((node) => node.x))
+  const maxX = Math.max(...nodes.map((node) => node.x + node.width))
+  const centerX = (minX + maxX) / 2
+  const adjustedNodes = new Map(layout.nodes)
+
+  for (const node of nodes) {
+    const nodeCenterX = node.x + node.width / 2
+    const scaledCenterX = centerX + (nodeCenterX - centerX) * factor
+    adjustedNodes.set(node.id, {
+      ...node,
+      x: scaledCenterX - node.width / 2,
+    })
+  }
+
+  return { nodes: adjustedNodes }
+}
+
+export function scaleLayoutY(layout: LayoutResult, factor: number): LayoutResult {
+  if (!Number.isFinite(factor) || Math.abs(factor - 1) < 0.001) {
+    return layout
+  }
+
+  const nodes = Array.from(layout.nodes.values())
+
+  if (nodes.length === 0) {
+    return layout
+  }
+
+  const minY = Math.min(...nodes.map((node) => node.y))
+  const maxY = Math.max(...nodes.map((node) => node.y + node.height))
+  const centerY = (minY + maxY) / 2
+  const adjustedNodes = new Map(layout.nodes)
+
+  for (const node of nodes) {
+    const nodeCenterY = node.y + node.height / 2
+    const scaledCenterY = centerY + (nodeCenterY - centerY) * factor
+    adjustedNodes.set(node.id, {
+      ...node,
+      y: scaledCenterY - node.height / 2,
+    })
+  }
+
+  return { nodes: adjustedNodes }
+}
+
+export function packDisconnectedComponents(
+  layout: LayoutResult,
+  relations: Relation[],
+  options?: {
+    columnGap?: number
+    rowGap?: number
+    targetRowWidth?: number
+  },
+): LayoutResult {
+  const nodes = Array.from(layout.nodes.values())
+
+  if (nodes.length < 2) {
+    return layout
+  }
+
+  const columnGap = options?.columnGap ?? 120
+  const rowGap = options?.rowGap ?? 140
+  const adjacency = new Map<UUID, Set<UUID>>()
+
+  for (const node of nodes) {
+    adjacency.set(node.id, new Set<UUID>())
+  }
+
+  for (const relation of relations) {
+    if (!adjacency.has(relation.from) || !adjacency.has(relation.to)) {
+      continue
+    }
+
+    adjacency.get(relation.from)?.add(relation.to)
+    adjacency.get(relation.to)?.add(relation.from)
+  }
+
+  const visited = new Set<UUID>()
+  const components: Array<{ ids: UUID[]; minX: number; maxX: number; minY: number; maxY: number; width: number; height: number }> = []
+
+  for (const node of nodes.slice().sort((left, right) => left.x - right.x || left.y - right.y || left.id.localeCompare(right.id))) {
+    if (visited.has(node.id)) {
+      continue
+    }
+
+    const queue: UUID[] = [node.id]
+    const ids: UUID[] = []
+    visited.add(node.id)
+
+    while (queue.length > 0) {
+      const currentId = queue.shift()
+
+      if (!currentId) {
+        continue
+      }
+
+      ids.push(currentId)
+
+      for (const neighborId of adjacency.get(currentId) ?? []) {
+        if (visited.has(neighborId)) {
+          continue
+        }
+
+        visited.add(neighborId)
+        queue.push(neighborId)
+      }
+    }
+
+    const componentNodes = ids.map((id) => layout.nodes.get(id)).filter((entry): entry is PositionedNode => entry !== undefined)
+    const minX = Math.min(...componentNodes.map((entry) => entry.x))
+    const maxX = Math.max(...componentNodes.map((entry) => entry.x + entry.width))
+    const minY = Math.min(...componentNodes.map((entry) => entry.y))
+    const maxY = Math.max(...componentNodes.map((entry) => entry.y + entry.height))
+
+    components.push({
+      ids: ids.slice().sort((left, right) => left.localeCompare(right)),
+      minX,
+      maxX,
+      minY,
+      maxY,
+      width: maxX - minX,
+      height: maxY - minY,
+    })
+  }
+
+  if (components.length < 2) {
+    return layout
+  }
+
+  const totalArea = components.reduce((sum, component) => sum + component.width * component.height, 0)
+  const targetRowWidth = options?.targetRowWidth ?? Math.max(2200, Math.sqrt(totalArea) * 1.6)
+  const adjustedNodes = new Map(layout.nodes)
+
+  let cursorX = 0
+  let cursorY = 0
+  let rowHeight = 0
+
+  const orderedComponents = components
+    .slice()
+    .sort((left, right) => left.minY - right.minY || left.minX - right.minX || left.ids[0].localeCompare(right.ids[0]))
+
+  for (const component of orderedComponents) {
+    if (cursorX > 0 && cursorX + component.width > targetRowWidth) {
+      cursorX = 0
+      cursorY += rowHeight + rowGap
+      rowHeight = 0
+    }
+
+    const shiftX = cursorX - component.minX
+    const shiftY = cursorY - component.minY
+
+    for (const nodeId of component.ids) {
+      const node = adjustedNodes.get(nodeId)
+
+      if (!node) {
+        continue
+      }
+
+      adjustedNodes.set(nodeId, {
+        ...node,
+        x: node.x + shiftX,
+        y: node.y + shiftY,
+      })
+    }
+
+    cursorX += component.width + columnGap
+    rowHeight = Math.max(rowHeight, component.height)
+  }
+
+  return { nodes: adjustedNodes }
+}
+
 export function getSingleChildCenterTargets(layout: LayoutResult, relations: Relation[]): Map<UUID, number> {
   const centerTargets = new Map<UUID, number>()
   const groupedChildren = buildBiologicalChildGroups(relations, layout)
@@ -557,9 +984,522 @@ export function alignSingleChildNodes(layout: LayoutResult, centerTargets: Map<U
   return { nodes: adjustedNodes }
 }
 
-export function alignMarriagePairs(layout: LayoutResult, relations: Relation[], anchoredNodeIds: Set<UUID>): LayoutResult {
+export function alignSingleParentChildGroups(layout: LayoutResult, relations: Relation[], overlayRelations: Relation[] = []): LayoutResult {
   const adjustedNodes = new Map(layout.nodes)
-  const targetGap = 32
+  const groups = buildBiologicalChildGroups(relations, layout)
+  const spouseIdsByPerson = new Map<UUID, Set<UUID>>()
+
+  for (const relation of overlayRelations) {
+    if (relation.type !== 'marriage') {
+      continue
+    }
+
+    const fromPartners = spouseIdsByPerson.get(relation.from) ?? new Set<UUID>()
+    fromPartners.add(relation.to)
+    spouseIdsByPerson.set(relation.from, fromPartners)
+
+    const toPartners = spouseIdsByPerson.get(relation.to) ?? new Set<UUID>()
+    toPartners.add(relation.from)
+    spouseIdsByPerson.set(relation.to, toPartners)
+  }
+
+  for (const group of groups) {
+    if (group.parentIds.length !== 1 || group.childNodes.length < 2) {
+      continue
+    }
+
+    const parentNode = adjustedNodes.get(group.parentIds[0])
+
+    if (!parentNode) {
+      continue
+    }
+
+    const anchorCenterX = parentNode.x + parentNode.width / 2
+
+    const childSet = new Set(group.childIds)
+    const childNodes = group.childIds
+      .map((childId) => adjustedNodes.get(childId))
+      .filter((node): node is PositionedNode => node !== undefined)
+
+    const internalMarriagePartners = new Map<UUID, Set<UUID>>()
+    for (const relation of overlayRelations) {
+      if (relation.type !== 'marriage') {
+        continue
+      }
+
+      if (!childSet.has(relation.from) || !childSet.has(relation.to)) {
+        continue
+      }
+
+      const fromPartners = internalMarriagePartners.get(relation.from) ?? new Set<UUID>()
+      fromPartners.add(relation.to)
+      internalMarriagePartners.set(relation.from, fromPartners)
+
+      const toPartners = internalMarriagePartners.get(relation.to) ?? new Set<UUID>()
+      toPartners.add(relation.from)
+      internalMarriagePartners.set(relation.to, toPartners)
+    }
+
+    const childNodeById = new Map(childNodes.map((node) => [node.id, node]))
+    const visitedChildIds = new Set<UUID>()
+    const childBlocks: PositionedNode[][] = []
+
+    for (const childId of group.childIds) {
+      if (visitedChildIds.has(childId)) {
+        continue
+      }
+
+      const stack = [childId]
+      const blockIds: UUID[] = []
+
+      while (stack.length > 0) {
+        const currentId = stack.pop()
+
+        if (!currentId || visitedChildIds.has(currentId)) {
+          continue
+        }
+
+        visitedChildIds.add(currentId)
+        blockIds.push(currentId)
+
+        const partners = internalMarriagePartners.get(currentId)
+        if (!partners) {
+          continue
+        }
+
+        for (const partnerId of partners) {
+          if (!visitedChildIds.has(partnerId)) {
+            stack.push(partnerId)
+          }
+        }
+      }
+
+      const blockNodes = blockIds
+        .map((id) => childNodeById.get(id))
+        .filter((node): node is PositionedNode => node !== undefined)
+        .sort((left, right) => left.x - right.x || left.id.localeCompare(right.id))
+
+      if (blockNodes.length > 0) {
+        childBlocks.push(blockNodes)
+      }
+    }
+
+    const orderedBlocks = childBlocks
+      .sort((leftBlock, rightBlock) => {
+        const leftCenter = leftBlock.reduce((sum, node) => sum + node.x + node.width / 2, 0) / leftBlock.length
+        const rightCenter = rightBlock.reduce((sum, node) => sum + node.x + node.width / 2, 0) / rightBlock.length
+        return leftCenter - rightCenter || leftBlock[0].id.localeCompare(rightBlock[0].id)
+      })
+
+    const sortedChildren = orderedBlocks.flat()
+
+    if (sortedChildren.length < 2 || orderedBlocks.length === 0) {
+      continue
+    }
+
+    const hasExternalPartner = (nodeId: UUID): boolean => {
+      const partners = spouseIdsByPerson.get(nodeId)
+      return partners ? [...partners].some((partnerId) => !childSet.has(partnerId)) : false
+    }
+
+    const maxWidth = sortedChildren.reduce((max, childNode) => Math.max(max, childNode.width), 0)
+    const currentBlockCenters = orderedBlocks.map((block) => block.reduce((sum, node) => sum + node.x + node.width / 2, 0) / block.length)
+    const currentBlockSteps: number[] = []
+
+    for (let index = 1; index < currentBlockCenters.length; index += 1) {
+      currentBlockSteps.push(currentBlockCenters[index] - currentBlockCenters[index - 1])
+    }
+
+    const averageBlockStep = currentBlockSteps.length > 0
+      ? currentBlockSteps.reduce((sum, step) => sum + step, 0) / currentBlockSteps.length
+      : 0
+    const slotGap = 60
+    const marriageGap = 40
+    const partnerSpacingBoost = 28
+    const interBlockGapBase = Math.max(slotGap, averageBlockStep - maxWidth)
+
+    const blockLayouts = orderedBlocks.map((block) => {
+      const blockWidth = block.reduce((sum, node) => sum + node.width, 0) + marriageGap * Math.max(0, block.length - 1)
+      const leftNode = block[0]
+      const rightNode = block[block.length - 1]
+
+      return {
+        nodes: block,
+        width: blockWidth,
+        leftNeedsPartnerSpace: hasExternalPartner(leftNode.id),
+        rightNeedsPartnerSpace: hasExternalPartner(rightNode.id),
+      }
+    })
+
+    const blockGaps: number[] = []
+    for (let index = 0; index < blockLayouts.length - 1; index += 1) {
+      const leftBlock = blockLayouts[index]
+      const rightBlock = blockLayouts[index + 1]
+      const needsBoost = leftBlock.rightNeedsPartnerSpace || rightBlock.leftNeedsPartnerSpace
+      blockGaps.push(interBlockGapBase + (needsBoost ? partnerSpacingBoost : 0))
+    }
+
+    const totalWidth = blockLayouts.reduce((sum, block) => sum + block.width, 0)
+    const totalGap = blockGaps.reduce((sum, gap) => sum + gap, 0)
+    let cursorX = anchorCenterX - (totalWidth + totalGap) / 2
+
+    blockLayouts.forEach((block, blockIndex) => {
+      let nodeX = cursorX
+
+      block.nodes.forEach((node) => {
+        const currentNode = adjustedNodes.get(node.id)
+
+        if (!currentNode) {
+          return
+        }
+
+        adjustedNodes.set(node.id, {
+          ...currentNode,
+          x: nodeX,
+        })
+
+        nodeX += currentNode.width + marriageGap
+      })
+
+      cursorX += block.width + (blockGaps[blockIndex] ?? 0)
+    })
+
+  }
+
+  return { nodes: adjustedNodes }
+}
+
+export function alignSingleParentSingleChildNodes(layout: LayoutResult, relations: Relation[]): LayoutResult {
+  const adjustedNodes = new Map(layout.nodes)
+  const groups = buildBiologicalChildGroups(relations, layout)
+
+  for (const group of groups) {
+    if (group.parentIds.length !== 1 || group.childNodes.length !== 1) {
+      continue
+    }
+
+    const parentNode = adjustedNodes.get(group.parentIds[0])
+    const childNode = adjustedNodes.get(group.childNodes[0].id)
+
+    if (!parentNode || !childNode) {
+      continue
+    }
+
+    const parentCenterX = parentNode.x + parentNode.width / 2
+    adjustedNodes.set(childNode.id, {
+      ...childNode,
+      x: parentCenterX - childNode.width / 2,
+    })
+  }
+
+  return { nodes: adjustedNodes }
+}
+
+export function recenterMultiChildGroups(layout: LayoutResult, relations: Relation[]): LayoutResult {
+  const adjustedNodes = new Map(layout.nodes)
+  const groups = buildBiologicalChildGroups(relations, layout)
+
+  for (const group of groups) {
+    if (group.childIds.length < 2) {
+      continue
+    }
+
+    const parentNodes = group.parentIds
+      .map((parentId) => adjustedNodes.get(parentId))
+      .filter((node): node is PositionedNode => node !== undefined)
+
+    if (parentNodes.length === 0) {
+      continue
+    }
+
+    const childNodes = group.childIds
+      .map((childId) => adjustedNodes.get(childId))
+      .filter((node): node is PositionedNode => node !== undefined)
+
+    if (childNodes.length < 2) {
+      continue
+    }
+
+    const anchorX = parentNodes.length === 1
+      ? parentNodes[0].x + parentNodes[0].width / 2
+      : (Math.min(...parentNodes.map((node) => node.x + node.width / 2)) + Math.max(...parentNodes.map((node) => node.x + node.width / 2))) / 2
+    const childCenters = childNodes.map((node) => node.x + node.width / 2)
+    const childMidpointX = (Math.min(...childCenters) + Math.max(...childCenters)) / 2
+    const deltaX = anchorX - childMidpointX
+
+    if (Math.abs(deltaX) < 0.5) {
+      continue
+    }
+
+    for (const childNode of childNodes) {
+      adjustedNodes.set(childNode.id, {
+        ...childNode,
+        x: childNode.x + deltaX,
+      })
+    }
+  }
+
+  return { nodes: adjustedNodes }
+}
+
+export function symmetrizeChildGroups(
+  layout: LayoutResult,
+  relations: Relation[],
+  overlayRelations: Relation[] = [],
+): LayoutResult {
+  const adjustedNodes = new Map(layout.nodes)
+  const groups = buildBiologicalChildGroups(relations, layout)
+  const minimumGap = 20
+  const spouseByPersonId = new Map<UUID, UUID>()
+
+  for (const relation of overlayRelations.filter((candidate) => candidate.type === 'marriage')) {
+    spouseByPersonId.set(relation.from, relation.to)
+    spouseByPersonId.set(relation.to, relation.from)
+  }
+
+  for (const group of groups) {
+    if (group.childIds.length === 0) {
+      continue
+    }
+
+    const parentNodes = group.parentIds
+      .map((parentId) => adjustedNodes.get(parentId))
+      .filter((node): node is PositionedNode => node !== undefined)
+
+    if (parentNodes.length === 0) {
+      continue
+    }
+
+    const childNodes = group.childIds
+      .map((childId) => adjustedNodes.get(childId))
+      .filter((node): node is PositionedNode => node !== undefined)
+      .sort((left, right) => left.x - right.x || left.id.localeCompare(right.id))
+
+    if (childNodes.length === 0) {
+      continue
+    }
+
+    const anchorX = parentNodes.length === 1
+      ? parentNodes[0].x + parentNodes[0].width / 2
+      : (Math.min(...parentNodes.map((node) => node.x + node.width / 2)) + Math.max(...parentNodes.map((node) => node.x + node.width / 2))) / 2
+
+    const childCenters = childNodes
+      .map((node) => node.x + node.width / 2)
+      .sort((left, right) => left - right)
+    const measuredCenterGaps: number[] = []
+    for (let index = 1; index < childCenters.length; index += 1) {
+      measuredCenterGaps.push(childCenters[index] - childCenters[index - 1])
+    }
+
+    const sortedCenterGaps = measuredCenterGaps
+      .map((gap) => Math.max(gap, minimumGap))
+      .sort((left, right) => left - right)
+    const medianCenterGap = sortedCenterGaps.length === 0
+      ? minimumGap
+      : sortedCenterGaps[Math.floor(sortedCenterGaps.length / 2)]
+
+    const minimumRequiredCenterGap = childNodes.slice(1).reduce((maxGap, currentNode, index) => {
+      const previousNode = childNodes[index]
+      const requiredGap = previousNode.width / 2 + currentNode.width / 2 + minimumGap
+      return Math.max(maxGap, requiredGap)
+    }, minimumGap)
+    const centerStep = Math.max(medianCenterGap, minimumRequiredCenterGap)
+    const firstCenterX = anchorX - centerStep * ((childNodes.length - 1) / 2)
+
+    childNodes.forEach((childNode, index) => {
+      if (childNodes.length === 1) {
+        const spouseId = spouseByPersonId.get(childNode.id)
+        const spouseNode = spouseId ? adjustedNodes.get(spouseId) : undefined
+
+        if (spouseNode) {
+          const [leftNode, rightNode] = childNode.x <= spouseNode.x
+            ? [childNode, spouseNode]
+            : [spouseNode, childNode]
+          const currentGap = rightNode.x - (leftNode.x + leftNode.width)
+          const gap = Math.max(minimumGap, currentGap)
+          const pairWidth = leftNode.width + rightNode.width + gap
+          const nextLeftX = anchorX - pairWidth / 2
+          const nextRightX = nextLeftX + leftNode.width + gap
+
+          adjustedNodes.set(leftNode.id, {
+            ...leftNode,
+            x: nextLeftX,
+          })
+          adjustedNodes.set(rightNode.id, {
+            ...rightNode,
+            x: nextRightX,
+          })
+          return
+        }
+      }
+
+      const targetCenterX = firstCenterX + index * centerStep
+      const targetX = targetCenterX - childNode.width / 2
+
+      adjustedNodes.set(childNode.id, {
+        ...childNode,
+        x: targetX,
+      })
+    })
+  }
+
+  return { nodes: adjustedNodes }
+}
+
+export function alignMarriagePairsToFamilyAxis(
+  layout: LayoutResult,
+  biologicalRelations: Relation[],
+  overlayRelations: Relation[],
+): LayoutResult {
+  const adjustedNodes = new Map(layout.nodes)
+  const minimumGap = 20
+  const parentIdsByChild = new Map<UUID, UUID[]>()
+
+  for (const relation of biologicalRelations.filter((candidate) => candidate.type === 'biological_parent')) {
+    const parentIds = parentIdsByChild.get(relation.to) ?? []
+    parentIds.push(relation.from)
+    parentIds.sort((left, right) => left.localeCompare(right))
+    parentIdsByChild.set(relation.to, parentIds)
+  }
+
+  const marriages = overlayRelations
+    .filter((relation) => relation.type === 'marriage')
+    .sort((left, right) => left.id.localeCompare(right.id))
+
+  for (const marriage of marriages) {
+    const firstNode = adjustedNodes.get(marriage.from)
+    const secondNode = adjustedNodes.get(marriage.to)
+
+    if (!firstNode || !secondNode) {
+      continue
+    }
+
+    const candidateAxes: number[] = []
+    for (const node of [firstNode, secondNode]) {
+      const parentIds = parentIdsByChild.get(node.id) ?? []
+      if (parentIds.length === 0) {
+        continue
+      }
+
+      const parentNodes = parentIds
+        .map((parentId) => adjustedNodes.get(parentId))
+        .filter((parentNode): parentNode is PositionedNode => parentNode !== undefined)
+
+      if (parentNodes.length !== parentIds.length) {
+        continue
+      }
+
+      const parentCenters = parentNodes.map((parentNode) => parentNode.x + parentNode.width / 2)
+      candidateAxes.push((Math.min(...parentCenters) + Math.max(...parentCenters)) / 2)
+    }
+
+    if (candidateAxes.length === 0) {
+      continue
+    }
+
+    const axisX = candidateAxes.reduce((sum, axis) => sum + axis, 0) / candidateAxes.length
+    const [leftNode, rightNode] = firstNode.x <= secondNode.x ? [firstNode, secondNode] : [secondNode, firstNode]
+    const currentGap = rightNode.x - (leftNode.x + leftNode.width)
+    const gap = Math.max(minimumGap, currentGap)
+    const pairWidth = leftNode.width + rightNode.width + gap
+    const nextLeftX = axisX - pairWidth / 2
+
+    adjustedNodes.set(leftNode.id, {
+      ...leftNode,
+      x: nextLeftX,
+    })
+    adjustedNodes.set(rightNode.id, {
+      ...rightNode,
+      x: nextLeftX + leftNode.width + gap,
+    })
+  }
+
+  return { nodes: adjustedNodes }
+}
+
+export function alignTwoParentPairsToChildAxis(
+  layout: LayoutResult,
+  relations: Relation[],
+  overlayRelations: Relation[],
+): LayoutResult {
+  const adjustedNodes = new Map(layout.nodes)
+  const groups = buildBiologicalChildGroups(relations, { nodes: adjustedNodes })
+  const minimumGap = 20
+  const marriedPairKeys = new Set<string>()
+
+  for (const relation of overlayRelations.filter((candidate) => candidate.type === 'marriage')) {
+    const left = relation.from < relation.to ? relation.from : relation.to
+    const right = relation.from < relation.to ? relation.to : relation.from
+    marriedPairKeys.add(`${left}|${right}`)
+  }
+
+  for (const group of groups) {
+    if (group.parentIds.length !== 2) {
+      continue
+    }
+
+    const [firstParentId, secondParentId] = group.parentIds
+    const leftParentId = firstParentId < secondParentId ? firstParentId : secondParentId
+    const rightParentId = firstParentId < secondParentId ? secondParentId : firstParentId
+    const pairKey = `${leftParentId}|${rightParentId}`
+
+    if (!marriedPairKeys.has(pairKey)) {
+      continue
+    }
+
+    const firstParentNode = adjustedNodes.get(firstParentId)
+    const secondParentNode = adjustedNodes.get(secondParentId)
+    if (!firstParentNode || !secondParentNode) {
+      continue
+    }
+
+    const childNodes = group.childIds
+      .map((childId) => adjustedNodes.get(childId))
+      .filter((node): node is PositionedNode => node !== undefined)
+
+    if (childNodes.length === 0) {
+      continue
+    }
+
+    const childCenters = childNodes.map((childNode) => childNode.x + childNode.width / 2)
+    const anchorX = (Math.min(...childCenters) + Math.max(...childCenters)) / 2
+    const [leftNode, rightNode] = firstParentNode.x <= secondParentNode.x
+      ? [firstParentNode, secondParentNode]
+      : [secondParentNode, firstParentNode]
+    const currentGap = rightNode.x - (leftNode.x + leftNode.width)
+    const gap = Math.max(minimumGap, currentGap)
+    const pairWidth = leftNode.width + rightNode.width + gap
+    const nextLeftX = anchorX - pairWidth / 2
+
+    adjustedNodes.set(leftNode.id, {
+      ...leftNode,
+      x: nextLeftX,
+    })
+    adjustedNodes.set(rightNode.id, {
+      ...rightNode,
+      x: nextLeftX + leftNode.width + gap,
+    })
+  }
+
+  return { nodes: adjustedNodes }
+}
+
+export function alignMarriagePairs(
+  layout: LayoutResult,
+  relations: Relation[],
+  anchoredNodeIds: Set<UUID>,
+  biologicalRelations: Relation[] = [],
+): LayoutResult {
+  const adjustedNodes = new Map(layout.nodes)
+  const targetGap = 40
+  const rowTolerance = 14
+  const sidePadding = 8
+  const biologicalDegree = new Map<UUID, number>()
+
+  for (const relation of biologicalRelations.filter((candidate) => candidate.type === 'biological_parent')) {
+    biologicalDegree.set(relation.from, (biologicalDegree.get(relation.from) ?? 0) + 1)
+    biologicalDegree.set(relation.to, (biologicalDegree.get(relation.to) ?? 0) + 1)
+  }
 
   for (const relation of relations.filter((candidate) => candidate.type === 'marriage').sort((left, right) => left.id.localeCompare(right.id))) {
     const firstNode = adjustedNodes.get(relation.from)
@@ -578,6 +1518,85 @@ export function alignMarriagePairs(layout: LayoutResult, relations: Relation[], 
     const currentGap = rightNode.x - (leftNode.x + leftNode.width)
 
     if (Math.abs(currentGap - targetGap) < 1) {
+      continue
+    }
+
+    const firstDegree = biologicalDegree.get(firstNode.id) ?? 0
+    const secondDegree = biologicalDegree.get(secondNode.id) ?? 0
+
+    let anchorNode = firstNode
+    let movingNode = secondNode
+
+    if (anchoredNodeIds.has(secondNode.id) && !anchoredNodeIds.has(firstNode.id)) {
+      anchorNode = secondNode
+      movingNode = firstNode
+    } else if (!anchoredNodeIds.has(firstNode.id) && !anchoredNodeIds.has(secondNode.id) && secondDegree > firstDegree) {
+      anchorNode = secondNode
+      movingNode = firstNode
+    }
+
+    const candidateY = anchorNode.y
+    const rowNodes = [...adjustedNodes.values()].filter((node) => {
+      if (node.id === anchorNode.id || node.id === movingNode.id) {
+        return false
+      }
+
+      const centerYDelta = Math.abs((node.y + node.height / 2) - (candidateY + anchorNode.height / 2))
+      return centerYDelta <= rowTolerance
+    })
+
+    const candidateRightX = anchorNode.x + anchorNode.width + targetGap
+    const candidateLeftX = anchorNode.x - targetGap - movingNode.width
+
+    const isCandidateFree = (candidateX: number) => !rowNodes.some((node) => {
+      const overlapX = candidateX < node.x + node.width + sidePadding && candidateX + movingNode.width > node.x - sidePadding
+      const overlapY = candidateY < node.y + node.height + sidePadding && candidateY + movingNode.height > node.y - sidePadding
+      return overlapX && overlapY
+    })
+
+    const rightFree = isCandidateFree(candidateRightX)
+    const leftFree = isCandidateFree(candidateLeftX)
+
+    if (rightFree || leftFree) {
+      const nextX = rightFree ? candidateRightX : candidateLeftX
+      adjustedNodes.set(movingNode.id, {
+        ...movingNode,
+        x: nextX,
+        y: candidateY,
+      })
+      continue
+    }
+
+    const candidateX = candidateRightX
+    const verticalOffsets = [movingNode.height + 18, 2 * (movingNode.height + 18), 3 * (movingNode.height + 18)]
+    let placed = false
+
+    for (const offset of verticalOffsets) {
+      const nextY = candidateY + offset
+      const collision = [...adjustedNodes.values()].some((node) => {
+        if (node.id === anchorNode.id || node.id === movingNode.id) {
+          return false
+        }
+
+        const overlapX = candidateX < node.x + node.width + sidePadding && candidateX + movingNode.width > node.x - sidePadding
+        const overlapY = nextY < node.y + node.height + sidePadding && nextY + movingNode.height > node.y - sidePadding
+        return overlapX && overlapY
+      })
+
+      if (collision) {
+        continue
+      }
+
+      adjustedNodes.set(movingNode.id, {
+        ...movingNode,
+        x: candidateX,
+        y: nextY,
+      })
+      placed = true
+      break
+    }
+
+    if (placed) {
       continue
     }
 
@@ -617,9 +1636,13 @@ export function alignMarriagePairs(layout: LayoutResult, relations: Relation[], 
 export function buildSpouseProjectionState(
   validation: ValidationResult,
   layout: LayoutResult,
-  selectedIds: UUID[],
+  _selectedIds: UUID[],
   spouseOwnerOverrides: Record<string, UUID>,
+  options?: {
+    collapseChildEdges?: boolean
+  },
 ): SpouseProjectionState {
+  const collapseChildEdges = options?.collapseChildEdges ?? true
   const hiddenChildEdgeKeys = new Set<string>()
   const projectedMarriageIds = new Set<UUID>()
   const nodes: SpouseProjectionNode[] = []
@@ -629,9 +1652,6 @@ export function buildSpouseProjectionState(
     width: node.width,
     height: node.height,
   }))
-  const rankedNodes = Array.from(layout.nodes.values()).sort((left, right) => left.y - right.y || left.x - right.x || left.id.localeCompare(right.id))
-  const rankById = new Map(rankedNodes.map((node, index) => [node.id, index]))
-
   const marriages = validation.validOverlayRelations.filter((relation) => relation.type === 'marriage').sort((left, right) => left.id.localeCompare(right.id))
 
   for (const relation of marriages) {
@@ -647,52 +1667,55 @@ export function buildSpouseProjectionState(
     }
 
     const sharedChildren = getSharedChildren(relation.from, relation.to, validation)
-    const overrideOwnerId = spouseOwnerOverrides[relation.id]
-    const selectedOwnerId = selectedIds.find((selectedId) => selectedId === relation.from || selectedId === relation.to)
-    const ownerId = overrideOwnerId === relation.from || overrideOwnerId === relation.to ? overrideOwnerId : selectedOwnerId ?? defaultMarriageOwnerId(relation, rankById)
+    const ownerId = resolveProjectedMarriageOwner({
+      relation,
+      validation,
+      spouseOwnerOverrides,
+    })
 
     projectedMarriageIds.add(relation.id)
 
-    for (const childId of sharedChildren) {
-      const collapsedParentId = ownerId === relation.from ? relation.to : relation.from
-      hiddenChildEdgeKeys.add(`${collapsedParentId}|${childId}`)
+    if (collapseChildEdges) {
+      for (const childId of sharedChildren) {
+        const collapsedParentId = ownerId === relation.from ? relation.to : relation.from
+        hiddenChildEdgeKeys.add(`${collapsedParentId}|${childId}`)
+      }
     }
 
     const width = 152
     const height = 54
     const horizontalGap = 28
 
-    for (const anchorId of [relation.from, relation.to] as const) {
-      const anchorNode = layout.nodes.get(anchorId)
-      const partnerId = anchorId === relation.from ? relation.to : relation.from
-      const partnerNode = layout.nodes.get(partnerId)
+    const anchorId = ownerId
+    const anchorNode = layout.nodes.get(anchorId)
+    const partnerId = anchorId === relation.from ? relation.to : relation.from
+    const partnerNode = layout.nodes.get(partnerId)
 
-      if (!anchorNode || !partnerNode) {
-        continue
-      }
-
-      const side = partnerNode.x >= anchorNode.x ? 'right' : 'left'
-      const placement = findProjectionPlacement(anchorNode, side, width, height, horizontalGap, occupiedRects)
-
-      occupiedRects.push({
-        x: placement.x,
-        y: placement.y,
-        width,
-        height,
-      })
-
-      nodes.push({
-        relationId: relation.id,
-        ownerId: anchorId,
-        companionId: partnerId,
-        sharedChildren,
-        x: placement.x,
-        y: placement.y,
-        width,
-        height,
-        side,
-      })
+    if (!anchorNode || !partnerNode) {
+      continue
     }
+
+    const side = partnerNode.x >= anchorNode.x ? 'right' : 'left'
+    const placement = findProjectionPlacement(anchorNode, side, width, height, horizontalGap, occupiedRects)
+
+    occupiedRects.push({
+      x: placement.x,
+      y: placement.y,
+      width,
+      height,
+    })
+
+    nodes.push({
+      relationId: relation.id,
+      ownerId: anchorId,
+      companionId: partnerId,
+      sharedChildren,
+      x: placement.x,
+      y: placement.y,
+      width,
+      height,
+      side,
+    })
   }
 
   return { hiddenChildEdgeKeys, projectedMarriageIds, nodes }
@@ -748,15 +1771,62 @@ function getSharedChildren(firstParentId: UUID, secondParentId: UUID, validation
   return secondChildren.filter((childId) => firstChildren.has(childId)).sort((left, right) => left.localeCompare(right))
 }
 
-function defaultMarriageOwnerId(relation: Relation, rankById: Map<UUID, number>): UUID {
-  const fromRank = rankById.get(relation.from) ?? Number.MAX_SAFE_INTEGER
-  const toRank = rankById.get(relation.to) ?? Number.MAX_SAFE_INTEGER
+function resolveProjectedMarriageOwner({
+  relation,
+  validation,
+  spouseOwnerOverrides,
+}: {
+  relation: Relation
+  validation: ValidationResult
+  spouseOwnerOverrides: Record<string, UUID>
+}): UUID {
+  const continuationOwner = relation.attributes?.layout?.continuationOwner
 
-  if (fromRank !== toRank) {
-    return fromRank < toRank ? relation.from : relation.to
+  if (continuationOwner === 'from') {
+    return relation.from
   }
 
-  return relation.from.localeCompare(relation.to) <= 0 ? relation.from : relation.to
+  if (continuationOwner === 'to') {
+    return relation.to
+  }
+
+  const overrideOwnerId = spouseOwnerOverrides[relation.id]
+
+  if (overrideOwnerId === relation.from || overrideOwnerId === relation.to) {
+    return overrideOwnerId
+  }
+
+  const fromGender = normalizeGender(validation.personById.get(relation.from)?.gender)
+  const toGender = normalizeGender(validation.personById.get(relation.to)?.gender)
+
+  if (fromGender === 'male' && toGender !== 'male') {
+    return relation.from
+  }
+
+  if (toGender === 'male' && fromGender !== 'male') {
+    return relation.to
+  }
+
+  // Deterministic fallback when no override and no clear gender-based owner exists.
+  return relation.from
+}
+
+function normalizeGender(value: string | null | undefined): 'male' | 'female' | 'other' {
+  if (!value) {
+    return 'other'
+  }
+
+  const normalized = value.trim().toLowerCase()
+
+  if (normalized === 'male' || normalized === 'm' || normalized === 'mann' || normalized === 'männlich') {
+    return 'male'
+  }
+
+  if (normalized === 'female' || normalized === 'f' || normalized === 'frau' || normalized === 'weiblich') {
+    return 'female'
+  }
+
+  return 'other'
 }
 
 export function expandCameraBounds(camera: CameraView, projections: SpouseProjectionNode[], houseAnchors: HouseAnchor[]): CameraView {

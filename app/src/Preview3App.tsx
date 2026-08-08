@@ -20,8 +20,10 @@ import {
 import {
   buildPreview3RenderedTree,
   buildPreview3TreePipeline,
+  type Preview3TreeDebugData,
 } from './preview3/treePipeline'
 import { buildPreview3ViewState } from './preview3/analysis'
+import { getPreview3ModeDefinition, preview3ModeOptions } from './preview3/modes'
 import {
   defaultLeftPanel,
   defaultPageTheme,
@@ -73,6 +75,9 @@ type PanState = {
 
 const STORAGE_KEY = 'legendarium.preview3.preferences.v1'
 const COMPACT_BREAKPOINT = 1024
+const PNG_EXPORT_SCALE = 4
+const PNG_EXPORT_MAX_EDGE = 6400
+const PNG_EXPORT_MIN_EDGE = 1800
 
 const fontOptions = [
   'Aptos, Segoe UI Variable, Trebuchet MS, sans-serif',
@@ -241,7 +246,7 @@ function isFadeMode(value: unknown): value is FadeMode {
 }
 
 function isPreviewTreeMode(value: unknown): value is PreviewTreeMode {
-  return value === 'mode0' || value === 'mode1' || value === 'mode2'
+  return value === 'mode0' || value === 'mode1' || value === 'mode2' || value === 'modeA' || value === 'modeC' || value === 'modeD' || value === 'modeR' || value === 'modeR2'
 }
 
 function sanitizeThemeState(input: unknown, fallback: ThemeState): ThemeState {
@@ -306,6 +311,7 @@ function normalizePersistedState(input: PersistedState): PersistedState {
     datasetName,
     activePage,
     treeMode: isPreviewTreeMode(input.treeMode) ? input.treeMode : 'mode0',
+    debugOverlaysEnabled: Boolean(input.debugOverlaysEnabled),
     pageTheme: sanitizeThemeState(input.pageTheme, defaultPageTheme),
     treeTheme: sanitizeThemeState(input.treeTheme, defaultTreeTheme),
     leftPanel: sanitizePanelState(input.leftPanel, defaultLeftPanel),
@@ -363,8 +369,11 @@ async function exportSvgAsPng(svgElement: SVGSVGElement, filename: string) {
   await new Promise<void>((resolve, reject) => {
     const image = new Image()
     image.onload = () => {
-      const width = svgElement.clientWidth || 1600
-      const height = svgElement.clientHeight || 900
+      const baseWidth = svgElement.clientWidth || 1600
+      const baseHeight = svgElement.clientHeight || 900
+      const scale = Math.min(PNG_EXPORT_SCALE, PNG_EXPORT_MAX_EDGE / Math.max(baseWidth, baseHeight))
+      const width = Math.max(1, Math.round(baseWidth * scale))
+      const height = Math.max(1, Math.round(baseHeight * scale))
       const canvas = document.createElement('canvas')
       canvas.width = width
       canvas.height = height
@@ -403,11 +412,12 @@ async function exportSvgAsPng(svgElement: SVGSVGElement, filename: string) {
 }
 
 async function exportSvgWithViewBoxAsPng(svgElement: SVGSVGElement, filename: string, viewBox: string) {
+  const { width: exportWidth, height: exportHeight } = getHighResExportDimensions(viewBox)
   const clone = svgElement.cloneNode(true) as SVGSVGElement
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
   clone.setAttribute('viewBox', viewBox)
-  clone.setAttribute('width', '2200')
-  clone.setAttribute('height', '1400')
+  clone.setAttribute('width', String(exportWidth))
+  clone.setAttribute('height', String(exportHeight))
   clone.setAttribute('style', collectSvgThemeVariables(svgElement))
 
   const serialized = new XMLSerializer().serializeToString(clone)
@@ -418,8 +428,8 @@ async function exportSvgWithViewBoxAsPng(svgElement: SVGSVGElement, filename: st
     const image = new Image()
     image.onload = () => {
       const canvas = document.createElement('canvas')
-      canvas.width = 2200
-      canvas.height = 1400
+      canvas.width = exportWidth
+      canvas.height = exportHeight
       const context = canvas.getContext('2d')
 
       if (!context) {
@@ -452,6 +462,35 @@ async function exportSvgWithViewBoxAsPng(svgElement: SVGSVGElement, filename: st
     }
     image.src = url
   })
+}
+
+function getHighResExportDimensions(viewBox: string) {
+  const [, , widthToken = '2200', heightToken = '1400'] = viewBox.trim().split(/\s+/)
+  const viewBoxWidth = Math.max(1, Number(widthToken) || 2200)
+  const viewBoxHeight = Math.max(1, Number(heightToken) || 1400)
+  const longestSide = Math.max(viewBoxWidth, viewBoxHeight)
+  const scale = Math.min(PNG_EXPORT_SCALE, PNG_EXPORT_MAX_EDGE / longestSide)
+  const scaledWidth = Math.round(viewBoxWidth * scale)
+  const scaledHeight = Math.round(viewBoxHeight * scale)
+
+  if (scaledWidth >= PNG_EXPORT_MIN_EDGE || scaledHeight >= PNG_EXPORT_MIN_EDGE) {
+    return {
+      width: Math.min(PNG_EXPORT_MAX_EDGE, Math.max(1, scaledWidth)),
+      height: Math.min(PNG_EXPORT_MAX_EDGE, Math.max(1, scaledHeight)),
+    }
+  }
+
+  if (viewBoxWidth >= viewBoxHeight) {
+    return {
+      width: PNG_EXPORT_MIN_EDGE,
+      height: Math.max(1, Math.round((viewBoxHeight / viewBoxWidth) * PNG_EXPORT_MIN_EDGE)),
+    }
+  }
+
+  return {
+    width: Math.max(1, Math.round((viewBoxWidth / viewBoxHeight) * PNG_EXPORT_MIN_EDGE)),
+    height: PNG_EXPORT_MIN_EDGE,
+  }
 }
 
 function collectSvgThemeVariables(svgElement: SVGSVGElement) {
@@ -540,6 +579,7 @@ export default function Preview3App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [datasetName, setDatasetName] = useState<DatasetName>(storedState?.datasetName ?? 'demo')
   const [treeMode, setTreeMode] = useState<PreviewTreeMode>(storedState?.treeMode ?? 'mode0')
+  const [debugOverlaysEnabled, setDebugOverlaysEnabled] = useState(Boolean(storedState?.debugOverlaysEnabled))
   const [pageTheme, setPageTheme] = useState<ThemeState>(storedState?.pageTheme ?? defaultPageTheme)
   const [treeTheme, setTreeTheme] = useState<ThemeState>(storedState?.treeTheme ?? defaultTreeTheme)
   const [leftPanel, setLeftPanel] = useState<PanelState>(storedState?.leftPanel ?? defaultLeftPanel)
@@ -555,6 +595,7 @@ export default function Preview3App() {
   const [searchQuery, setSearchQuery] = useState(storedState?.searchQuery ?? '')
   const [loadedDataset, setLoadedDataset] = useState<LoadedDataset | null>(null)
   const [graphState, setGraphState] = useState<GraphMvpState | null>(null)
+  const [treeDebugData, setTreeDebugData] = useState<Preview3TreeDebugData | null>(null)
   const [camera, setCamera] = useState<CameraView | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -577,6 +618,7 @@ export default function Preview3App() {
   const latestCameraRef = useRef<CameraView | null>(null)
   const preferredFocusIdRef = useRef<UUID | null>(null)
   const panelId = useId().replace(/:/g, '-')
+  const activeModeDefinition = useMemo(() => getPreview3ModeDefinition(treeMode), [treeMode])
   const viewState = useMemo(() => {
     if (!graphState) {
       return null
@@ -649,13 +691,14 @@ export default function Preview3App() {
       setErrorMessage(null)
 
       try {
-        const { graphState: nextGraphState, initialCamera } = await buildPreview3TreePipeline(loadedDataset, treeMode)
+        const { graphState: nextGraphState, initialCamera, debugData } = await buildPreview3TreePipeline(loadedDataset, activeModeDefinition)
 
         if (!isMounted) {
           return
         }
 
         setGraphState(nextGraphState)
+        setTreeDebugData(debugData)
         setCamera(
           preserveCameraForTreeRebuild({
             previousCamera: latestCameraRef.current,
@@ -680,7 +723,7 @@ export default function Preview3App() {
     return () => {
       isMounted = false
     }
-  }, [loadedDataset, treeMode])
+  }, [activeModeDefinition, loadedDataset])
 
   useEffect(() => {
     const handleResize = () => {
@@ -763,6 +806,7 @@ export default function Preview3App() {
         datasetName,
         activePage,
         treeMode,
+        debugOverlaysEnabled,
         pageTheme,
         treeTheme,
         leftPanel,
@@ -776,7 +820,7 @@ export default function Preview3App() {
         searchQuery,
       } satisfies PersistedState),
     )
-  }, [activePage, datasetName, fadeMode, filterLogic, filters, leftPanel, legendMinimized, pageTheme, rightPanel, searchQuery, showInTree, treeMode, treeTheme, wideMode])
+  }, [activePage, datasetName, debugOverlaysEnabled, fadeMode, filterLogic, filters, leftPanel, legendMinimized, pageTheme, rightPanel, searchQuery, showInTree, treeMode, treeTheme, wideMode])
 
   useEffect(() => {
     if (!dragState) {
@@ -1077,7 +1121,7 @@ export default function Preview3App() {
     selectedIds,
     spouseOwnerOverrides,
     shouldHideNode,
-    renderMode: treeMode,
+    modeDefinition: activeModeDefinition,
   })
   const {
     spouseProjection,
@@ -1414,6 +1458,7 @@ export default function Preview3App() {
     setFadeMode('dim')
     setFilters(emptyFilters)
     setSearchQuery('')
+    setDebugOverlaysEnabled(false)
     setSelectionA(null)
     setSelectionB(null)
     setFocusedPersonId(null)
@@ -1844,6 +1889,8 @@ export default function Preview3App() {
         filteredOutNodeIds={filteredOutNodeIds}
         highlightedEdgeIds={highlightedEdgeIds}
         houseAnchors={houseAnchors}
+        debugData={treeDebugData}
+        debugOverlaysEnabled={debugOverlaysEnabled}
         cameraView={cameraView}
         layout={layout}
         lcaAnalysis={lcaAnalysis}
@@ -1861,6 +1908,8 @@ export default function Preview3App() {
         startCanvasPan={startCanvasPan}
         treeTheme={treeTheme}
         treeMode={treeMode}
+        modeDefinition={activeModeDefinition}
+        modeOptions={preview3ModeOptions}
         validation={validation}
         wideMode={wideMode}
         canvasViewportRef={canvasViewportRef}
@@ -1940,6 +1989,60 @@ export default function Preview3App() {
             <span>Reset settings</span>
           </button>
         </section>
+        {treeDebugData ? (
+          <section className="preview3-page-card-block stats">
+            <div className="preview3-section-heading">
+              <h3>Debug</h3>
+              <span>{treeDebugData.modeId}</span>
+            </div>
+            <label className="preview3-debug-toggle">
+              <input
+                type="checkbox"
+                checked={debugOverlaysEnabled}
+                onChange={(event) => setDebugOverlaysEnabled(event.target.checked)}
+              />
+              <span>Show debug overlays in tree and PNG export</span>
+            </label>
+            <div className="preview3-debug-summary">
+              <p><strong>{treeDebugData.modeLabel}</strong></p>
+              <p className="preview3-helper-text">{treeDebugData.modeSummary}</p>
+            </div>
+            <div className="preview3-debug-group">
+              <h4>Strategy summary</h4>
+              <ul className="preview3-inline-list">
+                {treeDebugData.strategySummary.map((entry) => <li key={entry}>{entry}</li>)}
+              </ul>
+            </div>
+            <div className="preview3-debug-group">
+              <h4>Active stages</h4>
+              <ul className="preview3-inline-list">
+                {treeDebugData.activeStages.map((stage) => <li key={stage}>{stage}</li>)}
+              </ul>
+            </div>
+            <div className="preview3-debug-group">
+              <h4>House anchors</h4>
+              <div className="preview3-debug-house-list">
+                {treeDebugData.houseAnchors.map((entry) => (
+                  <article key={entry.houseId} className="preview3-debug-house-card">
+                    <div className="preview3-section-heading compact">
+                      <h4>{entry.displayName}</h4>
+                      <span>{entry.rootNodeIds.length} roots</span>
+                    </div>
+                    <p>Ideal / placed / drift: {Math.round(entry.idealCenterX)} / {Math.round(entry.placedCenterX)} / {Math.round(entry.driftX)}</p>
+                    <p>Reserved span / cluster width: {Math.round(entry.reservedSpan)} / {Math.round(entry.clusterWidth)}</p>
+                    <p>House yOffset: {entry.houseYOffset}</p>
+                    <p>Root nodes: {entry.rootNodeIds.map((nodeId) => validation.personById.get(nodeId)?.name ?? nodeId).join(', ')}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+            <div className="preview3-debug-group">
+              <h4>Applied offsets</h4>
+              <p>House offsets: {treeDebugData.appliedHouseOffsets.length === 0 ? 'none' : treeDebugData.appliedHouseOffsets.map((entry) => `${entry.displayName} (${entry.yOffset})`).join(', ')}</p>
+              <p>Person offsets: {treeDebugData.appliedPersonOffsets.length === 0 ? 'none' : treeDebugData.appliedPersonOffsets.map((entry) => `${entry.name} (${entry.yOffset})`).join(', ')}</p>
+            </div>
+          </section>
+        ) : null}
         <section className="preview3-page-card-block stats">
           <div className="preview3-section-heading">
             <h3>Warnings</h3>
