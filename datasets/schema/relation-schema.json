@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "legendarium-explorer-relation-schema.json",
+  "title": "LegendariumExplorer Relation Schema",
+  "description": "Schema for validating relationship records in LegendariumExplorer datasets",
+  "type": "object",
+  "required": ["id", "type", "from", "to"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier (UUID v4)",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "examples": ["550e8400-e29b-41d4-a716-446655440000"]
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "biological_parent",
+        "biological_child",
+        "adoptive_parent",
+        "adoptive_child",
+        "spouse",
+        "sibling",
+        "half_sibling",
+        "step_parent",
+        "step_child",
+        "grandparent",
+        "grandchild",
+        "uncle",
+        "aunt",
+        "nephew",
+        "niece",
+        "cousin",
+        "ancestor",
+        "descendant",
+        "teacher",
+        "student",
+        "lord",
+        "vassal",
+        "friend",
+        "ally",
+        "enemy"
+      ],
+      "description": "Type of relationship"
+    },
+    "from": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the source person (the one who has the relation)",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "to": {
+      "type": "string",
+      "format": "uuid",
+      "description": "ID of the target person (the one the relation points to)",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "attributes": {
+      "type": "object",
+      "description": "Optional additional attributes for the relationship",
+      "properties": {
+        "notes": {
+          "type": "string",
+          "description": "Additional notes about this relationship"
+        },
+        "source": {
+          "type": "string",
+          "description": "Source reference for this relationship"
+        },
+        "canonicity": {
+          "type": "string",
+          "enum": ["canonical", "uncertain", "non-canonical", "fanon"],
+          "description": "Canonical status of this relationship"
+        }
+      }
+    }
+  }
+}

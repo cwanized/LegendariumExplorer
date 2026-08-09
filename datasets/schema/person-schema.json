@@ -1,0 +1,134 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "legendarium-explorer-person-schema.json",
+  "title": "LegendariumExplorer Person Schema",
+  "description": "Schema for validating person records in LegendariumExplorer datasets",
+  "type": "object",
+  "required": ["id", "name", "gender", "species", "birth", "death", "houses", "sourceLinks", "metadata"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier (UUID v4)",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "examples": ["0469c9c1-58f0-4c19-a6ab-ca79f103c64f"]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Full name of the person",
+      "examples": ["Haleth", "Tar-Minastir", "Ar-Adûnakhôr"]
+    },
+    "gender": {
+      "type": "string",
+      "enum": ["male", "female", "unknown"],
+      "description": "Gender of the person",
+      "examples": ["male", "female"]
+    },
+    "species": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Species or race of the person",
+      "examples": ["Man", "Elf", "Dwarf", "Maia", "Vala", "Hobbit", "Orc"]
+    },
+    "birth": {
+      "type": ["object", "null"],
+      "properties": {
+        "era": {
+          "type": "string",
+          "description": "Era of birth",
+          "examples": ["First Age", "Second Age", "Third Age", "Fourth Age"]
+        },
+        "year": {
+          "type": ["integer", "null"],
+          "description": "Year of birth within the era",
+          "minimum": -50000,
+          "maximum": 50000,
+          "examples": [451, 1370, null]
+        }
+      },
+      "required": ["era"]
+    },
+    "death": {
+      "type": ["object", "null"],
+      "properties": {
+        "era": {
+          "type": "string",
+          "description": "Era of death",
+          "examples": ["First Age", "Second Age", "Third Age", "Fourth Age"]
+        },
+        "year": {
+          "type": ["integer", "null"],
+          "description": "Year of death within the era",
+          "minimum": -50000,
+          "maximum": 50000,
+          "examples": [451, null]
+        }
+      },
+      "required": ["era"]
+    },
+    "houses": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "List of houses or lineages the person belongs to",
+      "examples": [["House of Haleth"], ["Dunedain"], ["House of Bëor", "Dunedain"]]
+    },
+    "sourceLinks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "url"],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display label for the source",
+            "examples": ["Tolkien Gateway", "Fandom"]
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to the source",
+            "examples": ["https://tolkiengateway.net/wiki/Haleth"]
+          }
+        }
+      },
+      "description": "List of external source references"
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["description"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Biographical description of the person"
+        },
+        "canonicity": {
+          "type": "string",
+          "enum": ["canonical", "uncertain", "non-canonical", "fanon"],
+          "description": "Canonical status of this person"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes or comments"
+        }
+      }
+    },
+    "portraitUrl": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL to a portrait image",
+      "examples": ["https://example.com/portrait.jpg"]
+    },
+    "yOffset": {
+      "type": "integer",
+      "description": "Vertical offset for tree visualization (multiples of 72)",
+      "examples": [0, 72, 144, -72]
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "a5def383-7ae8-4a1e-bff9-615e9c80e6e7",
+  "name": "Beren Erchamion",
+  "gender": "male",
+  "birth": {
+    "era": "First Age",
+    "year": 432
+  },
+  "death": {
+    "era": null,
+    "year": null
+  },
+  "houses": [
+    "House of Bëor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Beren"
+    }
+  ],
+  "metadata": {
+    "description": "Son of Barahir"
+  },
+  "species": "Man",
+  "portraitUrl": ""
+}

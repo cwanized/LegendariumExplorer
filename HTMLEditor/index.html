@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LegendariumExplorer Data Editor</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="data.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>⚔️ LegendariumExplorer Data Editor</h1>
+      <p>Personen browsen, editieren, Beziehungen verwalten</p>
+      <div style="display: flex; gap: 1rem; justify-content: center; align-items: center; margin-top: 1rem; flex-wrap: wrap;">
+        <div class="form-group" style="margin: 0;">
+          <label for="datasetSelect" style="color: var(--text-secondary); font-size: 0.85rem;">📁 Datensatz:</label>
+          <select id="datasetSelect" style="padding: 0.5rem 1rem; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 0.9rem; cursor: pointer;">
+            <!-- Wird per JS gefüllt -->
+          </select>
+        </div>
+        <div id="backendStatus" style="padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #ff4466; display: inline-block;"></span>
+          <span>Backend: Offline</span>
+        </div>
+        <button class="btn btn-primary" id="themeToggle">🌓 Theme wechseln</button>
+      </div>
+    </header>
+
+    <div class="main-grid">
+      <!-- Linke Spalte: Person List + Validation -->
+      <div class="left-column">
+        <div class="panel">
+          <h2>📜 Personen</h2>
+          <div class="search-box">
+            <input type="text" id="personSearch" placeholder="Suche nach Name oder ID...">
+          </div>
+          <div class="dropdown-container">
+            <input type="text" id="personDropdown" placeholder="Oder auswählen..." readonly>
+            <div class="dropdown-results" id="personDropdownResults"></div>
+          </div>
+          <ul class="person-list" id="personList">
+            <!-- Wird per JS gefüllt -->
+          </ul>
+        </div>
+        
+        <!-- Datenvalidierung unter Personen -->
+        <div class="panel validation-panel" id="validationPanel">
+          <h2>✅ Datenvalidierung</h2>
+          <div id="validationResults">
+            <p style="color: var(--text-secondary); font-size: 0.85rem;">Wähle eine Person um Validierung zu sehen...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mittlere Spalte: Detail View & Edit -->
+      <div class="panel">
+        <h2>📋 Steckbrief</h2>
+        <div id="detailView" class="detail-view">
+          <p style="color: var(--text-secondary);">Wähle eine Person aus der Liste...</p>
+        </div>
+      </div>
+
+      <!-- Rechte Spalte: Relations -->
+      <div class="panel">
+        <h2>🔗 Beziehungen</h2>
+        <div id="familyTreePreview" class="family-tree-preview">
+          <p style="color: var(--text-secondary); font-size: 0.85rem;">Wähle eine Person für Stammbaum-Vorschau...</p>
+        </div>
+        <div id="relationsView">
+          <p style="color: var(--text-secondary);">Wähle eine Person um Beziehungen zu sehen...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+</body>
+</html>

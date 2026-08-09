@@ -1,0 +1,23 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440030",
+  "name": "Bregolas",
+  "gender": "male",
+  "birth": null,
+  "death": {
+    "era": "First Age",
+    "year": 455
+  },
+  "houses": [
+    "House of Bëor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Bregolas"
+    }
+  ],
+  "metadata": {
+    "description": "Son of Bregor, father of Baragund and Belegund."
+  },
+  "species": "Man"
+}
