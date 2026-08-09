@@ -311,6 +311,7 @@ function normalizePersistedState(input: PersistedState): PersistedState {
     datasetName,
     activePage,
     treeMode: isPreviewTreeMode(input.treeMode) ? input.treeMode : 'mode0',
+    overlayEnabled: typeof input.overlayEnabled === 'boolean' ? input.overlayEnabled : true,
     debugOverlaysEnabled: Boolean(input.debugOverlaysEnabled),
     pageTheme: sanitizeThemeState(input.pageTheme, defaultPageTheme),
     treeTheme: sanitizeThemeState(input.treeTheme, defaultTreeTheme),
@@ -579,6 +580,7 @@ export default function Preview3App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [datasetName, setDatasetName] = useState<DatasetName>(storedState?.datasetName ?? 'demo')
   const [treeMode, setTreeMode] = useState<PreviewTreeMode>(storedState?.treeMode ?? 'mode0')
+  const [overlayEnabled, setOverlayEnabled] = useState(storedState?.overlayEnabled ?? true)
   const [debugOverlaysEnabled, setDebugOverlaysEnabled] = useState(Boolean(storedState?.debugOverlaysEnabled))
   const [pageTheme, setPageTheme] = useState<ThemeState>(storedState?.pageTheme ?? defaultPageTheme)
   const [treeTheme, setTreeTheme] = useState<ThemeState>(storedState?.treeTheme ?? defaultTreeTheme)
@@ -806,6 +808,7 @@ export default function Preview3App() {
         datasetName,
         activePage,
         treeMode,
+        overlayEnabled,
         debugOverlaysEnabled,
         pageTheme,
         treeTheme,
@@ -820,7 +823,7 @@ export default function Preview3App() {
         searchQuery,
       } satisfies PersistedState),
     )
-  }, [activePage, datasetName, debugOverlaysEnabled, fadeMode, filterLogic, filters, leftPanel, legendMinimized, pageTheme, rightPanel, searchQuery, showInTree, treeMode, treeTheme, wideMode])
+  }, [activePage, datasetName, debugOverlaysEnabled, fadeMode, filterLogic, filters, leftPanel, legendMinimized, overlayEnabled, pageTheme, rightPanel, searchQuery, showInTree, treeMode, treeTheme, wideMode])
 
   useEffect(() => {
     if (!dragState) {
@@ -1446,6 +1449,7 @@ export default function Preview3App() {
     setActivePage('family-tree')
     setDatasetName('demo')
     setTreeMode('mode0')
+    setOverlayEnabled(true)
     setPageTheme(defaultPageTheme)
     setTreeTheme(defaultTreeTheme)
     setLeftPanel(defaultLeftPanel)
@@ -1910,6 +1914,7 @@ export default function Preview3App() {
         treeMode={treeMode}
         modeDefinition={activeModeDefinition}
         modeOptions={preview3ModeOptions}
+        overlayEnabled={overlayEnabled}
         validation={validation}
         wideMode={wideMode}
         canvasViewportRef={canvasViewportRef}
@@ -1919,7 +1924,7 @@ export default function Preview3App() {
         spouseProjection={spouseProjection}
         renderPrimaryPanel={renderPrimaryPanel}
         renderThemeModeToggle={renderThemeModeToggle}
-        onResetView={() => setCamera(expandCameraBounds(getGraphBounds(layout.nodes), spouseProjection.nodes, houseAnchors))}
+        onResetView={() => setCamera(expandCameraBounds(getGraphBounds(layout.nodes), overlayEnabled ? spouseProjection.nodes : [], houseAnchors))}
         onBrowserFullscreenToggle={toggleBrowserFullscreen}
         onContentFullscreenToggle={() => setContentFullscreen((current) => !current)}
         onContentFullscreenClose={() => setContentFullscreen(false)}
@@ -1931,6 +1936,7 @@ export default function Preview3App() {
         onTreeThemeEditorToggle={() => setThemeEditorScope(themeEditorScope === 'tree' ? null : 'tree')}
         onTreeThemePresetChange={(preset: ThemePreset) => updateThemePreset('tree', preset)}
         onTreeModeChange={setTreeMode}
+        onOverlayToggle={() => setOverlayEnabled((current) => !current)}
         onWideModeToggle={() => setWideMode((current) => !current)}
         onClearSelection={clearSelection}
         onNodeSelect={handleNodeSelect}

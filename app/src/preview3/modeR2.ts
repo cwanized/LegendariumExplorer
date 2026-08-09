@@ -15,7 +15,7 @@ export function createModeR2Definition(): Preview3ModeDefinition {
       ],
       layoutStrategy: 'enhanced',
       houseAnchorStrategy: 'legacy',
-      applyMarriagePairAlignment: false,
+      applyMarriagePairAlignment: true,
       applyCuratedPersonOrder: false,
       applyCuratedPersonOffsets: false,
       layoutComponentSpacing: 96,
@@ -33,7 +33,7 @@ export function createModeR2Definition(): Preview3ModeDefinition {
       applyDisconnectedComponentPacking: false,
     },
     render: {
-      useSpouseProjection: false,
+      useSpouseProjection: true,
       collapseProjectedChildEdges: false,
       showOverlayRelations: true,
       marriageOverlayStyle: 'rigid',

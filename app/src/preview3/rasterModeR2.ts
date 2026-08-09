@@ -17,11 +17,17 @@ const GENERATION_HEIGHT = 194
 const COLUMN_SIZE = 220
 const PARTNER_GAP = 40
 const BLOCK_GAP_SPAN = 0.35
+const SIBLING_BLOCK_GAP_SPAN = 0.16
+const SIBLING_DESCENDANT_SPAN_CAP = 1.35
 const GROUP_GAP_SPAN = 0.45
-const HOUSE_GAP_SPAN = 2.2
-const CORRIDOR_PADDING_SPAN = 1
+const HOUSE_GAP_SPAN = 1.2
+const CORRIDOR_PADDING_SPAN = 0.7
 const PAIR_OWN_SPAN = (2 * NODE_WIDTH + PARTNER_GAP) / COLUMN_SIZE
 const CORRIDOR_COMPACTION_GAP = 0.8 * COLUMN_SIZE
+const APPLY_R2_BIOLOGICAL_SYMMETRY_POSTPASS = true
+const APPLY_R2_PARENTLESS_ADJACENCY_POSTPASS = true
+const APPLY_R2_MARRIAGE_ROW_HARMONIZATION = false
+const APPLY_R2_MARRIAGE_Y_ALIGNMENT_POSTPASS = false
 
 type FamilyGroup = {
   key: string
@@ -56,6 +62,8 @@ type RowGroup = {
   desiredCenter: number
   blocks: UUID[][]
   widthSpan: number
+  blockGapSpan: number
+  descendantSpanCap?: number
   leftSpan: number
 }
 
@@ -82,6 +90,7 @@ export function buildModeR2Layout(validation: ValidationResult, houseDefinitions
       .filter((group) => group.parentIds.length === 2)
       .map((group) => group.parentIds.join('|')),
   )
+  const coParentIdsByPersonId = buildCoParentMap(familyGroups)
   const familiesByParentId = new Map<UUID, FamilyGroup[]>()
 
   for (const group of familyGroups) {
@@ -103,8 +112,8 @@ export function buildModeR2Layout(validation: ValidationResult, houseDefinitions
     validation,
     orderedPersonIds,
     startHouseContexts,
-    overlayRelations: validation.validOverlayRelations,
   })
+  const spouseIdsByPersonId = buildSpouseMap(validation.validOverlayRelations, personById)
   const placementOwnerByPersonId = resolvePlacementOwners({
     validation,
     familyGroups,
@@ -112,17 +121,47 @@ export function buildModeR2Layout(validation: ValidationResult, houseDefinitions
     rowByPersonId,
     startHouseContexts,
     getPrimaryStartHouse: houseHelpers.getPrimaryStartHouse,
+    spouseIdsByPersonId,
     personById,
   })
-  const spouseIdsByPersonId = buildSpouseMap(validation.validOverlayRelations, personById)
   const componentKeyByPersonId = buildUndirectedComponentKeys(validation, orderedPersonIds, personComparator)
+  const partnerIdsByPersonId = buildPartnerMap(spouseIdsByPersonId, coParentIdsByPersonId)
   const corridorKeyByPersonId = new Map<UUID, string>()
 
-  const getCorridorKey = (personId: UUID) => {
+  for (const personId of orderedPersonIds) {
     const ownerHouseId = placementOwnerByPersonId.get(personId)
     const corridorKey = ownerHouseId ? `house:${ownerHouseId}` : `other:${componentKeyByPersonId.get(personId) ?? personId}`
     corridorKeyByPersonId.set(personId, corridorKey)
-    return corridorKey
+  }
+
+  for (let pass = 0; pass < 3; pass += 1) {
+    for (const personId of orderedPersonIds) {
+      const parentIds = validation.parentsByChild.get(personId) ?? []
+      if (parentIds.length !== 0) {
+        continue
+      }
+
+      const partnerIds = [...(partnerIdsByPersonId.get(personId) ?? new Set<UUID>())]
+        .filter((partnerId) => (validation.parentsByChild.get(partnerId) ?? []).length > 0)
+      if (partnerIds.length === 0) {
+        continue
+      }
+
+      const partnerCorridors = partnerIds
+        .map((partnerId) => corridorKeyByPersonId.get(partnerId))
+        .filter((corridorKey): corridorKey is string => Boolean(corridorKey))
+        .sort((left, right) => left.localeCompare(right))
+      const targetCorridor = partnerCorridors[0]
+      if (!targetCorridor) {
+        continue
+      }
+
+      corridorKeyByPersonId.set(personId, targetCorridor)
+    }
+  }
+
+  const getCorridorKey = (personId: UUID) => {
+    return corridorKeyByPersonId.get(personId) ?? `other:${componentKeyByPersonId.get(personId) ?? personId}`
   }
 
   const personSpanCache = new Map<UUID, number>()
@@ -172,9 +211,18 @@ export function buildModeR2Layout(validation: ValidationResult, houseDefinitions
     return Math.max(PAIR_OWN_SPAN, sharedFamilySpan, getPersonSpan(block[0]), getPersonSpan(block[1]))
   }
 
-  const getGroupWidthSpan = (blocks: UUID[][]): number => blocks.reduce((sum, block, index) => {
-    const nextSum = sum + getBlockSpan(block)
-    return index === blocks.length - 1 ? nextSum : nextSum + BLOCK_GAP_SPAN
+  const getBlockSpanWithinGroup = (block: UUID[], descendantSpanCap?: number): number => {
+    const baseSpan = getBlockSpan(block)
+    if (block.length === 1 && descendantSpanCap !== undefined) {
+      return Math.max(1, Math.min(baseSpan, descendantSpanCap))
+    }
+
+    return baseSpan
+  }
+
+  const getGroupWidthSpan = (blocks: UUID[][], blockGapSpan = BLOCK_GAP_SPAN, descendantSpanCap?: number): number => blocks.reduce((sum, block, index) => {
+    const nextSum = sum + getBlockSpanWithinGroup(block, descendantSpanCap)
+    return index === blocks.length - 1 ? nextSum : nextSum + blockGapSpan
   }, 0)
 
   const rowIdsByGeneration = new Map<number, UUID[]>()
@@ -191,6 +239,7 @@ export function buildModeR2Layout(validation: ValidationResult, houseDefinitions
     orderedPersonIds,
     getCorridorKey,
     spouseIdsByPersonId,
+    coParentIdsByPersonId,
     sharedChildPairKeys,
     getGroupWidthSpan,
     compareIds: personComparator,
@@ -225,13 +274,16 @@ export function buildModeR2Layout(validation: ValidationResult, houseDefinitions
         validation,
         familyByKey,
         spouseIdsByPersonId,
+        coParentIdsByPersonId,
         sharedChildPairKeys,
         compareIds: personComparator,
       })
 
       const groups: RowGroup[] = familyBlocks.map((familyBlock) => {
         const memberIds = [...familyBlock.memberIds].sort(personComparator)
-        const widthSpan = getGroupWidthSpan(familyBlock.blocks)
+        const blockGapSpan = resolveGroupBlockGapSpan(familyBlock)
+        const descendantSpanCap = resolveGroupDescendantSpanCap(familyBlock)
+        const widthSpan = getGroupWidthSpan(familyBlock.blocks, blockGapSpan, descendantSpanCap)
         const desiredCenter = resolveDesiredCenter({
           parentIds: familyBlock.parentIds,
           corridorCenter: corridor.centerSpan,
@@ -245,6 +297,8 @@ export function buildModeR2Layout(validation: ValidationResult, houseDefinitions
           desiredCenter,
           blocks: familyBlock.blocks,
           widthSpan,
+          blockGapSpan,
+          descendantSpanCap,
           leftSpan: corridor.leftSpan,
         }
       })
@@ -263,7 +317,7 @@ export function buildModeR2Layout(validation: ValidationResult, houseDefinitions
         let blockCursor = group.leftSpan
 
         for (const block of group.blocks) {
-          const blockSpan = getBlockSpan(block)
+          const blockSpan = getBlockSpanWithinGroup(block, group.descendantSpanCap)
           const slotX = blockCursor * COLUMN_SIZE
           const slotWidth = blockSpan * COLUMN_SIZE
           const blockCenterSpan = blockCursor + blockSpan / 2
@@ -279,7 +333,7 @@ export function buildModeR2Layout(validation: ValidationResult, houseDefinitions
               height: NODE_HEIGHT,
             })
             centerSpanByPersonId.set(personId, blockCenterSpan)
-            blockCursor += blockSpan + BLOCK_GAP_SPAN
+            blockCursor += blockSpan + group.blockGapSpan
             continue
           }
 
@@ -306,7 +360,7 @@ export function buildModeR2Layout(validation: ValidationResult, houseDefinitions
           })
           centerSpanByPersonId.set(leftId, blockCenterSpan)
           centerSpanByPersonId.set(rightId, blockCenterSpan)
-          blockCursor += blockSpan + BLOCK_GAP_SPAN
+          blockCursor += blockSpan + group.blockGapSpan
         }
       }
     }
@@ -322,18 +376,35 @@ export function buildModeR2Layout(validation: ValidationResult, houseDefinitions
     corridorKeyByPersonId,
   })
 
-  const symmetryAlignedNodes = enforceBiologicalFamilySymmetry({
-    nodes: compactedNodes,
-    validation,
-    familyGroups,
-    spouseIdsByPersonId,
-  })
+  const symmetryAlignedNodes = APPLY_R2_BIOLOGICAL_SYMMETRY_POSTPASS
+    ? enforceBiologicalFamilySymmetry({
+        nodes: compactedNodes,
+        familyGroups,
+      })
+    : compactedNodes
 
-  const minX = Math.min(...[...symmetryAlignedNodes.values()].map((node) => node.x))
-  const minY = Math.min(...[...symmetryAlignedNodes.values()].map((node) => node.y))
+  const postProcessedNodes = APPLY_R2_PARENTLESS_ADJACENCY_POSTPASS
+    ? enforceParentlessPartnerAdjacency({
+        nodes: symmetryAlignedNodes,
+        partnerIdsByPersonId,
+        parentsByChild: validation.parentsByChild,
+      })
+    : symmetryAlignedNodes
+
+  const marriageAlignedYNodes = APPLY_R2_MARRIAGE_Y_ALIGNMENT_POSTPASS
+    ? enforceMarriagePairYAlignment({
+        nodes: postProcessedNodes,
+        marriages: validation.validOverlayRelations,
+        parentsByChild: validation.parentsByChild,
+        childrenByParent: validation.childrenByParent,
+      })
+    : postProcessedNodes
+
+  const minX = Math.min(...[...marriageAlignedYNodes.values()].map((node) => node.x))
+  const minY = Math.min(...[...marriageAlignedYNodes.values()].map((node) => node.y))
   const normalizedNodes = new Map<UUID, PositionedNode>()
 
-  for (const node of symmetryAlignedNodes.values()) {
+  for (const node of marriageAlignedYNodes.values()) {
     normalizedNodes.set(node.id, {
       ...node,
       x: node.x - minX + OUTER_PADDING,
@@ -346,16 +417,28 @@ export function buildModeR2Layout(validation: ValidationResult, houseDefinitions
   }
 }
 
+function resolveGroupBlockGapSpan(familyBlock: FamilyBlock): number {
+  const isSiblingSingletonGroup = familyBlock.parentIds.length > 0
+    && familyBlock.blocks.length > 1
+    && familyBlock.blocks.every((block) => block.length === 1)
+
+  return isSiblingSingletonGroup ? SIBLING_BLOCK_GAP_SPAN : BLOCK_GAP_SPAN
+}
+
+function resolveGroupDescendantSpanCap(familyBlock: FamilyBlock): number | undefined {
+  const isSiblingSingletonGroup = familyBlock.parentIds.length > 0
+    && familyBlock.blocks.length > 1
+    && familyBlock.blocks.every((block) => block.length === 1)
+
+  return isSiblingSingletonGroup ? SIBLING_DESCENDANT_SPAN_CAP : undefined
+}
+
 function enforceBiologicalFamilySymmetry({
   nodes,
-  validation,
   familyGroups,
-  spouseIdsByPersonId,
 }: {
   nodes: Map<UUID, PositionedNode>
-  validation: ValidationResult
   familyGroups: FamilyGroup[]
-  spouseIdsByPersonId: Map<UUID, Set<UUID>>
 }): Map<UUID, PositionedNode> {
   const adjustedNodes = new Map(nodes)
   const familiesByTopRow = [...familyGroups].sort((left, right) => {
@@ -363,50 +446,125 @@ function enforceBiologicalFamilySymmetry({
     const rightRow = Math.min(...right.childIds.map((childId) => adjustedNodes.get(childId)?.y ?? Number.MAX_SAFE_INTEGER))
 
     if (leftRow !== rightRow) {
-      return rightRow - leftRow
+      return leftRow - rightRow
     }
 
     return left.key.localeCompare(right.key)
   })
 
-  for (const family of familiesByTopRow) {
-    const parentNodes = family.parentIds
-      .map((parentId) => adjustedNodes.get(parentId))
-      .filter((node): node is PositionedNode => node !== undefined)
-    const childNodes = family.childIds
-      .map((childId) => adjustedNodes.get(childId))
-      .filter((node): node is PositionedNode => node !== undefined)
+  for (let pass = 0; pass < 3; pass += 1) {
+    let changed = false
 
-    if (parentNodes.length === 0 || childNodes.length === 0) {
-      continue
-    }
+    for (const family of familiesByTopRow) {
+      const parentNodes = family.parentIds
+        .map((parentId) => adjustedNodes.get(parentId))
+        .filter((node): node is PositionedNode => node !== undefined)
+      const childNodes = family.childIds
+        .map((childId) => adjustedNodes.get(childId))
+        .filter((node): node is PositionedNode => node !== undefined)
 
-    const parentCenter = family.parentIds.length === 1
-      ? parentNodes[0].x + parentNodes[0].width / 2
-      : (Math.min(...parentNodes.map((node) => node.x + node.width / 2)) + Math.max(...parentNodes.map((node) => node.x + node.width / 2))) / 2
-    const childCenters = childNodes.map((node) => node.x + node.width / 2)
-    const childCenter = (Math.min(...childCenters) + Math.max(...childCenters)) / 2
-    const deltaX = parentCenter - childCenter
-
-    if (Math.abs(deltaX) < 0.5) {
-      continue
-    }
-
-    const subtreeNodeIds = collectFamilySubtreeNodeIds({
-      childIds: family.childIds,
-      validation,
-      spouseIdsByPersonId,
-    })
-
-    for (const nodeId of subtreeNodeIds) {
-      const node = adjustedNodes.get(nodeId)
-      if (!node) {
+      if (parentNodes.length === 0 || childNodes.length === 0) {
         continue
       }
 
-      adjustedNodes.set(nodeId, {
-        ...node,
-        x: node.x + deltaX,
+      const parentCenter = resolveFamilyParentCenter(parentNodes, family.parentIds.length)
+      const childCenters = childNodes.map((node) => node.x + node.width / 2)
+      const childCenter = (Math.min(...childCenters) + Math.max(...childCenters)) / 2
+      const deltaX = parentCenter - childCenter
+
+      if (Math.abs(deltaX) < 0.5) {
+        continue
+      }
+
+      changed = true
+      for (const childId of family.childIds) {
+        const node = adjustedNodes.get(childId)
+        if (!node) {
+          continue
+        }
+
+        adjustedNodes.set(childId, {
+          ...node,
+          x: node.x + deltaX,
+        })
+      }
+    }
+
+    if (!changed) {
+      break
+    }
+  }
+
+  return adjustedNodes
+}
+
+function resolveFamilyParentCenter(parentNodes: PositionedNode[], parentCount: number): number {
+  if (parentCount <= 1 || parentNodes.length <= 1) {
+    return parentNodes[0].x + parentNodes[0].width / 2
+  }
+
+  const sortedByY = [...parentNodes].sort((left, right) => left.y - right.y)
+  const topParent = sortedByY[0]
+  const bottomParent = sortedByY[sortedByY.length - 1]
+  const generationGap = Math.abs(bottomParent.y - topParent.y)
+
+  // For split-generation couples, prefer the local visual pair center around the lower parent.
+  if (generationGap >= 2 * GENERATION_HEIGHT) {
+    const bottomCenter = bottomParent.x + bottomParent.width / 2
+    const topCenter = topParent.x + topParent.width / 2
+    const direction = topCenter >= bottomCenter ? 1 : -1
+    return bottomCenter + direction * ((NODE_WIDTH + PARTNER_GAP) / 2)
+  }
+
+  const parentCenters = parentNodes.map((node) => node.x + node.width / 2)
+  return (Math.min(...parentCenters) + Math.max(...parentCenters)) / 2
+}
+
+function enforceParentlessPartnerAdjacency({
+  nodes,
+  partnerIdsByPersonId,
+  parentsByChild,
+}: {
+  nodes: Map<UUID, PositionedNode>
+  partnerIdsByPersonId: Map<UUID, Set<UUID>>
+  parentsByChild: Map<UUID, UUID[]>
+}): Map<UUID, PositionedNode> {
+  const adjustedNodes = new Map(nodes)
+  const processedPairKeys = new Set<string>()
+
+  for (const [personId, partnerIds] of partnerIdsByPersonId.entries()) {
+    for (const partnerId of partnerIds) {
+      const pairKey = [personId, partnerId].sort().join('|')
+      if (processedPairKeys.has(pairKey)) {
+        continue
+      }
+      processedPairKeys.add(pairKey)
+
+      const personParentCount = (parentsByChild.get(personId) ?? []).length
+      const partnerParentCount = (parentsByChild.get(partnerId) ?? []).length
+
+      if (!((personParentCount === 0 && partnerParentCount > 0) || (partnerParentCount === 0 && personParentCount > 0))) {
+        continue
+      }
+
+      const floatingId = personParentCount === 0 ? personId : partnerId
+      const anchoredId = personParentCount === 0 ? partnerId : personId
+      const floatingNode = adjustedNodes.get(floatingId)
+      const anchoredNode = adjustedNodes.get(anchoredId)
+
+      if (!floatingNode || !anchoredNode) {
+        continue
+      }
+
+      const toRight = floatingNode.x >= anchoredNode.x
+      const targetX = toRight
+        ? anchoredNode.x + anchoredNode.width + PARTNER_GAP
+        : anchoredNode.x - floatingNode.width - PARTNER_GAP
+
+      adjustedNodes.set(floatingId, {
+        ...floatingNode,
+        x: targetX,
+        y: anchoredNode.y,
       })
     }
   }
@@ -414,40 +572,56 @@ function enforceBiologicalFamilySymmetry({
   return adjustedNodes
 }
 
-function collectFamilySubtreeNodeIds({
-  childIds,
-  validation,
-  spouseIdsByPersonId,
+function enforceMarriagePairYAlignment({
+  nodes,
+  marriages,
+  parentsByChild,
+  childrenByParent,
 }: {
-  childIds: UUID[]
-  validation: ValidationResult
-  spouseIdsByPersonId: Map<UUID, Set<UUID>>
-}): Set<UUID> {
-  const result = new Set<UUID>()
-  const queue = [...childIds]
+  nodes: Map<UUID, PositionedNode>
+  marriages: Relation[]
+  parentsByChild: Map<UUID, UUID[]>
+  childrenByParent: Map<UUID, UUID[]>
+}): Map<UUID, PositionedNode> {
+  const adjustedNodes = new Map(nodes)
 
-  while (queue.length > 0) {
-    const currentId = queue.shift()
-    if (!currentId || result.has(currentId)) {
+  for (const relation of marriages.filter((candidate) => candidate.type === 'marriage')) {
+    const fromNode = adjustedNodes.get(relation.from)
+    const toNode = adjustedNodes.get(relation.to)
+    if (!fromNode || !toNode) {
       continue
     }
 
-    result.add(currentId)
+    const fromParentCount = (parentsByChild.get(relation.from) ?? []).length
+    const toParentCount = (parentsByChild.get(relation.to) ?? []).length
+    const fromDegree = fromParentCount + (childrenByParent.get(relation.from) ?? []).length
+    const toDegree = toParentCount + (childrenByParent.get(relation.to) ?? []).length
 
-    for (const spouseId of spouseIdsByPersonId.get(currentId) ?? []) {
-      if (!result.has(spouseId)) {
-        queue.push(spouseId)
-      }
+    let anchorId = relation.from
+    let movingId = relation.to
+
+    if (toParentCount > fromParentCount || (toParentCount === fromParentCount && toDegree > fromDegree)) {
+      anchorId = relation.to
+      movingId = relation.from
     }
 
-    for (const descendantId of validation.childrenByParent.get(currentId) ?? []) {
-      if (!result.has(descendantId)) {
-        queue.push(descendantId)
-      }
+    const anchorNode = adjustedNodes.get(anchorId)
+    const movingNode = adjustedNodes.get(movingId)
+    if (!anchorNode || !movingNode) {
+      continue
     }
+
+    if (Math.abs(anchorNode.y - movingNode.y) < 0.5) {
+      continue
+    }
+
+    adjustedNodes.set(movingId, {
+      ...movingNode,
+      y: anchorNode.y,
+    })
   }
 
-  return result
+  return adjustedNodes
 }
 
 function compactCorridorLayout({
@@ -578,12 +752,10 @@ function buildGenerationRows({
   validation,
   orderedPersonIds,
   startHouseContexts,
-  overlayRelations,
 }: {
   validation: ValidationResult
   orderedPersonIds: UUID[]
   startHouseContexts: HouseContext[]
-  overlayRelations: Relation[]
 }): Map<UUID, number> {
   const seededRows = new Map<UUID, number>()
 
@@ -633,50 +805,46 @@ function buildGenerationRows({
     }
   }
 
-  const marriageRelations = overlayRelations.filter((relation) => relation.type === 'marriage')
-  const sortedByRow = [...orderedPersonIds].sort((leftId, rightId) => {
-    const leftRow = rowByPersonId.get(leftId) ?? 1
-    const rightRow = rowByPersonId.get(rightId) ?? 1
+  if (APPLY_R2_MARRIAGE_ROW_HARMONIZATION) {
+    harmonizeMarriageRows(validation, rowByPersonId)
+    enforceBiologicalRowOrder(validation, rowByPersonId)
+  }
 
-    if (leftRow !== rightRow) {
-      return leftRow - rightRow
-    }
+  return rowByPersonId
+}
 
-    return leftId.localeCompare(rightId)
-  })
+function harmonizeMarriageRows(validation: ValidationResult, rowByPersonId: Map<UUID, number>): void {
+  const marriages = validation.validOverlayRelations
+    .filter((relation) => relation.type === 'marriage')
+    .sort((left, right) => left.id.localeCompare(right.id))
 
-  for (let pass = 0; pass < orderedPersonIds.length; pass += 1) {
+  for (let pass = 0; pass < 4; pass += 1) {
     let changed = false
 
-    for (const relation of marriageRelations) {
-      const fromRow = rowByPersonId.get(relation.from)
-      const toRow = rowByPersonId.get(relation.to)
-      if (fromRow === undefined || toRow === undefined) {
+    for (const relation of marriages) {
+      const fromRow = rowByPersonId.get(relation.from) ?? 1
+      const toRow = rowByPersonId.get(relation.to) ?? 1
+      if (fromRow === toRow) {
         continue
       }
 
-      const targetRow = Math.max(fromRow, toRow)
+      const fromParentIds = validation.parentsByChild.get(relation.from) ?? []
+      const toParentIds = validation.parentsByChild.get(relation.to) ?? []
+      const minFromRow = fromParentIds.length === 0
+        ? 1
+        : Math.max(...fromParentIds.map((parentId) => rowByPersonId.get(parentId) ?? 1)) + 1
+      const minToRow = toParentIds.length === 0
+        ? 1
+        : Math.max(...toParentIds.map((parentId) => rowByPersonId.get(parentId) ?? 1)) + 1
+      const targetRow = Math.max(fromRow, toRow, minFromRow, minToRow)
+
       if (fromRow !== targetRow) {
         rowByPersonId.set(relation.from, targetRow)
         changed = true
       }
+
       if (toRow !== targetRow) {
         rowByPersonId.set(relation.to, targetRow)
-        changed = true
-      }
-    }
-
-    for (const personId of sortedByRow) {
-      const parentIds = validation.parentsByChild.get(personId) ?? []
-      if (parentIds.length === 0) {
-        continue
-      }
-
-      const requiredRow = Math.max(...parentIds.map((parentId) => rowByPersonId.get(parentId) ?? 1)) + 1
-      const currentRow = rowByPersonId.get(personId) ?? 1
-
-      if (currentRow < requiredRow) {
-        rowByPersonId.set(personId, requiredRow)
         changed = true
       }
     }
@@ -685,8 +853,32 @@ function buildGenerationRows({
       break
     }
   }
+}
 
-  return rowByPersonId
+function enforceBiologicalRowOrder(validation: ValidationResult, rowByPersonId: Map<UUID, number>): void {
+  const biologicalRelations = validation.validBiologicalRelations
+    .filter((relation) => relation.type === 'biological_parent')
+
+  for (let pass = 0; pass < 6; pass += 1) {
+    let changed = false
+
+    for (const relation of biologicalRelations) {
+      const parentRow = rowByPersonId.get(relation.from) ?? 1
+      const childRow = rowByPersonId.get(relation.to) ?? 1
+      const minChildRow = parentRow + 1
+
+      if (childRow >= minChildRow) {
+        continue
+      }
+
+      rowByPersonId.set(relation.to, minChildRow)
+      changed = true
+    }
+
+    if (!changed) {
+      break
+    }
+  }
 }
 
 function resolvePlacementOwners({
@@ -696,6 +888,7 @@ function resolvePlacementOwners({
   rowByPersonId,
   startHouseContexts,
   getPrimaryStartHouse,
+  spouseIdsByPersonId,
   personById,
 }: {
   validation: ValidationResult
@@ -704,6 +897,7 @@ function resolvePlacementOwners({
   rowByPersonId: Map<UUID, number>
   startHouseContexts: HouseContext[]
   getPrimaryStartHouse: (personId: UUID) => HouseDefinition | null
+  spouseIdsByPersonId: Map<UUID, Set<UUID>>
   personById: Map<UUID, Person>
 }): Map<UUID, string | null> {
   const ownerByPersonId = new Map<UUID, string | null>()
@@ -737,6 +931,31 @@ function resolvePlacementOwners({
       if (startHouse) {
         ownerByPersonId.set(personId, startHouse.id)
       }
+    }
+
+    for (const personId of orderedPersonIds) {
+      const parentIds = validation.parentsByChild.get(personId) ?? []
+      if (parentIds.length !== 0) {
+        continue
+      }
+
+      const spouseIds = spouseIdsByPersonId.get(personId)
+      if (!spouseIds || spouseIds.size === 0) {
+        continue
+      }
+
+      const spouseOwnerCandidates = [...spouseIds]
+        .filter((spouseId) => (validation.parentsByChild.get(spouseId) ?? []).length > 0)
+        .map((spouseId) => ownerByPersonId.get(spouseId))
+        .filter((owner): owner is string => Boolean(owner))
+        .sort((left, right) => left.localeCompare(right))
+
+      const spouseOwner = spouseOwnerCandidates[0]
+      if (!spouseOwner) {
+        continue
+      }
+
+      ownerByPersonId.set(personId, spouseOwner)
     }
 
     for (const family of sortedFamilies) {
@@ -878,6 +1097,50 @@ function buildSpouseMap(relations: Relation[], personById: Map<UUID, Person>): M
   return spouseIdsByPersonId
 }
 
+function buildCoParentMap(familyGroups: FamilyGroup[]): Map<UUID, Set<UUID>> {
+  const coParentIdsByPersonId = new Map<UUID, Set<UUID>>()
+
+  for (const family of familyGroups) {
+    if (family.parentIds.length !== 2) {
+      continue
+    }
+
+    const leftId = family.parentIds[0]
+    const rightId = family.parentIds[1]
+
+    const leftSet = coParentIdsByPersonId.get(leftId) ?? new Set<UUID>()
+    leftSet.add(rightId)
+    coParentIdsByPersonId.set(leftId, leftSet)
+
+    const rightSet = coParentIdsByPersonId.get(rightId) ?? new Set<UUID>()
+    rightSet.add(leftId)
+    coParentIdsByPersonId.set(rightId, rightSet)
+  }
+
+  return coParentIdsByPersonId
+}
+
+function buildPartnerMap(
+  spouseIdsByPersonId: Map<UUID, Set<UUID>>,
+  coParentIdsByPersonId: Map<UUID, Set<UUID>>,
+): Map<UUID, Set<UUID>> {
+  const partnerIdsByPersonId = new Map<UUID, Set<UUID>>()
+
+  const merge = (source: Map<UUID, Set<UUID>>) => {
+    for (const [personId, partnerIds] of source) {
+      const target = partnerIdsByPersonId.get(personId) ?? new Set<UUID>()
+      for (const partnerId of partnerIds) {
+        target.add(partnerId)
+      }
+      partnerIdsByPersonId.set(personId, target)
+    }
+  }
+
+  merge(spouseIdsByPersonId)
+  merge(coParentIdsByPersonId)
+  return partnerIdsByPersonId
+}
+
 function buildUndirectedComponentKeys(
   validation: ValidationResult,
   orderedPersonIds: UUID[],
@@ -939,6 +1202,7 @@ function buildCorridorDefinitions({
   orderedPersonIds,
   getCorridorKey,
   spouseIdsByPersonId,
+  coParentIdsByPersonId,
   sharedChildPairKeys,
   getGroupWidthSpan,
   compareIds,
@@ -948,6 +1212,7 @@ function buildCorridorDefinitions({
   orderedPersonIds: UUID[]
   getCorridorKey: (personId: UUID) => string
   spouseIdsByPersonId: Map<UUID, Set<UUID>>
+  coParentIdsByPersonId: Map<UUID, Set<UUID>>
   sharedChildPairKeys: Set<string>
   getGroupWidthSpan: (blocks: UUID[][]) => number
   compareIds: (leftId: UUID, rightId: UUID) => number
@@ -970,10 +1235,10 @@ function buildCorridorDefinitions({
     }
 
     for (const [corridorKey, memberIds] of memberIdsByCorridorKey) {
-      const blocks = buildRowBlocks(memberIds, new Set(memberIds), spouseIdsByPersonId, sharedChildPairKeys, compareIds)
+      const blocks = buildRowBlocks(memberIds, new Set(memberIds), spouseIdsByPersonId, coParentIdsByPersonId, sharedChildPairKeys, compareIds)
       const widthSpan = getGroupWidthSpan(blocks) + 2 * CORRIDOR_PADDING_SPAN
       const currentWidth = widthByCorridorKey.get(corridorKey) ?? 0
-      widthByCorridorKey.set(corridorKey, Math.max(currentWidth, widthSpan, 4))
+      widthByCorridorKey.set(corridorKey, Math.max(currentWidth, widthSpan, 2.5))
     }
   }
 
@@ -1088,6 +1353,7 @@ function buildRowBlocks(
   memberIds: UUID[],
   rowIdSet: Set<UUID>,
   spouseIdsByPersonId: Map<UUID, Set<UUID>>,
+  coParentIdsByPersonId: Map<UUID, Set<UUID>>,
   sharedChildPairKeys: Set<string>,
   compareIds: (leftId: UUID, rightId: UUID) => number,
 ): UUID[][] {
@@ -1101,7 +1367,10 @@ function buildRowBlocks(
       continue
     }
 
-    const candidatePartnerIds = [...(spouseIdsByPersonId.get(personId) ?? new Set<UUID>())]
+    const candidatePartnerIds = [...new Set([
+      ...(spouseIdsByPersonId.get(personId) ?? new Set<UUID>()),
+      ...(coParentIdsByPersonId.get(personId) ?? new Set<UUID>()),
+    ])]
       .filter((candidateId) => rowIdSet.has(candidateId) && !usedIds.has(candidateId))
 
     if (candidatePartnerIds.length === 0) {
@@ -1145,6 +1414,7 @@ function buildFamilyBlocksForRow({
   validation,
   familyByKey,
   spouseIdsByPersonId,
+  coParentIdsByPersonId,
   sharedChildPairKeys,
   compareIds,
 }: {
@@ -1153,6 +1423,7 @@ function buildFamilyBlocksForRow({
   validation: ValidationResult
   familyByKey: Map<string, FamilyGroup>
   spouseIdsByPersonId: Map<UUID, Set<UUID>>
+  coParentIdsByPersonId: Map<UUID, Set<UUID>>
   sharedChildPairKeys: Set<string>
   compareIds: (leftId: UUID, rightId: UUID) => number
 }): FamilyBlock[] {
@@ -1162,6 +1433,7 @@ function buildFamilyBlocksForRow({
     validation,
     familyByKey,
     spouseIdsByPersonId,
+    coParentIdsByPersonId,
     sharedChildPairKeys,
     compareIds,
   })
@@ -1242,6 +1514,7 @@ function buildCoupleBlocksForRow({
   validation,
   familyByKey,
   spouseIdsByPersonId,
+  coParentIdsByPersonId,
   sharedChildPairKeys,
   compareIds,
 }: {
@@ -1250,10 +1523,11 @@ function buildCoupleBlocksForRow({
   validation: ValidationResult
   familyByKey: Map<string, FamilyGroup>
   spouseIdsByPersonId: Map<UUID, Set<UUID>>
+  coParentIdsByPersonId: Map<UUID, Set<UUID>>
   sharedChildPairKeys: Set<string>
   compareIds: (leftId: UUID, rightId: UUID) => number
 }): CoupleBlock[] {
-  const blocks = buildRowBlocks(memberIds, rowIdSet, spouseIdsByPersonId, sharedChildPairKeys, compareIds)
+  const blocks = buildRowBlocks(memberIds, rowIdSet, spouseIdsByPersonId, coParentIdsByPersonId, sharedChildPairKeys, compareIds)
 
   return blocks
     .filter((block): block is [UUID, UUID] => block.length === 2)

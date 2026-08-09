@@ -54,6 +54,7 @@ export type PersistedState = {
   datasetName: DatasetName
   activePage: PageKey
   treeMode: PreviewTreeMode
+  overlayEnabled?: boolean
   debugOverlaysEnabled?: boolean
   pageTheme: ThemeState
   treeTheme: ThemeState

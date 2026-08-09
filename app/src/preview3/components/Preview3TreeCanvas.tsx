@@ -12,6 +12,16 @@ type LcaAnalysis = {
   edgeIds: Set<UUID>
 } | null
 
+type GroupRenderParentAnchor = {
+  key: string
+  parentId: UUID
+  x: number
+  y: number
+  width: number
+  height: number
+  isProjection: boolean
+}
+
 type Preview3TreeCanvasProps = {
   browserFullscreen: boolean
   contentFullscreen: boolean
@@ -43,6 +53,7 @@ type Preview3TreeCanvasProps = {
   treeMode: PreviewTreeMode
   modeDefinition: Preview3ModeDefinition
   modeOptions: Preview3ModeOption[]
+  overlayEnabled: boolean
   validation: ValidationResult
   wideMode: boolean
   canvasViewportRef: RefObject<HTMLDivElement | null>
@@ -62,6 +73,7 @@ type Preview3TreeCanvasProps = {
   onOpenSpouseContinuation: (relationId: UUID, ownerId: UUID) => void
   onPanelCollapse: (side: 'left' | 'right') => void
   onTreeModeChange: (mode: PreviewTreeMode) => void
+  onOverlayToggle: () => void
   onTreeThemeEditorToggle: () => void
   onTreeThemePresetChange: (preset: ThemePreset) => void
   onWideModeToggle: () => void
@@ -100,6 +112,7 @@ export function Preview3TreeCanvas({
   treeMode,
   modeDefinition,
   modeOptions,
+  overlayEnabled,
   validation,
   wideMode,
   canvasViewportRef,
@@ -119,6 +132,7 @@ export function Preview3TreeCanvas({
   onOpenSpouseContinuation,
   onPanelCollapse,
   onTreeModeChange,
+  onOverlayToggle,
   onTreeThemeEditorToggle,
   onTreeThemePresetChange,
   onWideModeToggle,
@@ -133,6 +147,72 @@ export function Preview3TreeCanvas({
     { value: 'imladris', label: 'Imladris' },
     { value: 'custom', label: 'Custom' },
   ]
+
+  const projectionsByCompanionId = new Map<UUID, SpouseProjectionNode[]>()
+  for (const projection of spouseProjection.nodes) {
+    const projections = projectionsByCompanionId.get(projection.companionId) ?? []
+    projections.push(projection)
+    projectionsByCompanionId.set(projection.companionId, projections)
+  }
+
+  const resolveGroupParentAnchors = (group: BiologicalChildGroup): GroupRenderParentAnchor[] => {
+    const childTopY = Math.min(...group.childNodes.map((node) => node.y))
+    const childCenters = group.childNodes.map((node) => node.x + node.width / 2)
+    const childCenterX = (Math.min(...childCenters) + Math.max(...childCenters)) / 2
+
+    return group.parentIds
+      .map((parentId) => {
+        const mainNode = layout.nodes.get(parentId)
+        const projectionCandidates = overlayEnabled
+          ? (projectionsByCompanionId.get(parentId) ?? []).filter((projection) => (
+            projection.sharedChildren.some((childId) => group.childIds.includes(childId))
+          ))
+          : []
+
+        const candidates: GroupRenderParentAnchor[] = []
+
+        if (mainNode) {
+          candidates.push({
+            key: `main:${parentId}`,
+            parentId,
+            x: mainNode.x,
+            y: mainNode.y,
+            width: mainNode.width,
+            height: mainNode.height,
+            isProjection: false,
+          })
+        }
+
+        for (const projection of projectionCandidates) {
+          candidates.push({
+            key: `projection:${projection.relationId}:${projection.ownerId}:${projection.companionId}`,
+            parentId,
+            x: projection.x,
+            y: projection.y,
+            width: projection.width,
+            height: projection.height,
+            isProjection: true,
+          })
+        }
+
+        if (candidates.length === 0) {
+          return null
+        }
+
+        candidates.sort((left, right) => {
+          const leftCenterX = left.x + left.width / 2
+          const rightCenterX = right.x + right.width / 2
+          const leftDistance = Math.hypot(leftCenterX - childCenterX, (left.y + left.height / 2) - childTopY)
+          const rightDistance = Math.hypot(rightCenterX - childCenterX, (right.y + right.height / 2) - childTopY)
+          return leftDistance - rightDistance
+        })
+
+        return candidates[0]
+      })
+      .filter((anchor): anchor is GroupRenderParentAnchor => anchor !== null)
+  }
+
+  const renderedProjectionBacklinkKeys = new Set<string>()
 
   return (
     <section className={`preview3-workspace ${contentFullscreen ? 'content-fullscreen' : ''}`}>
@@ -170,6 +250,10 @@ export function Preview3TreeCanvas({
             onValueChange={(value) => onTreeModeChange(value as PreviewTreeMode)}
             options={modeOptions}
           />
+          <label className="preview3-toolbar-toggle" title="Toggle overlays">
+            <input type="checkbox" checked={overlayEnabled} onChange={onOverlayToggle} />
+            <span>Overlay</span>
+          </label>
         </div>
         <Preview3Icon name="separator" />
         <div className="preview3-toolbar-group align-end">
@@ -259,10 +343,10 @@ export function Preview3TreeCanvas({
 
             return (
               <g key={anchor.houseId}>
-                <line x1={anchorCenterX} y1={anchorBottomY} x2={anchorCenterX} y2={junctionY} stroke="var(--preview3-tree-overlay)" strokeWidth={1.8} strokeOpacity={0.55} />
-                <line x1={connectorLineMinX} y1={junctionY} x2={connectorLineMaxX} y2={junctionY} stroke="var(--preview3-tree-overlay)" strokeWidth={1.8} strokeOpacity={0.55} />
+                <line x1={anchorCenterX} y1={anchorBottomY} x2={anchorCenterX} y2={junctionY} stroke="var(--preview3-tree-overlay)" strokeWidth={1.8} strokeOpacity={0.72} />
+                <line x1={connectorLineMinX} y1={junctionY} x2={connectorLineMaxX} y2={junctionY} stroke="var(--preview3-tree-overlay)" strokeWidth={1.8} strokeOpacity={0.72} />
                 {rootNodes.map((node) => (
-                  <line key={`${anchor.houseId}:${node.id}`} x1={node.x + node.width / 2} y1={junctionY} x2={node.x + node.width / 2} y2={node.y} stroke="var(--preview3-tree-overlay)" strokeWidth={1.8} strokeOpacity={0.55} />
+                  <line key={`${anchor.houseId}:${node.id}`} x1={node.x + node.width / 2} y1={junctionY} x2={node.x + node.width / 2} y2={node.y} stroke="var(--preview3-tree-overlay)" strokeWidth={1.8} strokeOpacity={0.72} />
                 ))}
                 <g transform={`translate(${anchorRenderX} ${anchorRenderY})`}>
                   <rect
@@ -287,7 +371,7 @@ export function Preview3TreeCanvas({
             )
           }) : null}
 
-          {overlayRelations.map((relation) => {
+          {!overlayEnabled ? null : overlayRelations.map((relation) => {
             const fromNode = layout.nodes.get(relation.from)
             const toNode = layout.nodes.get(relation.to)
             if (!fromNode || !toNode) {
@@ -314,7 +398,7 @@ export function Preview3TreeCanvas({
                 stroke="var(--preview3-tree-overlay)"
                 strokeWidth={isRigidMarriage ? 2.2 : 1.6}
                 strokeDasharray={isRigidMarriage ? undefined : '7 7'}
-                strokeOpacity={isDimmed ? 0.22 : isRigidMarriage ? 0.78 : 0.58}
+                strokeOpacity={isDimmed ? 0.22 : isRigidMarriage ? 0.9 : 0.74}
               />
             )
           })}
@@ -323,19 +407,28 @@ export function Preview3TreeCanvas({
             const highlighted = group.relationIds.some((relationId) => highlightedEdgeIds.has(relationId))
             const groupFiltered = [...group.parentIds, ...group.childIds].some((nodeId) => filteredOutNodeIds.has(nodeId))
             const faded = (lcaAnalysis && fadeMode === 'dim' && !highlighted) || groupFiltered
+            const parentAnchors = resolveGroupParentAnchors(group)
+            if (parentAnchors.length === 0) {
+              return null
+            }
+
+            const parentCenters = parentAnchors.map((anchor) => anchor.x + anchor.width / 2)
+            const renderedJunctionX = parentCenters.length === 1
+              ? parentCenters[0]
+              : (Math.min(...parentCenters) + Math.max(...parentCenters)) / 2
             const childCenters = group.childNodes.map((node) => node.x + node.width / 2)
             const siblingMinX = Math.min(...childCenters)
             const siblingMaxX = Math.max(...childCenters)
             const isSingleChildGroup = group.childNodes.length === 1
             const singleChildNode = isSingleChildGroup ? group.childNodes[0] : null
-            const isStrictSingleParentSingleChild = isSingleChildGroup && group.parentNodes.length === 1
+            const isStrictSingleParentSingleChild = isSingleChildGroup && parentAnchors.length === 1
 
             return (
               <g key={group.key}>
-                {group.parentNodes.map((node) => {
-                  const parentCenterX = node.x + node.width / 2
-                  const parentBottomY = node.y + node.height
-                  const targetX = singleChildNode ? singleChildNode.x + singleChildNode.width / 2 : group.junctionX
+                {parentAnchors.map((anchor) => {
+                  const parentCenterX = anchor.x + anchor.width / 2
+                  const parentBottomY = anchor.y + anchor.height
+                  const targetX = singleChildNode ? singleChildNode.x + singleChildNode.width / 2 : renderedJunctionX
                   const targetY = singleChildNode ? singleChildNode.y : group.junctionY
                   const controlY = singleChildNode ? parentBottomY + Math.max((targetY - parentBottomY) * 0.45, 18) : parentBottomY + Math.max((group.junctionY - parentBottomY) * 0.7, 16)
 
@@ -344,44 +437,80 @@ export function Preview3TreeCanvas({
 
                     return (
                       <line
-                        key={`${group.key}:${node.id}:parent`}
+                        key={`${group.key}:${anchor.key}:parent`}
                         x1={parentCenterX}
                         y1={parentBottomY}
                         x2={childCenterX}
                         y2={singleChildNode.y}
                         stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'}
                         strokeWidth={highlighted ? 3.6 : 2.2}
-                        strokeOpacity={faded ? 0.22 : 0.82}
+                        strokeOpacity={faded ? 0.22 : 0.92}
                       />
                     )
                   }
 
                   return (
                     <path
-                      key={`${group.key}:${node.id}:parent`}
+                      key={`${group.key}:${anchor.key}:parent`}
                       d={`M ${parentCenterX} ${parentBottomY} Q ${parentCenterX} ${controlY} ${targetX} ${targetY}`}
                       fill="none"
                       stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'}
                       strokeWidth={highlighted ? 3.6 : 2.2}
-                      strokeOpacity={faded ? 0.22 : 0.82}
+                      strokeOpacity={faded ? 0.22 : 0.92}
                     />
                   )
                 })}
 
-                {!isSingleChildGroup && group.siblingY > group.junctionY ? <line x1={group.junctionX} y1={group.junctionY} x2={group.junctionX} y2={group.siblingY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.82} /> : null}
+                {!overlayEnabled ? null : parentAnchors.map((anchor) => {
+                  if (!anchor.isProjection) {
+                    return null
+                  }
 
-                {group.childNodes.length > 1 ? <line x1={siblingMinX} y1={group.siblingY} x2={siblingMaxX} y2={group.siblingY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.82} /> : null}
+                  const backlinkKey = `${anchor.key}:${anchor.parentId}`
+                  if (renderedProjectionBacklinkKeys.has(backlinkKey)) {
+                    return null
+                  }
+                  renderedProjectionBacklinkKeys.add(backlinkKey)
+
+                  const originalParentNode = layout.nodes.get(anchor.parentId)
+                  if (!originalParentNode) {
+                    return null
+                  }
+
+                  const originalCenterX = originalParentNode.x + originalParentNode.width / 2
+                  const originalCenterY = originalParentNode.y + originalParentNode.height / 2
+                  const projectionCenterX = anchor.x + anchor.width / 2
+                  const projectionCenterY = anchor.y + anchor.height / 2
+
+                  return (
+                    <line
+                      key={`${group.key}:${anchor.key}:projection-link`}
+                      x1={originalCenterX}
+                      y1={originalCenterY}
+                      x2={projectionCenterX}
+                      y2={projectionCenterY}
+                      stroke="var(--preview3-tree-overlay)"
+                      strokeDasharray="5 7"
+                      strokeWidth={1.4}
+                      strokeOpacity={faded ? 0.2 : 0.62}
+                    />
+                  )
+                })}
+
+                {!isSingleChildGroup && group.siblingY > group.junctionY ? <line x1={renderedJunctionX} y1={group.junctionY} x2={renderedJunctionX} y2={group.siblingY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} /> : null}
+
+                {group.childNodes.length > 1 ? <line x1={siblingMinX} y1={group.siblingY} x2={siblingMaxX} y2={group.siblingY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} /> : null}
 
                 {!isSingleChildGroup ? group.childNodes.map((node) => {
                   const childCenterX = node.x + node.width / 2
                   const childTopY = node.y
-                  return <line key={`${group.key}:${node.id}:child`} x1={childCenterX} y1={group.childNodes.length > 1 ? group.siblingY : group.junctionY} x2={childCenterX} y2={childTopY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.82} />
+                  return <line key={`${group.key}:${node.id}:child`} x1={childCenterX} y1={group.childNodes.length > 1 ? group.siblingY : group.junctionY} x2={childCenterX} y2={childTopY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} />
                 }) : null}
               </g>
             )
           })}
 
-          {spouseProjection.nodes.map((projection) => {
+          {!overlayEnabled ? null : spouseProjection.nodes.map((projection) => {
             const ownerNode = layout.nodes.get(projection.ownerId)
             const companionPerson = validation.personById.get(projection.companionId)
 
@@ -398,9 +527,9 @@ export function Preview3TreeCanvas({
 
             return (
               <g key={`${projection.relationId}:${projection.ownerId}:${projection.companionId}`} opacity={isFaded ? 0.28 : 1}>
-                <line x1={linkStartX} y1={linkY} x2={linkEndX} y2={projection.y + projection.height / 2} stroke="var(--preview3-tree-overlay)" strokeDasharray="6 6" strokeOpacity={0.82} />
+                <line x1={linkStartX} y1={linkY} x2={linkEndX} y2={projection.y + projection.height / 2} stroke="var(--preview3-tree-overlay)" strokeDasharray="6 6" strokeOpacity={0.68} />
                 <g transform={`translate(${projection.x} ${projection.y})`} onClick={() => onOpenSpouseContinuation(projection.relationId, projection.companionId)}>
-                  <rect width={projection.width} height={projection.height} rx="16" ry="16" fill="var(--preview3-tree-surface-strong)" stroke={isSelected ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-border)'} strokeWidth={isSelected ? 2.6 : 1.6} />
+                  <rect width={projection.width} height={projection.height} rx="16" ry="16" fill="color-mix(in srgb, var(--preview3-tree-accent-soft) 42%, var(--preview3-tree-node-fill) 58%)" stroke={isSelected ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-border)'} strokeWidth={isSelected ? 2.6 : 1.6} />
                   <text x={14} y={22} className="preview3-svg-name">{companionPerson.name}</text>
                   <text x={14} y={40} className="preview3-svg-meta">{companionPerson.species ?? companionPerson.houses?.[0] ?? 'Spouse branch'}</text>
                 </g>

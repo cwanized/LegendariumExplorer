@@ -1489,11 +1489,17 @@ export function alignMarriagePairs(
   relations: Relation[],
   anchoredNodeIds: Set<UUID>,
   biologicalRelations: Relation[] = [],
+  options?: {
+    maxCenterYDelta?: number
+    preferSameRow?: boolean
+  },
 ): LayoutResult {
   const adjustedNodes = new Map(layout.nodes)
   const targetGap = 40
   const rowTolerance = 14
   const sidePadding = 8
+  const maxCenterYDelta = options?.maxCenterYDelta ?? 28
+  const preferSameRow = options?.preferSameRow ?? false
   const biologicalDegree = new Map<UUID, number>()
 
   for (const relation of biologicalRelations.filter((candidate) => candidate.type === 'biological_parent')) {
@@ -1510,16 +1516,12 @@ export function alignMarriagePairs(
     }
 
     const centerYDelta = Math.abs(firstNode.y + firstNode.height / 2 - (secondNode.y + secondNode.height / 2))
-    if (centerYDelta > 28) {
+    if (centerYDelta > maxCenterYDelta) {
       continue
     }
 
     const [leftNode, rightNode] = firstNode.x <= secondNode.x ? [firstNode, secondNode] : [secondNode, firstNode]
     const currentGap = rightNode.x - (leftNode.x + leftNode.width)
-
-    if (Math.abs(currentGap - targetGap) < 1) {
-      continue
-    }
 
     const firstDegree = biologicalDegree.get(firstNode.id) ?? 0
     const secondDegree = biologicalDegree.get(secondNode.id) ?? 0
@@ -1536,6 +1538,17 @@ export function alignMarriagePairs(
     }
 
     const candidateY = anchorNode.y
+
+    if (Math.abs(currentGap - targetGap) < 1) {
+      if (Math.abs(movingNode.y - candidateY) > 0.5) {
+        adjustedNodes.set(movingNode.id, {
+          ...movingNode,
+          y: candidateY,
+        })
+      }
+      continue
+    }
+
     const rowNodes = [...adjustedNodes.values()].filter((node) => {
       if (node.id === anchorNode.id || node.id === movingNode.id) {
         return false
@@ -1565,6 +1578,39 @@ export function alignMarriagePairs(
         y: candidateY,
       })
       continue
+    }
+
+    if (preferSameRow) {
+      const horizontalSearchOffsets = [20, 40, 60, 90, 130, 180, 240, 320, 420, 560]
+      let placedSameRow = false
+
+      for (const offset of horizontalSearchOffsets) {
+        const rightCandidate = candidateRightX + offset
+        if (isCandidateFree(rightCandidate)) {
+          adjustedNodes.set(movingNode.id, {
+            ...movingNode,
+            x: rightCandidate,
+            y: candidateY,
+          })
+          placedSameRow = true
+          break
+        }
+
+        const leftCandidate = candidateLeftX - offset
+        if (isCandidateFree(leftCandidate)) {
+          adjustedNodes.set(movingNode.id, {
+            ...movingNode,
+            x: leftCandidate,
+            y: candidateY,
+          })
+          placedSameRow = true
+          break
+        }
+      }
+
+      if (placedSameRow) {
+        continue
+      }
     }
 
     const candidateX = candidateRightX
@@ -1604,6 +1650,7 @@ export function alignMarriagePairs(
       adjustedNodes.set(rightNode.id, {
         ...rightNode,
         x: leftNode.x + leftNode.width + targetGap,
+        y: rightNode.id === movingNode.id ? candidateY : rightNode.y,
       })
       continue
     }
@@ -1612,6 +1659,7 @@ export function alignMarriagePairs(
       adjustedNodes.set(leftNode.id, {
         ...leftNode,
         x: rightNode.x - targetGap - leftNode.width,
+        y: leftNode.id === movingNode.id ? candidateY : leftNode.y,
       })
       continue
     }
@@ -1623,10 +1671,12 @@ export function alignMarriagePairs(
     adjustedNodes.set(leftNode.id, {
       ...leftNode,
       x: nextLeftX,
+      y: leftNode.id === movingNode.id ? candidateY : leftNode.y,
     })
     adjustedNodes.set(rightNode.id, {
       ...rightNode,
       x: nextLeftX + leftNode.width + targetGap,
+      y: rightNode.id === movingNode.id ? candidateY : rightNode.y,
     })
   }
 
@@ -1640,9 +1690,15 @@ export function buildSpouseProjectionState(
   spouseOwnerOverrides: Record<string, UUID>,
   options?: {
     collapseChildEdges?: boolean
+    duplicateBothPartners?: boolean
+    preferSameRowPlacement?: boolean
+    suppressProjectionWhenEitherPartnerParentless?: boolean
   },
 ): SpouseProjectionState {
   const collapseChildEdges = options?.collapseChildEdges ?? true
+  const duplicateBothPartners = options?.duplicateBothPartners ?? false
+  const preferSameRowPlacement = options?.preferSameRowPlacement ?? false
+  const suppressProjectionWhenEitherPartnerParentless = options?.suppressProjectionWhenEitherPartnerParentless ?? false
   const hiddenChildEdgeKeys = new Set<string>()
   const projectedMarriageIds = new Set<UUID>()
   const nodes: SpouseProjectionNode[] = []
@@ -1662,7 +1718,9 @@ export function buildSpouseProjectionState(
       continue
     }
 
-    if (canRenderInlineMarriage(fromNode, toNode)) {
+    const fromParentCount = (validation.parentsByChild.get(relation.from) ?? []).length
+    const toParentCount = (validation.parentsByChild.get(relation.to) ?? []).length
+    if (suppressProjectionWhenEitherPartnerParentless && (fromParentCount === 0 || toParentCount === 0)) {
       continue
     }
 
@@ -1685,37 +1743,55 @@ export function buildSpouseProjectionState(
     const width = 152
     const height = 54
     const horizontalGap = 28
+    const ownerPartnerId = ownerId === relation.from ? relation.to : relation.from
+    const hasSingleAnchoredSpouse = (fromParentCount === 0) !== (toParentCount === 0)
+    const placements = hasSingleAnchoredSpouse
+      ? (() => {
+          const anchorId = fromParentCount > 0 ? relation.from : relation.to
+          const companionId = anchorId === relation.from ? relation.to : relation.from
+          return [{ anchorId, companionId }]
+        })()
+      : duplicateBothPartners
+        ? [
+            { anchorId: ownerId, companionId: ownerPartnerId },
+            { anchorId: ownerPartnerId, companionId: ownerId },
+          ]
+        : [{ anchorId: ownerId, companionId: ownerPartnerId }]
 
-    const anchorId = ownerId
-    const anchorNode = layout.nodes.get(anchorId)
-    const partnerId = anchorId === relation.from ? relation.to : relation.from
-    const partnerNode = layout.nodes.get(partnerId)
+    for (const placementTarget of placements) {
+      const anchorNode = layout.nodes.get(placementTarget.anchorId)
+      const partnerNode = layout.nodes.get(placementTarget.companionId)
 
-    if (!anchorNode || !partnerNode) {
-      continue
+      if (!anchorNode || !partnerNode) {
+        continue
+      }
+
+      if (!duplicateBothPartners && canRenderInlineMarriage(anchorNode, partnerNode)) {
+        continue
+      }
+
+      const side = partnerNode.x >= anchorNode.x ? 'right' : 'left'
+      const placement = findProjectionPlacement(anchorNode, side, width, height, horizontalGap, occupiedRects, preferSameRowPlacement)
+
+      occupiedRects.push({
+        x: placement.x,
+        y: placement.y,
+        width,
+        height,
+      })
+
+      nodes.push({
+        relationId: relation.id,
+        ownerId: placementTarget.anchorId,
+        companionId: placementTarget.companionId,
+        sharedChildren,
+        x: placement.x,
+        y: placement.y,
+        width,
+        height,
+        side,
+      })
     }
-
-    const side = partnerNode.x >= anchorNode.x ? 'right' : 'left'
-    const placement = findProjectionPlacement(anchorNode, side, width, height, horizontalGap, occupiedRects)
-
-    occupiedRects.push({
-      x: placement.x,
-      y: placement.y,
-      width,
-      height,
-    })
-
-    nodes.push({
-      relationId: relation.id,
-      ownerId: anchorId,
-      companionId: partnerId,
-      sharedChildren,
-      x: placement.x,
-      y: placement.y,
-      width,
-      height,
-      side,
-    })
   }
 
   return { hiddenChildEdgeKeys, projectedMarriageIds, nodes }
@@ -1728,10 +1804,37 @@ function findProjectionPlacement(
   height: number,
   horizontalGap: number,
   occupiedRects: ProjectionRect[],
+  preferSameRowPlacement: boolean,
 ): { x: number; y: number } {
+  const sideSign = side === 'right' ? 1 : -1
+  const oppositeSideSign = -sideSign
   const baseX = side === 'right' ? anchorNode.x + anchorNode.width + horizontalGap : anchorNode.x - width - horizontalGap
+  const oppositeBaseX = side === 'right' ? anchorNode.x - width - horizontalGap : anchorNode.x + anchorNode.width + horizontalGap
   const baseY = anchorNode.y + 6
+  const horizontalSteps = [0, 36, 72, 112, 156, 220, 300, 420, 560, 720]
   const offsets = [0, -(height + 18), height + 18, -2 * (height + 18), 2 * (height + 18), -3 * (height + 18), 3 * (height + 18)]
+
+  // Keep projected spouses on the same visual row and choose the nearest free slot.
+  const sameRowCandidates = [
+    ...horizontalSteps.map((step) => ({ x: baseX + sideSign * step, y: baseY, step, sidePenalty: 0 })),
+    ...horizontalSteps.map((step) => ({ x: oppositeBaseX + oppositeSideSign * step, y: baseY, step, sidePenalty: 24 })),
+  ].sort((left, right) => {
+    const leftScore = left.step + left.sidePenalty
+    const rightScore = right.step + right.sidePenalty
+    return leftScore - rightScore
+  })
+
+  for (const candidate of sameRowCandidates) {
+    const rect = { x: candidate.x, y: candidate.y, width, height }
+    if (!occupiedRects.some((occupiedRect) => rectsOverlap(rect, occupiedRect, 10))) {
+      return { x: rect.x, y: rect.y }
+    }
+  }
+
+  if (preferSameRowPlacement) {
+    // In Mode R2, keep spouses on one row even when space is tight.
+    return { x: baseX, y: baseY }
+  }
 
   for (const offsetY of offsets) {
     const candidate = { x: baseX, y: baseY + offsetY, width, height }

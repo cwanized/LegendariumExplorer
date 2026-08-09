@@ -71,6 +71,7 @@ export async function buildPreview3TreePipeline(dataset: LoadedDataset, modeDefi
   const useVirtualGridLayout = modeDefinition.id === 'modeR' || modeDefinition.id === 'modeR2'
   const useModeRLayout = modeDefinition.id === 'modeR'
   const useModeR2Layout = modeDefinition.id === 'modeR2'
+  const marriagePairMaxCenterYDelta = useModeR2Layout ? 220 : 28
   const useElkFirstLayoutPasses = modeDefinition.id === 'modeC'
   const useExperimentalLayoutPasses = modeDefinition.id === 'modeD'
   const rawLayout = useModeR2Layout
@@ -104,11 +105,19 @@ export async function buildPreview3TreePipeline(dataset: LoadedDataset, modeDefi
         validation.validOverlayRelations,
         new Set(singleChildCenterTargets.keys()),
         validation.validBiologicalRelations,
+        { maxCenterYDelta: marriagePairMaxCenterYDelta, preferSameRow: useModeR2Layout },
       )
     : singleParentAlignedLayout
-  const orderedLayout = modeDefinition.pipeline.applyCuratedPersonOrder
-    ? applyCuratedPersonOrder(marriageAlignedLayout, validation.persons)
+  const childAxisCoupleAlignedLayout = useModeR2Layout
+    ? alignTwoParentPairsToChildAxis(
+        marriageAlignedLayout,
+        validation.validBiologicalRelations,
+        validation.validOverlayRelations,
+      )
     : marriageAlignedLayout
+  const orderedLayout = modeDefinition.pipeline.applyCuratedPersonOrder
+    ? applyCuratedPersonOrder(childAxisCoupleAlignedLayout, validation.persons)
+    : childAxisCoupleAlignedLayout
   const personOffsetLayout = modeDefinition.pipeline.applyCuratedPersonOffsets
     ? applyCuratedPersonOffsets(orderedLayout, validation.persons)
     : orderedLayout
@@ -326,6 +335,9 @@ export function buildPreview3RenderedTree({
   const spouseProjection = modeDefinition.render.useSpouseProjection
     ? buildSpouseProjectionState(validation, layout, selectedIds, spouseOwnerOverrides, {
         collapseChildEdges: modeDefinition.render.collapseProjectedChildEdges,
+        duplicateBothPartners: modeDefinition.id === 'modeR2',
+        preferSameRowPlacement: modeDefinition.id === 'modeR2',
+        suppressProjectionWhenEitherPartnerParentless: modeDefinition.id === 'modeR2',
       })
     : {
         hiddenChildEdgeKeys: new Set<string>(),

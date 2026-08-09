@@ -434,6 +434,23 @@
   background: color-mix(in srgb, var(--preview3-tree-border) 72%, transparent);
 }
 
+.preview3-toolbar-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  font-size: 0.82rem;
+  color: var(--preview3-tree-muted);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.preview3-toolbar-toggle input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--preview3-tree-accent);
+}
+
 .preview3-canvas-shell {
   position: relative;
   height: calc(100% - 62px);
