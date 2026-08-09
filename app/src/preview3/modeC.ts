@@ -33,8 +33,13 @@ export function createModeCDefinition(): Preview3ModeDefinition {
       applyDisconnectedComponentPacking: false,
     },
     render: {
-      useSpouseProjection: false,
-      collapseProjectedChildEdges: false,
+      spouseProjection: {
+        enabled: false,
+        collapseChildEdges: false,
+        duplicateStrategy: 'none',
+        parentlessStrategy: 'allow',
+        preferSameRowPlacement: false,
+      },
       showOverlayRelations: false,
       marriageOverlayStyle: 'rigid',
       showHouseAnchors: false,

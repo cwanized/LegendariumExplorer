@@ -1,6 +1,28 @@
 # Current State
 
-**Last Updated: 05. August 2026**
+**Last Updated: 09. August 2026**
+
+## Preview3 Cleanup Checkpoint (Deferred, 09. August 2026)
+
+This is intentionally parked for later continuation.
+
+Current stable checkpoint before pause:
+
+- Build is green (`npm run build` in `app/`).
+- R2 invariants remain stable in Playwright checks:
+	- Arwen/Aragorn each render as `base=1` and `projection=1`.
+	- Silmarien/Elatan projection suppression is active (`projection=0`).
+	- Elrond/Celebrian vertical alignment remains stable (`dy=0`).
+- R2 pair-placement cleanup was progressed without changing the validated behavior:
+	- explicit local pair-placement API is in place,
+	- compatibility wrapper still exists,
+	- pipeline uses the explicit post-layout flow.
+
+Deferred follow-up (do later):
+
+1. Continue semantic cleanup to reduce legacy overlap around pair-placement APIs.
+2. Keep deterministic R2 flow explicit (`family cohesion -> local pair placement -> final geometry`).
+3. Maintain the same guard loop per slice (`build -> Playwright invariants -> continue`).
 
 ## Step 5 Closure (05. August 2026)
 

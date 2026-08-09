@@ -1125,12 +1125,14 @@ export default function Preview3App() {
     spouseOwnerOverrides,
     shouldHideNode,
     modeDefinition: activeModeDefinition,
+    overlayEnabled,
   })
   const {
     spouseProjection,
     houseAnchors,
     overlayRelations,
     biologicalChildGroups,
+    groupParentAnchorsByKey,
   } = renderedTree
   const selectedCount = selectedIds.length
   const rightPanelShift = !rightPanel.collapsed && !rightPanel.undocked && !wideMode && !compactLayout ? rightPanel.width + 28 : 0
@@ -1920,6 +1922,7 @@ export default function Preview3App() {
         canvasViewportRef={canvasViewportRef}
         svgRef={svgRef}
         biologicalChildGroups={biologicalChildGroups}
+        groupParentAnchorsByKey={groupParentAnchorsByKey}
         overlayRelations={overlayRelations}
         spouseProjection={spouseProjection}
         renderPrimaryPanel={renderPrimaryPanel}

@@ -25,10 +25,13 @@ import {
   alignMarriagePairs,
   alignMarriagePairsToFamilyAxis,
   alignTwoParentPairsToChildAxis,
+  normalizeMarriagePairGeometry,
+  placeMarriagePairsLocally,
   recenterMultiChildGroups,
   symmetrizeChildGroups,
   alignSingleParentChildGroups,
   alignSingleParentSingleChildNodes,
+  enforceBiologicalFamilyAxes,
   alignSingleChildNodes,
   buildBiologicalChildGroups,
   buildHouseAnchorDebugEntries,
@@ -38,6 +41,7 @@ import {
   getSingleChildCenterTargets,
   resolveHouseOrderXConflicts,
   resolveHorizontalNodeOverlaps,
+  resolveNodeCollisions2D,
   packDisconnectedComponents,
   scaleLayoutX,
   scaleLayoutY,
@@ -46,6 +50,16 @@ import {
   type HouseAnchorDebugEntry,
   type SpouseProjectionState,
 } from './treeCore'
+
+export type Preview3GroupParentAnchor = {
+  key: string
+  parentId: UUID
+  x: number
+  y: number
+  width: number
+  height: number
+  isProjection: boolean
+}
 
 export type Preview3TreeDebugData = {
   modeId: Preview3ModeDefinition['id']
@@ -99,22 +113,23 @@ export async function buildPreview3TreePipeline(dataset: LoadedDataset, modeDefi
         validation.validOverlayRelations,
       )
     : childAlignedLayout
-  const marriageAlignedLayout = modeDefinition.pipeline.applyMarriagePairAlignment
-    ? alignMarriagePairs(
-        singleParentAlignedLayout,
-        validation.validOverlayRelations,
-        new Set(singleChildCenterTargets.keys()),
-        validation.validBiologicalRelations,
-        { maxCenterYDelta: marriagePairMaxCenterYDelta, preferSameRow: useModeR2Layout },
-      )
-    : singleParentAlignedLayout
   const childAxisCoupleAlignedLayout = useModeR2Layout
-    ? alignTwoParentPairsToChildAxis(
-        marriageAlignedLayout,
-        validation.validBiologicalRelations,
-        validation.validOverlayRelations,
-      )
-    : marriageAlignedLayout
+    ? applyModeR2PostLayoutPasses({
+        layout: singleParentAlignedLayout,
+        overlayRelations: validation.validOverlayRelations,
+        biologicalRelations: validation.validBiologicalRelations,
+        anchoredNodeIds: new Set(singleChildCenterTargets.keys()),
+        marriagePairMaxCenterYDelta,
+      })
+    : modeDefinition.pipeline.applyMarriagePairAlignment
+      ? alignMarriagePairs(
+          singleParentAlignedLayout,
+          validation.validOverlayRelations,
+          new Set(singleChildCenterTargets.keys()),
+          validation.validBiologicalRelations,
+          { maxCenterYDelta: marriagePairMaxCenterYDelta, preferSameRow: false },
+        )
+      : singleParentAlignedLayout
   const orderedLayout = modeDefinition.pipeline.applyCuratedPersonOrder
     ? applyCuratedPersonOrder(childAxisCoupleAlignedLayout, validation.persons)
     : childAxisCoupleAlignedLayout
@@ -312,6 +327,7 @@ export type Preview3RenderedTree = {
   biologicalRelations: Relation[]
   overlayRelations: Relation[]
   biologicalChildGroups: BiologicalChildGroup[]
+  groupParentAnchorsByKey: Map<string, Preview3GroupParentAnchor[]>
 }
 
 export function buildPreview3RenderedTree({
@@ -322,6 +338,7 @@ export function buildPreview3RenderedTree({
   spouseOwnerOverrides,
   shouldHideNode,
   modeDefinition,
+  overlayEnabled,
 }: {
   validation: ValidationResult
   layout: LayoutResult
@@ -330,14 +347,16 @@ export function buildPreview3RenderedTree({
   spouseOwnerOverrides: Record<string, UUID>
   shouldHideNode: (personId: UUID) => boolean
   modeDefinition: Preview3ModeDefinition
+  overlayEnabled: boolean
 }): Preview3RenderedTree {
   const effectiveHouseYOffsetUnit = resolveHouseYOffsetUnit(modeDefinition, layout, validation.validBiologicalRelations)
-  const spouseProjection = modeDefinition.render.useSpouseProjection
+  const spouseProjectionPolicy = modeDefinition.render.spouseProjection
+  const spouseProjection = spouseProjectionPolicy.enabled
     ? buildSpouseProjectionState(validation, layout, selectedIds, spouseOwnerOverrides, {
-        collapseChildEdges: modeDefinition.render.collapseProjectedChildEdges,
-        duplicateBothPartners: modeDefinition.id === 'modeR2',
-        preferSameRowPlacement: modeDefinition.id === 'modeR2',
-        suppressProjectionWhenEitherPartnerParentless: modeDefinition.id === 'modeR2',
+        collapseChildEdges: spouseProjectionPolicy.collapseChildEdges,
+        duplicateBothPartners: spouseProjectionPolicy.duplicateStrategy === 'double-sided',
+        preferSameRowPlacement: spouseProjectionPolicy.preferSameRowPlacement,
+        suppressProjectionWhenEitherPartnerParentless: spouseProjectionPolicy.parentlessStrategy === 'suppress',
       })
     : {
         hiddenChildEdgeKeys: new Set<string>(),
@@ -354,15 +373,21 @@ export function buildPreview3RenderedTree({
 
   const biologicalRelations = validation.validBiologicalRelations
     .filter((relation) => !shouldHideNode(relation.from) && !shouldHideNode(relation.to))
-    .filter((relation) => !modeDefinition.render.useSpouseProjection || !spouseProjection.hiddenChildEdgeKeys.has(`${relation.from}|${relation.to}`))
+    .filter((relation) => !spouseProjectionPolicy.enabled || !spouseProjection.hiddenChildEdgeKeys.has(`${relation.from}|${relation.to}`))
 
   const overlayRelations = modeDefinition.render.showOverlayRelations
     ? validation.validOverlayRelations
       .filter((relation) => !shouldHideNode(relation.from) && !shouldHideNode(relation.to))
-      .filter((relation) => !modeDefinition.render.useSpouseProjection || !spouseProjection.projectedMarriageIds.has(relation.id))
+      .filter((relation) => !spouseProjectionPolicy.enabled || !spouseProjection.projectedMarriageIds.has(relation.id))
     : []
 
   const biologicalChildGroups = buildBiologicalChildGroups(biologicalRelations, layout)
+  const groupParentAnchorsByKey = buildGroupParentAnchorsByKey({
+    biologicalChildGroups,
+    layout,
+    overlayEnabled,
+    spouseProjection,
+  })
 
   return {
     spouseProjection,
@@ -370,7 +395,90 @@ export function buildPreview3RenderedTree({
     biologicalRelations,
     overlayRelations,
     biologicalChildGroups,
+    groupParentAnchorsByKey,
   }
+}
+
+function buildGroupParentAnchorsByKey({
+  biologicalChildGroups,
+  layout,
+  overlayEnabled,
+  spouseProjection,
+}: {
+  biologicalChildGroups: BiologicalChildGroup[]
+  layout: LayoutResult
+  overlayEnabled: boolean
+  spouseProjection: SpouseProjectionState
+}): Map<string, Preview3GroupParentAnchor[]> {
+  const projectionsByCompanionId = new Map<UUID, typeof spouseProjection.nodes>()
+  for (const projection of spouseProjection.nodes) {
+    const projections = projectionsByCompanionId.get(projection.companionId) ?? []
+    projections.push(projection)
+    projectionsByCompanionId.set(projection.companionId, projections)
+  }
+
+  const anchorsByKey = new Map<string, Preview3GroupParentAnchor[]>()
+
+  for (const group of biologicalChildGroups) {
+    const childTopY = Math.min(...group.childNodes.map((node) => node.y))
+    const childCenters = group.childNodes.map((node) => node.x + node.width / 2)
+    const childCenterX = (Math.min(...childCenters) + Math.max(...childCenters)) / 2
+
+    const anchors = group.parentIds
+      .map((parentId) => {
+        const mainNode = layout.nodes.get(parentId)
+        const projectionCandidates = overlayEnabled
+          ? (projectionsByCompanionId.get(parentId) ?? []).filter((projection) => (
+            projection.sharedChildren.some((childId) => group.childIds.includes(childId))
+          ))
+          : []
+
+        const candidates: Preview3GroupParentAnchor[] = []
+
+        if (mainNode) {
+          candidates.push({
+            key: `main:${parentId}`,
+            parentId,
+            x: mainNode.x,
+            y: mainNode.y,
+            width: mainNode.width,
+            height: mainNode.height,
+            isProjection: false,
+          })
+        }
+
+        for (const projection of projectionCandidates) {
+          candidates.push({
+            key: `projection:${projection.relationId}:${projection.ownerId}:${projection.companionId}`,
+            parentId,
+            x: projection.x,
+            y: projection.y,
+            width: projection.width,
+            height: projection.height,
+            isProjection: true,
+          })
+        }
+
+        if (candidates.length === 0) {
+          return null
+        }
+
+        candidates.sort((left, right) => {
+          const leftCenterX = left.x + left.width / 2
+          const rightCenterX = right.x + right.width / 2
+          const leftDistance = Math.hypot(leftCenterX - childCenterX, (left.y + left.height / 2) - childTopY)
+          const rightDistance = Math.hypot(rightCenterX - childCenterX, (right.y + right.height / 2) - childTopY)
+          return leftDistance - rightDistance
+        })
+
+        return candidates[0]
+      })
+      .filter((anchor): anchor is Preview3GroupParentAnchor => anchor !== null)
+
+    anchorsByKey.set(group.key, anchors)
+  }
+
+  return anchorsByKey
 }
 
 function buildVirtualGridLayout(validation: ValidationResult, houseDefinitions: HouseDefinitions): LayoutResult {
@@ -812,6 +920,90 @@ function buildVirtualGridLayout(validation: ValidationResult, houseDefinitions: 
   return { nodes: normalizedNodes }
 }
 
+function applyModeR2PostLayoutPasses({
+  layout,
+  overlayRelations,
+  biologicalRelations,
+  anchoredNodeIds,
+  marriagePairMaxCenterYDelta,
+}: {
+  layout: LayoutResult
+  overlayRelations: Relation[]
+  biologicalRelations: Relation[]
+  anchoredNodeIds: Set<UUID>
+  marriagePairMaxCenterYDelta: number
+}): LayoutResult {
+  const marriageAlignedLayout = placeMarriagePairsLocally(
+    layout,
+    overlayRelations,
+    anchoredNodeIds,
+    biologicalRelations,
+    {
+      maxCenterYDelta: marriagePairMaxCenterYDelta,
+      preferSameRow: true,
+      allowPairMidpointFallback: false,
+      allowAnchoredFallbackPlacement: false,
+    },
+  )
+
+  const childAxisAlignedLayout = alignTwoParentPairsToChildAxis(
+    marriageAlignedLayout,
+    biologicalRelations,
+    overlayRelations,
+    { requireMarriage: false, maxShiftX: 180 },
+  )
+
+  const normalizedMarriageLayout = normalizeMarriagePairGeometry(
+    childAxisAlignedLayout,
+    overlayRelations,
+    { maxCenterYDelta: marriagePairMaxCenterYDelta },
+  )
+
+  const deoverlappedLayout = resolveHorizontalNodeOverlaps(normalizedMarriageLayout, {
+    minimumGap: 24,
+    rowQuantization: 6,
+  })
+
+  const singleChildTargets = getSingleChildCenterTargets(deoverlappedLayout, biologicalRelations)
+  const singleChildCenteredLayout = alignSingleChildNodes(deoverlappedLayout, singleChildTargets)
+
+  const realignedLayout = alignTwoParentPairsToChildAxis(
+    singleChildCenteredLayout,
+    biologicalRelations,
+    overlayRelations,
+    { requireMarriage: false, maxShiftX: 180 },
+  )
+
+  const finalRowDeoverlappedLayout = resolveHorizontalNodeOverlaps(realignedLayout, {
+    minimumGap: 24,
+    rowQuantization: 6,
+  })
+
+  const collisionResolvedLayout = resolveNodeCollisions2D(finalRowDeoverlappedLayout, {
+    minimumGap: 20,
+    maxIterations: 8,
+  })
+
+  // Final R2 stabilization: enforce hard biological axes (1..2 parents, n children)
+  // and alternate with collision resolution so neither constraint class is ignored.
+  let solvedLayout = collisionResolvedLayout
+  for (let iteration = 0; iteration < 5; iteration += 1) {
+    const axisLockedLayout = enforceBiologicalFamilyAxes(solvedLayout, biologicalRelations, {
+      maxParentCount: 2,
+      maxIterations: 6,
+      epsilon: 0.001,
+      targetCoupleGap: 32,
+    })
+
+    solvedLayout = resolveNodeCollisions2D(axisLockedLayout, {
+      minimumGap: 20,
+      maxIterations: 4,
+    })
+  }
+
+  return solvedLayout
+}
+
 function applyModeRStartHouseSubtreeOffsets(
   validation: ValidationResult,
   layout: LayoutResult,
@@ -988,7 +1180,7 @@ function buildPreview3TreeDebugData(
     strategySummary: [
       `Layout: ${modeDefinition.pipeline.layoutStrategy}`,
       `House anchors: ${modeDefinition.pipeline.houseAnchorStrategy}`,
-      `Spouse projection: ${modeDefinition.render.useSpouseProjection ? 'on' : 'off'}`,
+      `Spouse projection: ${modeDefinition.render.spouseProjection.enabled ? 'on' : 'off'}`,
       `Marriage overlay: ${modeDefinition.render.marriageOverlayStyle}`,
       `Curated person order: ${modeDefinition.pipeline.applyCuratedPersonOrder ? 'on' : 'off'}`,
       `Curated person offsets: ${modeDefinition.pipeline.applyCuratedPersonOffsets ? 'on' : 'off'}`,

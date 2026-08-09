@@ -767,6 +767,58 @@ export function resolveHorizontalNodeOverlaps(
   return { nodes: adjustedNodes }
 }
 
+export function resolveNodeCollisions2D(
+  layout: LayoutResult,
+  options?: {
+    minimumGap?: number
+    maxIterations?: number
+  },
+): LayoutResult {
+  const minimumGap = options?.minimumGap ?? 20
+  const maxIterations = options?.maxIterations ?? 6
+  const adjustedNodes = new Map(layout.nodes)
+
+  for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+    let moved = false
+    const nodes = [...adjustedNodes.values()].sort((left, right) => left.x - right.x || left.y - right.y || left.id.localeCompare(right.id))
+
+    for (let index = 0; index < nodes.length; index += 1) {
+      const leftNode = nodes[index]
+
+      for (let innerIndex = index + 1; innerIndex < nodes.length; innerIndex += 1) {
+        const rightNode = nodes[innerIndex]
+        const leftCurrent = adjustedNodes.get(leftNode.id)
+        const rightCurrent = adjustedNodes.get(rightNode.id)
+        if (!leftCurrent || !rightCurrent) {
+          continue
+        }
+
+        const overlapY = Math.min(leftCurrent.y + leftCurrent.height, rightCurrent.y + rightCurrent.height) - Math.max(leftCurrent.y, rightCurrent.y)
+        if (overlapY <= 0) {
+          continue
+        }
+
+        const requiredRightX = leftCurrent.x + leftCurrent.width + minimumGap
+        if (rightCurrent.x >= requiredRightX) {
+          continue
+        }
+
+        moved = true
+        adjustedNodes.set(rightCurrent.id, {
+          ...rightCurrent,
+          x: requiredRightX,
+        })
+      }
+    }
+
+    if (!moved) {
+      break
+    }
+  }
+
+  return { nodes: adjustedNodes }
+}
+
 export function scaleLayoutX(layout: LayoutResult, factor: number): LayoutResult {
   if (!Number.isFinite(factor) || Math.abs(factor - 1) < 0.001) {
     return layout
@@ -1195,6 +1247,113 @@ export function alignSingleParentSingleChildNodes(layout: LayoutResult, relation
   return { nodes: adjustedNodes }
 }
 
+export function enforceBiologicalFamilyAxes(
+  layout: LayoutResult,
+  relations: Relation[],
+  options?: {
+    maxParentCount?: number
+    maxIterations?: number
+    epsilon?: number
+    targetCoupleGap?: number
+  },
+): LayoutResult {
+  const adjustedNodes = new Map(layout.nodes)
+  const maxParentCount = options?.maxParentCount ?? 2
+  const maxIterations = options?.maxIterations ?? 8
+  const epsilon = options?.epsilon ?? 0.01
+  const targetCoupleGap = options?.targetCoupleGap ?? 20
+  const biologicalDegree = buildBiologicalDegreeMap(relations)
+
+  for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+    let changed = false
+    const groups = buildBiologicalChildGroups(relations, { nodes: adjustedNodes })
+
+    for (const group of groups) {
+      if (group.parentIds.length < 1 || group.parentIds.length > maxParentCount || group.childIds.length < 1) {
+        continue
+      }
+
+      const parentNodes = group.parentIds
+        .map((parentId) => adjustedNodes.get(parentId))
+        .filter((node): node is PositionedNode => node !== undefined)
+      const childNodes = group.childIds
+        .map((childId) => adjustedNodes.get(childId))
+        .filter((node): node is PositionedNode => node !== undefined)
+
+      if (parentNodes.length !== group.parentIds.length || childNodes.length !== group.childIds.length) {
+        continue
+      }
+
+      const parentCenters = parentNodes.map((node) => node.x + node.width / 2)
+      const childCenters = childNodes.map((node) => node.x + node.width / 2)
+      const parentAxisX = parentCenters.length === 1
+        ? parentCenters[0]
+        : (Math.min(...parentCenters) + Math.max(...parentCenters)) / 2
+      const childAxisX = childCenters.length === 1
+        ? childCenters[0]
+        : (Math.min(...childCenters) + Math.max(...childCenters)) / 2
+      const deltaX = parentAxisX - childAxisX
+
+      if (Math.abs(deltaX) <= epsilon) {
+        continue
+      }
+
+      changed = true
+
+      if (parentNodes.length === 1 && childNodes.length === 1) {
+        const parentNode = parentNodes[0]
+        const childNode = childNodes[0]
+        const parentDegree = biologicalDegree.get(parentNode.id) ?? 0
+        const childDegree = biologicalDegree.get(childNode.id) ?? 0
+        const moveParent = parentDegree < childDegree
+
+        adjustedNodes.set(moveParent ? parentNode.id : childNode.id, {
+          ...(moveParent ? parentNode : childNode),
+          x: (moveParent ? parentNode.x : childNode.x) + (moveParent ? -deltaX : deltaX),
+        })
+        continue
+      }
+
+      if (parentNodes.length === 2) {
+        const [leftParentNode, rightParentNode] = orderCoupleNodes(parentNodes[0], parentNodes[1])
+        const currentGap = rightParentNode.x - (leftParentNode.x + leftParentNode.width)
+        const pairChanged = Math.abs(deltaX) > epsilon || currentGap > targetCoupleGap + epsilon
+
+        if (!pairChanged) {
+          continue
+        }
+
+        changed = true
+        compactCoupleOnAxis(adjustedNodes, leftParentNode, rightParentNode, childAxisX, targetCoupleGap)
+        continue
+      }
+
+      const parentShiftX = -deltaX * 0.5
+      const childShiftX = deltaX * 0.5
+
+      for (const parentNode of parentNodes) {
+        adjustedNodes.set(parentNode.id, {
+          ...parentNode,
+          x: parentNode.x + parentShiftX,
+        })
+      }
+
+      for (const childNode of childNodes) {
+        adjustedNodes.set(childNode.id, {
+          ...childNode,
+          x: childNode.x + childShiftX,
+        })
+      }
+    }
+
+    if (!changed) {
+      break
+    }
+  }
+
+  return { nodes: adjustedNodes }
+}
+
 export function recenterMultiChildGroups(layout: LayoutResult, relations: Relation[]): LayoutResult {
   const adjustedNodes = new Map(layout.nodes)
   const groups = buildBiologicalChildGroups(relations, layout)
@@ -1312,23 +1471,7 @@ export function symmetrizeChildGroups(
         const spouseNode = spouseId ? adjustedNodes.get(spouseId) : undefined
 
         if (spouseNode) {
-          const [leftNode, rightNode] = childNode.x <= spouseNode.x
-            ? [childNode, spouseNode]
-            : [spouseNode, childNode]
-          const currentGap = rightNode.x - (leftNode.x + leftNode.width)
-          const gap = Math.max(minimumGap, currentGap)
-          const pairWidth = leftNode.width + rightNode.width + gap
-          const nextLeftX = anchorX - pairWidth / 2
-          const nextRightX = nextLeftX + leftNode.width + gap
-
-          adjustedNodes.set(leftNode.id, {
-            ...leftNode,
-            x: nextLeftX,
-          })
-          adjustedNodes.set(rightNode.id, {
-            ...rightNode,
-            x: nextRightX,
-          })
+          centerCoupleOnAxis(adjustedNodes, childNode, spouseNode, anchorX, minimumGap)
           return
         }
       }
@@ -1398,20 +1541,7 @@ export function alignMarriagePairsToFamilyAxis(
     }
 
     const axisX = candidateAxes.reduce((sum, axis) => sum + axis, 0) / candidateAxes.length
-    const [leftNode, rightNode] = firstNode.x <= secondNode.x ? [firstNode, secondNode] : [secondNode, firstNode]
-    const currentGap = rightNode.x - (leftNode.x + leftNode.width)
-    const gap = Math.max(minimumGap, currentGap)
-    const pairWidth = leftNode.width + rightNode.width + gap
-    const nextLeftX = axisX - pairWidth / 2
-
-    adjustedNodes.set(leftNode.id, {
-      ...leftNode,
-      x: nextLeftX,
-    })
-    adjustedNodes.set(rightNode.id, {
-      ...rightNode,
-      x: nextLeftX + leftNode.width + gap,
-    })
+    centerCoupleOnAxis(adjustedNodes, firstNode, secondNode, axisX, minimumGap)
   }
 
   return { nodes: adjustedNodes }
@@ -1421,11 +1551,27 @@ export function alignTwoParentPairsToChildAxis(
   layout: LayoutResult,
   relations: Relation[],
   overlayRelations: Relation[],
+  options?: {
+    maxShiftX?: number
+    requireMarriage?: boolean
+    maxAncestorDriftX?: number
+  },
 ): LayoutResult {
   const adjustedNodes = new Map(layout.nodes)
   const groups = buildBiologicalChildGroups(relations, { nodes: adjustedNodes })
   const minimumGap = 20
+  const maxShiftX = options?.maxShiftX ?? Number.POSITIVE_INFINITY
+  const requireMarriage = options?.requireMarriage ?? true
+  const maxAncestorDriftX = options?.maxAncestorDriftX
   const marriedPairKeys = new Set<string>()
+  const parentIdsByChild = new Map<UUID, UUID[]>()
+
+  for (const relation of relations.filter((candidate) => candidate.type === 'biological_parent')) {
+    const parentIds = parentIdsByChild.get(relation.to) ?? []
+    parentIds.push(relation.from)
+    parentIds.sort((left, right) => left.localeCompare(right))
+    parentIdsByChild.set(relation.to, parentIds)
+  }
 
   for (const relation of overlayRelations.filter((candidate) => candidate.type === 'marriage')) {
     const left = relation.from < relation.to ? relation.from : relation.to
@@ -1443,7 +1589,7 @@ export function alignTwoParentPairsToChildAxis(
     const rightParentId = firstParentId < secondParentId ? secondParentId : firstParentId
     const pairKey = `${leftParentId}|${rightParentId}`
 
-    if (!marriedPairKeys.has(pairKey)) {
+    if (requireMarriage && !marriedPairKeys.has(pairKey)) {
       continue
     }
 
@@ -1462,29 +1608,118 @@ export function alignTwoParentPairsToChildAxis(
     }
 
     const childCenters = childNodes.map((childNode) => childNode.x + childNode.width / 2)
-    const anchorX = (Math.min(...childCenters) + Math.max(...childCenters)) / 2
-    const [leftNode, rightNode] = firstParentNode.x <= secondParentNode.x
-      ? [firstParentNode, secondParentNode]
-      : [secondParentNode, firstParentNode]
-    const currentGap = rightNode.x - (leftNode.x + leftNode.width)
-    const gap = Math.max(minimumGap, currentGap)
-    const pairWidth = leftNode.width + rightNode.width + gap
-    const nextLeftX = anchorX - pairWidth / 2
+    const desiredAxisX = (Math.min(...childCenters) + Math.max(...childCenters)) / 2
+    const currentAxisX = (firstParentNode.x + firstParentNode.width / 2 + secondParentNode.x + secondParentNode.width / 2) / 2
+    const axisDeltaX = desiredAxisX - currentAxisX
+    const boundedAxisX = Number.isFinite(maxShiftX)
+      ? currentAxisX + Math.max(-maxShiftX, Math.min(maxShiftX, axisDeltaX))
+      : desiredAxisX
 
-    adjustedNodes.set(leftNode.id, {
-      ...leftNode,
-      x: nextLeftX,
-    })
-    adjustedNodes.set(rightNode.id, {
-      ...rightNode,
-      x: nextLeftX + leftNode.width + gap,
-    })
+    const ancestorAxes: number[] = []
+    for (const parentNode of [firstParentNode, secondParentNode]) {
+      const ancestorParentIds = parentIdsByChild.get(parentNode.id) ?? []
+      if (ancestorParentIds.length === 0) {
+        continue
+      }
+
+      const ancestorParentNodes = ancestorParentIds
+        .map((ancestorParentId) => adjustedNodes.get(ancestorParentId))
+        .filter((ancestorParentNode): ancestorParentNode is PositionedNode => ancestorParentNode !== undefined)
+
+      if (ancestorParentNodes.length !== ancestorParentIds.length) {
+        continue
+      }
+
+      const ancestorCenters = ancestorParentNodes.map((ancestorParentNode) => ancestorParentNode.x + ancestorParentNode.width / 2)
+      ancestorAxes.push((Math.min(...ancestorCenters) + Math.max(...ancestorCenters)) / 2)
+    }
+
+    const constrainedAxisX = (() => {
+      if (!Number.isFinite(maxAncestorDriftX) || ancestorAxes.length === 0) {
+        return boundedAxisX
+      }
+
+      const ancestorAxisX = ancestorAxes.reduce((sum, axis) => sum + axis, 0) / ancestorAxes.length
+      const maxDrift = Math.max(0, Number(maxAncestorDriftX))
+      const minAxisX = ancestorAxisX - maxDrift
+      const maxAxisRangeX = ancestorAxisX + maxDrift
+      const clampedAxisX = Math.max(minAxisX, Math.min(maxAxisRangeX, boundedAxisX))
+
+      if (Number.isFinite(maxShiftX) && Math.abs(clampedAxisX - currentAxisX) > maxShiftX + 1e-6) {
+        return boundedAxisX
+      }
+
+      return clampedAxisX
+    })()
+
+    centerCoupleOnAxis(adjustedNodes, firstParentNode, secondParentNode, constrainedAxisX, minimumGap)
   }
 
   return { nodes: adjustedNodes }
 }
 
-export function alignMarriagePairs(
+function orderCoupleNodes(
+  firstNode: PositionedNode,
+  secondNode: PositionedNode,
+): [PositionedNode, PositionedNode] {
+  return firstNode.x <= secondNode.x ? [firstNode, secondNode] : [secondNode, firstNode]
+}
+
+function resolveCoupleGap(
+  firstNode: PositionedNode,
+  secondNode: PositionedNode,
+  minimumGap: number,
+): number {
+  const [leftNode, rightNode] = orderCoupleNodes(firstNode, secondNode)
+  const currentGap = rightNode.x - (leftNode.x + leftNode.width)
+  return Math.max(minimumGap, currentGap)
+}
+
+function centerCoupleOnAxis(
+  adjustedNodes: Map<UUID, PositionedNode>,
+  firstNode: PositionedNode,
+  secondNode: PositionedNode,
+  axisX: number,
+  minimumGap: number,
+) {
+  const [leftNode, rightNode] = orderCoupleNodes(firstNode, secondNode)
+  const gap = resolveCoupleGap(leftNode, rightNode, minimumGap)
+  const pairWidth = leftNode.width + rightNode.width + gap
+  const nextLeftX = axisX - pairWidth / 2
+
+  adjustedNodes.set(leftNode.id, {
+    ...leftNode,
+    x: nextLeftX,
+  })
+  adjustedNodes.set(rightNode.id, {
+    ...rightNode,
+    x: nextLeftX + leftNode.width + gap,
+  })
+}
+
+function compactCoupleOnAxis(
+  adjustedNodes: Map<UUID, PositionedNode>,
+  firstNode: PositionedNode,
+  secondNode: PositionedNode,
+  axisX: number,
+  targetGap: number,
+) {
+  const [leftNode, rightNode] = orderCoupleNodes(firstNode, secondNode)
+  const pairGap = Math.max(20, targetGap)
+  const pairWidth = leftNode.width + rightNode.width + pairGap
+  const nextLeftX = axisX - pairWidth / 2
+
+  adjustedNodes.set(leftNode.id, {
+    ...leftNode,
+    x: nextLeftX,
+  })
+  adjustedNodes.set(rightNode.id, {
+    ...rightNode,
+    x: nextLeftX + leftNode.width + pairGap,
+  })
+}
+
+export function placeMarriagePairsLocally(
   layout: LayoutResult,
   relations: Relation[],
   anchoredNodeIds: Set<UUID>,
@@ -1492,6 +1727,8 @@ export function alignMarriagePairs(
   options?: {
     maxCenterYDelta?: number
     preferSameRow?: boolean
+    allowPairMidpointFallback?: boolean
+    allowAnchoredFallbackPlacement?: boolean
   },
 ): LayoutResult {
   const adjustedNodes = new Map(layout.nodes)
@@ -1500,12 +1737,9 @@ export function alignMarriagePairs(
   const sidePadding = 8
   const maxCenterYDelta = options?.maxCenterYDelta ?? 28
   const preferSameRow = options?.preferSameRow ?? false
-  const biologicalDegree = new Map<UUID, number>()
-
-  for (const relation of biologicalRelations.filter((candidate) => candidate.type === 'biological_parent')) {
-    biologicalDegree.set(relation.from, (biologicalDegree.get(relation.from) ?? 0) + 1)
-    biologicalDegree.set(relation.to, (biologicalDegree.get(relation.to) ?? 0) + 1)
-  }
+  const allowPairMidpointFallback = options?.allowPairMidpointFallback ?? true
+  const allowAnchoredFallbackPlacement = options?.allowAnchoredFallbackPlacement ?? true
+  const biologicalDegree = buildBiologicalDegreeMap(biologicalRelations)
 
   for (const relation of relations.filter((candidate) => candidate.type === 'marriage').sort((left, right) => left.id.localeCompare(right.id))) {
     const firstNode = adjustedNodes.get(relation.from)
@@ -1523,19 +1757,12 @@ export function alignMarriagePairs(
     const [leftNode, rightNode] = firstNode.x <= secondNode.x ? [firstNode, secondNode] : [secondNode, firstNode]
     const currentGap = rightNode.x - (leftNode.x + leftNode.width)
 
-    const firstDegree = biologicalDegree.get(firstNode.id) ?? 0
-    const secondDegree = biologicalDegree.get(secondNode.id) ?? 0
-
-    let anchorNode = firstNode
-    let movingNode = secondNode
-
-    if (anchoredNodeIds.has(secondNode.id) && !anchoredNodeIds.has(firstNode.id)) {
-      anchorNode = secondNode
-      movingNode = firstNode
-    } else if (!anchoredNodeIds.has(firstNode.id) && !anchoredNodeIds.has(secondNode.id) && secondDegree > firstDegree) {
-      anchorNode = secondNode
-      movingNode = firstNode
-    }
+    const { anchorNode, movingNode } = resolveMarriageAlignmentRoles(
+      firstNode,
+      secondNode,
+      anchoredNodeIds,
+      biologicalDegree,
+    )
 
     const candidateY = anchorNode.y
 
@@ -1549,104 +1776,27 @@ export function alignMarriagePairs(
       continue
     }
 
-    const rowNodes = [...adjustedNodes.values()].filter((node) => {
-      if (node.id === anchorNode.id || node.id === movingNode.id) {
-        return false
-      }
-
-      const centerYDelta = Math.abs((node.y + node.height / 2) - (candidateY + anchorNode.height / 2))
-      return centerYDelta <= rowTolerance
+    const anchorPlacement = resolveMarriageAnchorPlacement({
+      adjustedNodes,
+      anchorNode,
+      movingNode,
+      candidateY,
+      targetGap,
+      rowTolerance,
+      sidePadding,
+      preferSameRow,
     })
 
-    const candidateRightX = anchorNode.x + anchorNode.width + targetGap
-    const candidateLeftX = anchorNode.x - targetGap - movingNode.width
-
-    const isCandidateFree = (candidateX: number) => !rowNodes.some((node) => {
-      const overlapX = candidateX < node.x + node.width + sidePadding && candidateX + movingNode.width > node.x - sidePadding
-      const overlapY = candidateY < node.y + node.height + sidePadding && candidateY + movingNode.height > node.y - sidePadding
-      return overlapX && overlapY
-    })
-
-    const rightFree = isCandidateFree(candidateRightX)
-    const leftFree = isCandidateFree(candidateLeftX)
-
-    if (rightFree || leftFree) {
-      const nextX = rightFree ? candidateRightX : candidateLeftX
+    if (anchorPlacement) {
       adjustedNodes.set(movingNode.id, {
         ...movingNode,
-        x: nextX,
-        y: candidateY,
+        x: anchorPlacement.x,
+        y: anchorPlacement.y,
       })
       continue
     }
 
-    if (preferSameRow) {
-      const horizontalSearchOffsets = [20, 40, 60, 90, 130, 180, 240, 320, 420, 560]
-      let placedSameRow = false
-
-      for (const offset of horizontalSearchOffsets) {
-        const rightCandidate = candidateRightX + offset
-        if (isCandidateFree(rightCandidate)) {
-          adjustedNodes.set(movingNode.id, {
-            ...movingNode,
-            x: rightCandidate,
-            y: candidateY,
-          })
-          placedSameRow = true
-          break
-        }
-
-        const leftCandidate = candidateLeftX - offset
-        if (isCandidateFree(leftCandidate)) {
-          adjustedNodes.set(movingNode.id, {
-            ...movingNode,
-            x: leftCandidate,
-            y: candidateY,
-          })
-          placedSameRow = true
-          break
-        }
-      }
-
-      if (placedSameRow) {
-        continue
-      }
-    }
-
-    const candidateX = candidateRightX
-    const verticalOffsets = [movingNode.height + 18, 2 * (movingNode.height + 18), 3 * (movingNode.height + 18)]
-    let placed = false
-
-    for (const offset of verticalOffsets) {
-      const nextY = candidateY + offset
-      const collision = [...adjustedNodes.values()].some((node) => {
-        if (node.id === anchorNode.id || node.id === movingNode.id) {
-          return false
-        }
-
-        const overlapX = candidateX < node.x + node.width + sidePadding && candidateX + movingNode.width > node.x - sidePadding
-        const overlapY = nextY < node.y + node.height + sidePadding && nextY + movingNode.height > node.y - sidePadding
-        return overlapX && overlapY
-      })
-
-      if (collision) {
-        continue
-      }
-
-      adjustedNodes.set(movingNode.id, {
-        ...movingNode,
-        x: candidateX,
-        y: nextY,
-      })
-      placed = true
-      break
-    }
-
-    if (placed) {
-      continue
-    }
-
-    if (anchoredNodeIds.has(leftNode.id) && !anchoredNodeIds.has(rightNode.id)) {
+    if (allowAnchoredFallbackPlacement && anchoredNodeIds.has(leftNode.id) && !anchoredNodeIds.has(rightNode.id)) {
       adjustedNodes.set(rightNode.id, {
         ...rightNode,
         x: leftNode.x + leftNode.width + targetGap,
@@ -1655,12 +1805,16 @@ export function alignMarriagePairs(
       continue
     }
 
-    if (anchoredNodeIds.has(rightNode.id) && !anchoredNodeIds.has(leftNode.id)) {
+    if (allowAnchoredFallbackPlacement && anchoredNodeIds.has(rightNode.id) && !anchoredNodeIds.has(leftNode.id)) {
       adjustedNodes.set(leftNode.id, {
         ...leftNode,
         x: rightNode.x - targetGap - leftNode.width,
         y: leftNode.id === movingNode.id ? candidateY : leftNode.y,
       })
+      continue
+    }
+
+    if (!allowPairMidpointFallback) {
       continue
     }
 
@@ -1681,6 +1835,322 @@ export function alignMarriagePairs(
   }
 
   return { nodes: adjustedNodes }
+}
+
+export function alignMarriagePairs(
+  layout: LayoutResult,
+  relations: Relation[],
+  anchoredNodeIds: Set<UUID>,
+  biologicalRelations: Relation[] = [],
+  options?: {
+    maxCenterYDelta?: number
+    preferSameRow?: boolean
+    allowPairMidpointFallback?: boolean
+    allowAnchoredFallbackPlacement?: boolean
+  },
+): LayoutResult {
+  return placeMarriagePairsLocally(
+    layout,
+    relations,
+    anchoredNodeIds,
+    biologicalRelations,
+    options,
+  )
+}
+
+function buildBiologicalDegreeMap(biologicalRelations: Relation[]): Map<UUID, number> {
+  const biologicalDegree = new Map<UUID, number>()
+
+  for (const relation of biologicalRelations.filter((candidate) => candidate.type === 'biological_parent')) {
+    biologicalDegree.set(relation.from, (biologicalDegree.get(relation.from) ?? 0) + 1)
+    biologicalDegree.set(relation.to, (biologicalDegree.get(relation.to) ?? 0) + 1)
+  }
+
+  return biologicalDegree
+}
+
+function resolveMarriageAlignmentRoles(
+  firstNode: PositionedNode,
+  secondNode: PositionedNode,
+  anchoredNodeIds: Set<UUID>,
+  biologicalDegree: Map<UUID, number>,
+): { anchorNode: PositionedNode; movingNode: PositionedNode } {
+  const firstDegree = biologicalDegree.get(firstNode.id) ?? 0
+  const secondDegree = biologicalDegree.get(secondNode.id) ?? 0
+
+  if (anchoredNodeIds.has(secondNode.id) && !anchoredNodeIds.has(firstNode.id)) {
+    return { anchorNode: secondNode, movingNode: firstNode }
+  }
+
+  if (!anchoredNodeIds.has(firstNode.id) && !anchoredNodeIds.has(secondNode.id) && secondDegree > firstDegree) {
+    return { anchorNode: secondNode, movingNode: firstNode }
+  }
+
+  return { anchorNode: firstNode, movingNode: secondNode }
+}
+
+function collectMarriageRowNodes(
+  adjustedNodes: Map<UUID, PositionedNode>,
+  anchorNode: PositionedNode,
+  movingNode: PositionedNode,
+  candidateY: number,
+  rowTolerance: number,
+): PositionedNode[] {
+  return [...adjustedNodes.values()].filter((node) => {
+    if (node.id === anchorNode.id || node.id === movingNode.id) {
+      return false
+    }
+
+    const centerYDelta = Math.abs((node.y + node.height / 2) - (candidateY + anchorNode.height / 2))
+    return centerYDelta <= rowTolerance
+  })
+}
+
+function resolveMarriageAnchorPlacement({
+  adjustedNodes,
+  anchorNode,
+  movingNode,
+  candidateY,
+  targetGap,
+  rowTolerance,
+  sidePadding,
+  preferSameRow,
+}: {
+  adjustedNodes: Map<UUID, PositionedNode>
+  anchorNode: PositionedNode
+  movingNode: PositionedNode
+  candidateY: number
+  targetGap: number
+  rowTolerance: number
+  sidePadding: number
+  preferSameRow: boolean
+}): { x: number; y: number } | null {
+  const rowNodes = collectMarriageRowNodes(adjustedNodes, anchorNode, movingNode, candidateY, rowTolerance)
+  const candidateRightX = anchorNode.x + anchorNode.width + targetGap
+  const candidateLeftX = anchorNode.x - targetGap - movingNode.width
+
+  const isCandidateFree = (candidateX: number) => isMarriagePlacementFree({
+    rowNodes,
+    movingNode,
+    candidateX,
+    candidateY,
+    sidePadding,
+  })
+
+  const sameRowX = resolvePreferredSameRowPlacement(candidateRightX, candidateLeftX, isCandidateFree)
+  if (sameRowX !== null) {
+    return { x: sameRowX, y: candidateY }
+  }
+
+  if (preferSameRow) {
+    const extendedSameRowX = resolveExtendedSameRowPlacement(candidateRightX, candidateLeftX, isCandidateFree)
+    if (extendedSameRowX !== null) {
+      return { x: extendedSameRowX, y: candidateY }
+    }
+  }
+
+  return resolveMarriageVerticalPlacement(adjustedNodes, anchorNode, movingNode, candidateRightX, candidateY, sidePadding)
+}
+
+function isMarriagePlacementFree({
+  rowNodes,
+  movingNode,
+  candidateX,
+  candidateY,
+  sidePadding,
+}: {
+  rowNodes: PositionedNode[]
+  movingNode: PositionedNode
+  candidateX: number
+  candidateY: number
+  sidePadding: number
+}): boolean {
+  return !rowNodes.some((node) => {
+    const overlapX = candidateX < node.x + node.width + sidePadding && candidateX + movingNode.width > node.x - sidePadding
+    const overlapY = candidateY < node.y + node.height + sidePadding && candidateY + movingNode.height > node.y - sidePadding
+    return overlapX && overlapY
+  })
+}
+
+function resolvePreferredSameRowPlacement(
+  candidateRightX: number,
+  candidateLeftX: number,
+  isCandidateFree: (candidateX: number) => boolean,
+): number | null {
+  const rightFree = isCandidateFree(candidateRightX)
+  const leftFree = isCandidateFree(candidateLeftX)
+
+  if (!rightFree && !leftFree) {
+    return null
+  }
+
+  return rightFree ? candidateRightX : candidateLeftX
+}
+
+function resolveExtendedSameRowPlacement(
+  candidateRightX: number,
+  candidateLeftX: number,
+  isCandidateFree: (candidateX: number) => boolean,
+): number | null {
+  const horizontalSearchOffsets = [20, 40, 60, 90, 130, 180]
+
+  for (const offset of horizontalSearchOffsets) {
+    const rightCandidate = candidateRightX + offset
+    if (isCandidateFree(rightCandidate)) {
+      return rightCandidate
+    }
+
+    const leftCandidate = candidateLeftX - offset
+    if (isCandidateFree(leftCandidate)) {
+      return leftCandidate
+    }
+  }
+
+  return null
+}
+
+function resolveMarriageVerticalPlacement(
+  adjustedNodes: Map<UUID, PositionedNode>,
+  anchorNode: PositionedNode,
+  movingNode: PositionedNode,
+  candidateX: number,
+  candidateY: number,
+  sidePadding: number,
+): { x: number; y: number } | null {
+  const verticalOffsets = [movingNode.height + 18, 2 * (movingNode.height + 18), 3 * (movingNode.height + 18)]
+
+  for (const offset of verticalOffsets) {
+    const nextY = candidateY + offset
+    const collision = [...adjustedNodes.values()].some((node) => {
+      if (node.id === anchorNode.id || node.id === movingNode.id) {
+        return false
+      }
+
+      const overlapX = candidateX < node.x + node.width + sidePadding && candidateX + movingNode.width > node.x - sidePadding
+      const overlapY = nextY < node.y + node.height + sidePadding && nextY + movingNode.height > node.y - sidePadding
+      return overlapX && overlapY
+    })
+
+    if (!collision) {
+      return { x: candidateX, y: nextY }
+    }
+  }
+
+  return null
+}
+
+export function normalizeMarriagePairGeometry(
+  layout: LayoutResult,
+  relations: Relation[],
+  options?: {
+    maxCenterYDelta?: number
+    targetGap?: number
+  },
+): LayoutResult {
+  const adjustedNodes = new Map(layout.nodes)
+  const targetGap = options?.targetGap ?? 40
+  const maxCenterYDelta = options?.maxCenterYDelta ?? 28
+  const sidePadding = 8
+
+  for (const relation of relations.filter((candidate) => candidate.type === 'marriage').sort((left, right) => left.id.localeCompare(right.id))) {
+    const firstNode = adjustedNodes.get(relation.from)
+    const secondNode = adjustedNodes.get(relation.to)
+
+    if (!firstNode || !secondNode) {
+      continue
+    }
+
+    const centerYDelta = Math.abs(firstNode.y + firstNode.height / 2 - (secondNode.y + secondNode.height / 2))
+    if (centerYDelta > maxCenterYDelta) {
+      continue
+    }
+
+    const [leftNode, rightNode] = orderCoupleNodes(firstNode, secondNode)
+    const pairMidpoint = (leftNode.x + leftNode.width / 2 + rightNode.x + rightNode.width / 2) / 2
+    const nextLeftX = pairMidpoint - (leftNode.width + rightNode.width + targetGap) / 2
+    const nextRightX = nextLeftX + leftNode.width + targetGap
+    const targetY = Math.min(leftNode.y, rightNode.y)
+
+    const pairPlacement = [
+      {
+        id: leftNode.id,
+        x: nextLeftX,
+        y: targetY,
+        width: leftNode.width,
+        height: leftNode.height,
+      },
+      {
+        id: rightNode.id,
+        x: nextRightX,
+        y: targetY,
+        width: rightNode.width,
+        height: rightNode.height,
+      },
+    ]
+
+    if (!isMarriagePairPlacementFree(adjustedNodes, pairPlacement, sidePadding)) {
+      const yOnlyPlacement = [
+        {
+          id: leftNode.id,
+          x: leftNode.x,
+          y: targetY,
+          width: leftNode.width,
+          height: leftNode.height,
+        },
+        {
+          id: rightNode.id,
+          x: rightNode.x,
+          y: targetY,
+          width: rightNode.width,
+          height: rightNode.height,
+        },
+      ]
+
+      if (isMarriagePairPlacementFree(adjustedNodes, yOnlyPlacement, sidePadding)) {
+        adjustedNodes.set(leftNode.id, {
+          ...leftNode,
+          y: targetY,
+        })
+        adjustedNodes.set(rightNode.id, {
+          ...rightNode,
+          y: targetY,
+        })
+      }
+
+      continue
+    }
+
+    adjustedNodes.set(leftNode.id, {
+      ...leftNode,
+      x: nextLeftX,
+      y: targetY,
+    })
+    adjustedNodes.set(rightNode.id, {
+      ...rightNode,
+      x: nextLeftX + leftNode.width + targetGap,
+      y: targetY,
+    })
+  }
+
+  return { nodes: adjustedNodes }
+}
+
+function isMarriagePairPlacementFree(
+  adjustedNodes: Map<UUID, PositionedNode>,
+  pairPlacement: Array<{ id: UUID; x: number; y: number; width: number; height: number }>,
+  sidePadding: number,
+): boolean {
+  return pairPlacement.every((candidate) => {
+    return ![...adjustedNodes.values()].some((node) => {
+      if (node.id === candidate.id || pairPlacement.some((entry) => entry.id === node.id)) {
+        return false
+      }
+
+      const overlapX = candidate.x < node.x + node.width + sidePadding && candidate.x + candidate.width > node.x - sidePadding
+      const overlapY = candidate.y < node.y + node.height + sidePadding && candidate.y + candidate.height > node.y - sidePadding
+      return overlapX && overlapY
+    })
+  })
 }
 
 export function buildSpouseProjectionState(

@@ -28,6 +28,7 @@ const APPLY_R2_BIOLOGICAL_SYMMETRY_POSTPASS = true
 const APPLY_R2_PARENTLESS_ADJACENCY_POSTPASS = true
 const APPLY_R2_MARRIAGE_ROW_HARMONIZATION = false
 const APPLY_R2_MARRIAGE_Y_ALIGNMENT_POSTPASS = false
+const R2_SYMMETRY_MAX_SHIFT_PER_PASS = COLUMN_SIZE * 1.35
 
 type FamilyGroup = {
   key: string
@@ -441,6 +442,12 @@ function enforceBiologicalFamilySymmetry({
   familyGroups: FamilyGroup[]
 }): Map<UUID, PositionedNode> {
   const adjustedNodes = new Map(nodes)
+  const parentIdsWithChildren = new Set<UUID>()
+  for (const family of familyGroups) {
+    for (const parentId of family.parentIds) {
+      parentIdsWithChildren.add(parentId)
+    }
+  }
   const familiesByTopRow = [...familyGroups].sort((left, right) => {
     const leftRow = Math.min(...left.childIds.map((childId) => adjustedNodes.get(childId)?.y ?? Number.MAX_SAFE_INTEGER))
     const rightRow = Math.min(...right.childIds.map((childId) => adjustedNodes.get(childId)?.y ?? Number.MAX_SAFE_INTEGER))
@@ -459,7 +466,12 @@ function enforceBiologicalFamilySymmetry({
       const parentNodes = family.parentIds
         .map((parentId) => adjustedNodes.get(parentId))
         .filter((node): node is PositionedNode => node !== undefined)
-      const childNodes = family.childIds
+      const movableChildIds = family.childIds.filter((childId) => !parentIdsWithChildren.has(childId))
+      if (movableChildIds.length === 0) {
+        continue
+      }
+      const effectiveChildIds = movableChildIds
+      const childNodes = effectiveChildIds
         .map((childId) => adjustedNodes.get(childId))
         .filter((node): node is PositionedNode => node !== undefined)
 
@@ -471,13 +483,14 @@ function enforceBiologicalFamilySymmetry({
       const childCenters = childNodes.map((node) => node.x + node.width / 2)
       const childCenter = (Math.min(...childCenters) + Math.max(...childCenters)) / 2
       const deltaX = parentCenter - childCenter
+      const clampedDeltaX = Math.max(-R2_SYMMETRY_MAX_SHIFT_PER_PASS, Math.min(R2_SYMMETRY_MAX_SHIFT_PER_PASS, deltaX))
 
-      if (Math.abs(deltaX) < 0.5) {
+      if (Math.abs(clampedDeltaX) < 0.5) {
         continue
       }
 
       changed = true
-      for (const childId of family.childIds) {
+      for (const childId of effectiveChildIds) {
         const node = adjustedNodes.get(childId)
         if (!node) {
           continue
@@ -485,7 +498,7 @@ function enforceBiologicalFamilySymmetry({
 
         adjustedNodes.set(childId, {
           ...node,
-          x: node.x + deltaX,
+          x: node.x + clampedDeltaX,
         })
       }
     }

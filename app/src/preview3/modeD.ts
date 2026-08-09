@@ -11,6 +11,7 @@ export function createModeDDefinition(): Preview3ModeDefinition {
         'validate-dataset',
         'base-layout',
         'single-child-centering',
+        'marriage-pair-alignment',
         'render-tree-preparation',
       ],
       layoutStrategy: 'legacy',
@@ -33,8 +34,13 @@ export function createModeDDefinition(): Preview3ModeDefinition {
       applyDisconnectedComponentPacking: false,
     },
     render: {
-      useSpouseProjection: false,
-      collapseProjectedChildEdges: false,
+      spouseProjection: {
+        enabled: false,
+        collapseChildEdges: false,
+        duplicateStrategy: 'none',
+        parentlessStrategy: 'allow',
+        preferSameRowPlacement: false,
+      },
       showOverlayRelations: false,
       marriageOverlayStyle: 'rigid',
       showHouseAnchors: false,

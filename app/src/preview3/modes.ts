@@ -8,6 +8,7 @@ export type Preview3PipelineStage =
   | 'validate-dataset'
   | 'base-layout'
   | 'single-child-centering'
+  | 'two-parent-child-axis-alignment'
   | 'marriage-pair-alignment'
   | 'curated-person-order'
   | 'curated-person-offsets'
@@ -20,6 +21,16 @@ export type Preview3HouseAnchorStrategy = 'legacy' | 'enhanced'
 export type Preview3MarriageOverlayStyle = 'dashed' | 'rigid'
 export type Preview3HouseYOffsetUnitSource = 'fixed' | 'generation'
 export type Preview3HouseAnchorVerticalAlignment = 'global-top-row' | 'founder-top-row'
+export type Preview3ProjectionDuplicateStrategy = 'none' | 'single-sided' | 'double-sided'
+export type Preview3ProjectionParentlessStrategy = 'allow' | 'suppress'
+
+export type Preview3SpouseProjectionPolicy = {
+  enabled: boolean
+  collapseChildEdges: boolean
+  duplicateStrategy: Preview3ProjectionDuplicateStrategy
+  parentlessStrategy: Preview3ProjectionParentlessStrategy
+  preferSameRowPlacement: boolean
+}
 
 export type Preview3ModeDefinition = {
   id: PreviewTreeMode
@@ -48,8 +59,7 @@ export type Preview3ModeDefinition = {
     applyDisconnectedComponentPacking: boolean
   }
   render: {
-    useSpouseProjection: boolean
-    collapseProjectedChildEdges: boolean
+    spouseProjection: Preview3SpouseProjectionPolicy
     showOverlayRelations: boolean
     marriageOverlayStyle: Preview3MarriageOverlayStyle
     showHouseAnchors: boolean
@@ -100,8 +110,13 @@ const preview3ModeDefinitions: Preview3ModeDefinition[] = [
       applyDisconnectedComponentPacking: false,
     },
     render: {
-      useSpouseProjection: true,
-      collapseProjectedChildEdges: true,
+      spouseProjection: {
+        enabled: true,
+        collapseChildEdges: true,
+        duplicateStrategy: 'single-sided',
+        parentlessStrategy: 'allow',
+        preferSameRowPlacement: false,
+      },
       showOverlayRelations: true,
       marriageOverlayStyle: 'dashed',
       showHouseAnchors: true,
@@ -141,8 +156,13 @@ const preview3ModeDefinitions: Preview3ModeDefinition[] = [
       applyDisconnectedComponentPacking: false,
     },
     render: {
-      useSpouseProjection: false,
-      collapseProjectedChildEdges: true,
+      spouseProjection: {
+        enabled: false,
+        collapseChildEdges: true,
+        duplicateStrategy: 'none',
+        parentlessStrategy: 'allow',
+        preferSameRowPlacement: false,
+      },
       showOverlayRelations: true,
       marriageOverlayStyle: 'rigid',
       showHouseAnchors: true,
@@ -182,8 +202,13 @@ const preview3ModeDefinitions: Preview3ModeDefinition[] = [
       applyDisconnectedComponentPacking: false,
     },
     render: {
-      useSpouseProjection: true,
-      collapseProjectedChildEdges: true,
+      spouseProjection: {
+        enabled: true,
+        collapseChildEdges: true,
+        duplicateStrategy: 'single-sided',
+        parentlessStrategy: 'allow',
+        preferSameRowPlacement: false,
+      },
       showOverlayRelations: true,
       marriageOverlayStyle: 'dashed',
       showHouseAnchors: true,
@@ -226,8 +251,13 @@ const preview3ModeDefinitions: Preview3ModeDefinition[] = [
       applyDisconnectedComponentPacking: false,
     },
     render: {
-      useSpouseProjection: false,
-      collapseProjectedChildEdges: true,
+      spouseProjection: {
+        enabled: false,
+        collapseChildEdges: true,
+        duplicateStrategy: 'none',
+        parentlessStrategy: 'allow',
+        preferSameRowPlacement: false,
+      },
       showOverlayRelations: true,
       marriageOverlayStyle: 'rigid',
       showHouseAnchors: true,

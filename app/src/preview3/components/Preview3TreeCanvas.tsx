@@ -3,7 +3,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 
 import type { CameraView, LayoutResult, UUID, ValidationResult, PositionedNode } from '../../graph'
 import type { Preview3ModeDefinition, Preview3ModeOption } from '../modes'
-import type { Preview3TreeDebugData } from '../treePipeline'
+import type { Preview3GroupParentAnchor, Preview3TreeDebugData } from '../treePipeline'
 import { AppSelect, IconButton, Preview3Icon } from '../ui'
 import type { ExportScope, FadeMode, PreviewTreeMode, ThemePreset, ThemeScope, ThemeState } from '../state'
 import { canRenderInlineMarriage, type BiologicalChildGroup, type HouseAnchor, type SpouseProjectionNode } from '../treeCore'
@@ -11,16 +11,6 @@ import { canRenderInlineMarriage, type BiologicalChildGroup, type HouseAnchor, t
 type LcaAnalysis = {
   edgeIds: Set<UUID>
 } | null
-
-type GroupRenderParentAnchor = {
-  key: string
-  parentId: UUID
-  x: number
-  y: number
-  width: number
-  height: number
-  isProjection: boolean
-}
 
 type Preview3TreeCanvasProps = {
   browserFullscreen: boolean
@@ -59,6 +49,7 @@ type Preview3TreeCanvasProps = {
   canvasViewportRef: RefObject<HTMLDivElement | null>
   svgRef: RefObject<SVGSVGElement | null>
   biologicalChildGroups: BiologicalChildGroup[]
+  groupParentAnchorsByKey: Map<string, Preview3GroupParentAnchor[]>
   overlayRelations: ValidationResult['validOverlayRelations']
   spouseProjection: { nodes: SpouseProjectionNode[] }
   renderPrimaryPanel: (side: 'left' | 'right') => ReactElement | null
@@ -118,6 +109,7 @@ export function Preview3TreeCanvas({
   canvasViewportRef,
   svgRef,
   biologicalChildGroups,
+  groupParentAnchorsByKey,
   overlayRelations,
   spouseProjection,
   renderPrimaryPanel,
@@ -147,70 +139,6 @@ export function Preview3TreeCanvas({
     { value: 'imladris', label: 'Imladris' },
     { value: 'custom', label: 'Custom' },
   ]
-
-  const projectionsByCompanionId = new Map<UUID, SpouseProjectionNode[]>()
-  for (const projection of spouseProjection.nodes) {
-    const projections = projectionsByCompanionId.get(projection.companionId) ?? []
-    projections.push(projection)
-    projectionsByCompanionId.set(projection.companionId, projections)
-  }
-
-  const resolveGroupParentAnchors = (group: BiologicalChildGroup): GroupRenderParentAnchor[] => {
-    const childTopY = Math.min(...group.childNodes.map((node) => node.y))
-    const childCenters = group.childNodes.map((node) => node.x + node.width / 2)
-    const childCenterX = (Math.min(...childCenters) + Math.max(...childCenters)) / 2
-
-    return group.parentIds
-      .map((parentId) => {
-        const mainNode = layout.nodes.get(parentId)
-        const projectionCandidates = overlayEnabled
-          ? (projectionsByCompanionId.get(parentId) ?? []).filter((projection) => (
-            projection.sharedChildren.some((childId) => group.childIds.includes(childId))
-          ))
-          : []
-
-        const candidates: GroupRenderParentAnchor[] = []
-
-        if (mainNode) {
-          candidates.push({
-            key: `main:${parentId}`,
-            parentId,
-            x: mainNode.x,
-            y: mainNode.y,
-            width: mainNode.width,
-            height: mainNode.height,
-            isProjection: false,
-          })
-        }
-
-        for (const projection of projectionCandidates) {
-          candidates.push({
-            key: `projection:${projection.relationId}:${projection.ownerId}:${projection.companionId}`,
-            parentId,
-            x: projection.x,
-            y: projection.y,
-            width: projection.width,
-            height: projection.height,
-            isProjection: true,
-          })
-        }
-
-        if (candidates.length === 0) {
-          return null
-        }
-
-        candidates.sort((left, right) => {
-          const leftCenterX = left.x + left.width / 2
-          const rightCenterX = right.x + right.width / 2
-          const leftDistance = Math.hypot(leftCenterX - childCenterX, (left.y + left.height / 2) - childTopY)
-          const rightDistance = Math.hypot(rightCenterX - childCenterX, (right.y + right.height / 2) - childTopY)
-          return leftDistance - rightDistance
-        })
-
-        return candidates[0]
-      })
-      .filter((anchor): anchor is GroupRenderParentAnchor => anchor !== null)
-  }
 
   const renderedProjectionBacklinkKeys = new Set<string>()
 
@@ -407,18 +335,31 @@ export function Preview3TreeCanvas({
             const highlighted = group.relationIds.some((relationId) => highlightedEdgeIds.has(relationId))
             const groupFiltered = [...group.parentIds, ...group.childIds].some((nodeId) => filteredOutNodeIds.has(nodeId))
             const faded = (lcaAnalysis && fadeMode === 'dim' && !highlighted) || groupFiltered
-            const parentAnchors = resolveGroupParentAnchors(group)
+            const parentAnchors = groupParentAnchorsByKey.get(group.key) ?? []
             if (parentAnchors.length === 0) {
               return null
             }
 
             const parentCenters = parentAnchors.map((anchor) => anchor.x + anchor.width / 2)
-            const renderedJunctionX = parentCenters.length === 1
-              ? parentCenters[0]
-              : (Math.min(...parentCenters) + Math.max(...parentCenters)) / 2
             const childCenters = group.childNodes.map((node) => node.x + node.width / 2)
             const siblingMinX = Math.min(...childCenters)
             const siblingMaxX = Math.max(...childCenters)
+            const childMidpointX = (siblingMinX + siblingMaxX) / 2
+            const parentMinX = Math.min(...parentCenters)
+            const parentMaxX = Math.max(...parentCenters)
+            const parentSpanX = parentMaxX - parentMinX
+            const parentCentersY = parentAnchors.map((anchor) => anchor.y + anchor.height / 2)
+            const parentSpreadY = Math.max(...parentCentersY) - Math.min(...parentCentersY)
+            const referenceChildWidth = group.childNodes[0]?.width ?? 176
+            const parentStretchThresholdX = Math.max(referenceChildWidth * 2.2, 380)
+            const parentStretchThresholdY = Math.max(referenceChildWidth * 0.9, 160)
+            const useChildCenteredJunction = parentAnchors.length > 1
+              && (parentSpanX > parentStretchThresholdX || parentSpreadY > parentStretchThresholdY)
+            const renderedJunctionX = parentCenters.length === 1
+              ? parentCenters[0]
+              : useChildCenteredJunction
+                ? childMidpointX
+                : (parentMinX + parentMaxX) / 2
             const isSingleChildGroup = group.childNodes.length === 1
             const singleChildNode = isSingleChildGroup ? group.childNodes[0] : null
             const isStrictSingleParentSingleChild = isSingleChildGroup && parentAnchors.length === 1

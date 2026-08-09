@@ -10,6 +10,8 @@ export function createModeR2Definition(): Preview3ModeDefinition {
       stages: [
         'validate-dataset',
         'base-layout',
+        'marriage-pair-alignment',
+        'two-parent-child-axis-alignment',
         'house-anchor-placement',
         'render-tree-preparation',
       ],
@@ -33,8 +35,13 @@ export function createModeR2Definition(): Preview3ModeDefinition {
       applyDisconnectedComponentPacking: false,
     },
     render: {
-      useSpouseProjection: true,
-      collapseProjectedChildEdges: false,
+      spouseProjection: {
+        enabled: true,
+        collapseChildEdges: false,
+        duplicateStrategy: 'double-sided',
+        parentlessStrategy: 'suppress',
+        preferSameRowPlacement: true,
+      },
       showOverlayRelations: true,
       marriageOverlayStyle: 'rigid',
       showHouseAnchors: true,
