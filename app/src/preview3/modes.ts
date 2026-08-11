@@ -3,6 +3,7 @@ import { createModeCDefinition } from './modeC'
 import { createModeDDefinition } from './modeD'
 import { createModeRDefinition } from './modeR'
 import { createModeR2Definition } from './modeR2'
+import { createModeR3Definition } from './modeR3'
 
 export type Preview3PipelineStage =
   | 'validate-dataset'
@@ -73,6 +74,7 @@ export type Preview3ModeOption = {
 
 const preview3ModeDefinitions: Preview3ModeDefinition[] = [
   createModeR2Definition(),
+  createModeR3Definition(),
   createModeRDefinition(),
   createModeCDefinition(),
   createModeDDefinition(),

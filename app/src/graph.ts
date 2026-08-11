@@ -866,6 +866,11 @@ export function comparePersonsForLayout(left: Person, right: Person) {
     return leftOrder - rightOrder
   }
 
+  const birthComparison = compareTimeValuesForLayout(left.birth, right.birth)
+  if (birthComparison !== 0) {
+    return birthComparison
+  }
+
   const nameComparison = left.name.localeCompare(right.name)
   if (nameComparison !== 0) {
     return nameComparison
@@ -888,4 +893,29 @@ function comparePersonIdsForLayout(leftId: UUID, rightId: UUID, persons: Person[
   }
 
   return comparePersonsForLayout(left, right)
+}
+
+function compareTimeValuesForLayout(left: TimeValue, right: TimeValue): number {
+  if (left && right) {
+    const eraComparison = left.era.localeCompare(right.era)
+    if (eraComparison !== 0) {
+      return eraComparison
+    }
+
+    if (left.year !== right.year) {
+      return left.year - right.year
+    }
+
+    return 0
+  }
+
+  if (left) {
+    return -1
+  }
+
+  if (right) {
+    return 1
+  }
+
+  return 0
 }

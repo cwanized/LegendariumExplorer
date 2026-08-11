@@ -4,6 +4,11 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import type { CameraView, LayoutResult, UUID, ValidationResult, PositionedNode } from '../../graph'
 import type { Preview3ModeDefinition, Preview3ModeOption } from '../modes'
 import type { Preview3GroupParentAnchor, Preview3TreeDebugData } from '../treePipeline'
+import {
+  R2_RASTER_COLUMN_SIZE,
+  R2_RASTER_OUTER_PADDING,
+  R2_RASTER_ROW_HEIGHT,
+} from '../rasterModeR2'
 import { AppSelect, IconButton, Preview3Icon } from '../ui'
 import type { ExportScope, FadeMode, PreviewTreeMode, ThemePreset, ThemeScope, ThemeState } from '../state'
 import { canRenderInlineMarriage, type BiologicalChildGroup, type HouseAnchor, type SpouseProjectionNode } from '../treeCore'
@@ -43,6 +48,7 @@ type Preview3TreeCanvasProps = {
   treeMode: PreviewTreeMode
   modeDefinition: Preview3ModeDefinition
   modeOptions: Preview3ModeOption[]
+  followRulerLine: boolean
   overlayEnabled: boolean
   validation: ValidationResult
   wideMode: boolean
@@ -64,6 +70,7 @@ type Preview3TreeCanvasProps = {
   onOpenSpouseContinuation: (relationId: UUID, ownerId: UUID) => void
   onPanelCollapse: (side: 'left' | 'right') => void
   onTreeModeChange: (mode: PreviewTreeMode) => void
+  onFollowRulerLineToggle: () => void
   onOverlayToggle: () => void
   onTreeThemeEditorToggle: () => void
   onTreeThemePresetChange: (preset: ThemePreset) => void
@@ -103,6 +110,7 @@ export function Preview3TreeCanvas({
   treeMode,
   modeDefinition,
   modeOptions,
+  followRulerLine,
   overlayEnabled,
   validation,
   wideMode,
@@ -124,6 +132,7 @@ export function Preview3TreeCanvas({
   onOpenSpouseContinuation,
   onPanelCollapse,
   onTreeModeChange,
+  onFollowRulerLineToggle,
   onOverlayToggle,
   onTreeThemeEditorToggle,
   onTreeThemePresetChange,
@@ -141,6 +150,41 @@ export function Preview3TreeCanvas({
   ]
 
   const renderedProjectionBacklinkKeys = new Set<string>()
+  const showR2HelperGrid = modeDefinition.id === 'modeR2'
+  const helperGridMinX = cameraView.x - 800
+  const helperGridMaxX = cameraView.x + cameraView.width + 800
+  const helperGridMinY = cameraView.y - 800
+  const helperGridMaxY = cameraView.y + cameraView.height + 800
+  const helperGridPrimaryOriginX = R2_RASTER_OUTER_PADDING
+  const helperGridSecondaryOriginX = helperGridPrimaryOriginX + R2_RASTER_COLUMN_SIZE / 2
+  const helperGridCellStepX = R2_RASTER_COLUMN_SIZE / 2
+  const helperGridOriginY = R2_RASTER_OUTER_PADDING
+  const helperGridVerticalCellLines: number[] = []
+  const helperGridVerticalLinesPrimary: number[] = []
+  const helperGridVerticalLinesSecondary: number[] = []
+  const helperGridHorizontalLines: number[] = []
+
+  if (showR2HelperGrid) {
+    const startCellX = helperGridPrimaryOriginX + Math.floor((helperGridMinX - helperGridPrimaryOriginX) / helperGridCellStepX) * helperGridCellStepX
+    for (let x = startCellX; x <= helperGridMaxX; x += helperGridCellStepX) {
+      helperGridVerticalCellLines.push(x)
+    }
+
+    const startPrimaryX = helperGridPrimaryOriginX + Math.floor((helperGridMinX - helperGridPrimaryOriginX) / R2_RASTER_COLUMN_SIZE) * R2_RASTER_COLUMN_SIZE
+    for (let x = startPrimaryX; x <= helperGridMaxX; x += R2_RASTER_COLUMN_SIZE) {
+      helperGridVerticalLinesPrimary.push(x)
+    }
+
+    const startSecondaryX = helperGridSecondaryOriginX + Math.floor((helperGridMinX - helperGridSecondaryOriginX) / R2_RASTER_COLUMN_SIZE) * R2_RASTER_COLUMN_SIZE
+    for (let x = startSecondaryX; x <= helperGridMaxX; x += R2_RASTER_COLUMN_SIZE) {
+      helperGridVerticalLinesSecondary.push(x)
+    }
+
+    const startY = helperGridOriginY + Math.floor((helperGridMinY - helperGridOriginY) / R2_RASTER_ROW_HEIGHT) * R2_RASTER_ROW_HEIGHT
+    for (let y = startY; y <= helperGridMaxY; y += R2_RASTER_ROW_HEIGHT) {
+      helperGridHorizontalLines.push(y)
+    }
+  }
 
   return (
     <section className={`preview3-workspace ${contentFullscreen ? 'content-fullscreen' : ''}`}>
@@ -182,6 +226,12 @@ export function Preview3TreeCanvas({
             <input type="checkbox" checked={overlayEnabled} onChange={onOverlayToggle} />
             <span>Overlay</span>
           </label>
+          {modeDefinition.id !== 'modeR3' ? null : (
+            <label className="preview3-toolbar-toggle" title="Follow owner ruler-line for child axis placement">
+              <input type="checkbox" checked={followRulerLine} onChange={onFollowRulerLineToggle} />
+              <span>FollowRulerLine</span>
+            </label>
+          )}
         </div>
         <Preview3Icon name="separator" />
         <div className="preview3-toolbar-group align-end">
@@ -222,6 +272,22 @@ export function Preview3TreeCanvas({
             </pattern>
           </defs>
           <rect x={cameraView.x - 800} y={cameraView.y - 800} width={cameraView.width + 1600} height={cameraView.height + 1600} fill={`url(#${panelId}-grid)`} />
+          {!showR2HelperGrid ? null : (
+            <g aria-label="mode-r2-helper-grid" pointerEvents="none">
+              {helperGridVerticalCellLines.map((x) => (
+                <line key={`r2-grid-cell-${x}`} x1={x} y1={helperGridMinY} x2={x} y2={helperGridMaxY} stroke="#64748b" strokeWidth={0.9} strokeOpacity={0.16} />
+              ))}
+              {helperGridVerticalLinesPrimary.map((x) => (
+                <line key={`r2-grid-primary-${x}`} x1={x} y1={helperGridMinY} x2={x} y2={helperGridMaxY} stroke="#2c7a7b" strokeWidth={1.2} strokeOpacity={0.24} />
+              ))}
+              {helperGridVerticalLinesSecondary.map((x) => (
+                <line key={`r2-grid-secondary-${x}`} x1={x} y1={helperGridMinY} x2={x} y2={helperGridMaxY} stroke="#b45309" strokeWidth={1} strokeDasharray="4 4" strokeOpacity={0.24} />
+              ))}
+              {helperGridHorizontalLines.map((y) => (
+                <line key={`r2-grid-row-${y}`} x1={helperGridMinX} y1={y} x2={helperGridMaxX} y2={y} stroke="#334155" strokeWidth={1} strokeOpacity={0.18} />
+              ))}
+            </g>
+          )}
           <rect x={cameraView.x - 800} y={cameraView.y - 800} width={cameraView.width + 1600} height={cameraView.height + 1600} fill="transparent" onPointerDown={startCanvasPan} />
           {debugOverlaysEnabled && debugData ? debugData.houseAnchors.map((entry) => {
             const rootNodes = entry.rootNodeIds
@@ -254,7 +320,7 @@ export function Preview3TreeCanvas({
               return null
             }
 
-            const renderAnchorAsNode = modeDefinition.id === 'modeR' || modeDefinition.id === 'modeR2'
+            const renderAnchorAsNode = modeDefinition.id === 'modeR' || modeDefinition.id === 'modeR2' || modeDefinition.id === 'modeR3'
             const anchorRenderWidth = renderAnchorAsNode ? Math.max(anchor.width, 176) : anchor.width
             const anchorRenderHeight = renderAnchorAsNode ? 64 : anchor.height
             const anchorRenderX = renderAnchorAsNode
@@ -340,65 +406,46 @@ export function Preview3TreeCanvas({
               return null
             }
 
-            const parentCenters = parentAnchors.map((anchor) => anchor.x + anchor.width / 2)
             const childCenters = group.childNodes.map((node) => node.x + node.width / 2)
             const siblingMinX = Math.min(...childCenters)
             const siblingMaxX = Math.max(...childCenters)
-            const childMidpointX = (siblingMinX + siblingMaxX) / 2
-            const parentMinX = Math.min(...parentCenters)
-            const parentMaxX = Math.max(...parentCenters)
-            const parentSpanX = parentMaxX - parentMinX
-            const parentCentersY = parentAnchors.map((anchor) => anchor.y + anchor.height / 2)
-            const parentSpreadY = Math.max(...parentCentersY) - Math.min(...parentCentersY)
-            const referenceChildWidth = group.childNodes[0]?.width ?? 176
-            const parentStretchThresholdX = Math.max(referenceChildWidth * 2.2, 380)
-            const parentStretchThresholdY = Math.max(referenceChildWidth * 0.9, 160)
-            const useChildCenteredJunction = parentAnchors.length > 1
-              && (parentSpanX > parentStretchThresholdX || parentSpreadY > parentStretchThresholdY)
+            const parentCenters = parentAnchors.map((anchor) => anchor.x + anchor.width / 2)
             const renderedJunctionX = parentCenters.length === 1
               ? parentCenters[0]
-              : useChildCenteredJunction
-                ? childMidpointX
-                : (parentMinX + parentMaxX) / 2
+              : (Math.min(...parentCenters) + Math.max(...parentCenters)) / 2
             const isSingleChildGroup = group.childNodes.length === 1
-            const singleChildNode = isSingleChildGroup ? group.childNodes[0] : null
-            const isStrictSingleParentSingleChild = isSingleChildGroup && parentAnchors.length === 1
 
             return (
               <g key={group.key}>
                 {parentAnchors.map((anchor) => {
                   const parentCenterX = anchor.x + anchor.width / 2
                   const parentBottomY = anchor.y + anchor.height
-                  const targetX = singleChildNode ? singleChildNode.x + singleChildNode.width / 2 : renderedJunctionX
-                  const targetY = singleChildNode ? singleChildNode.y : group.junctionY
-                  const controlY = singleChildNode ? parentBottomY + Math.max((targetY - parentBottomY) * 0.45, 18) : parentBottomY + Math.max((group.junctionY - parentBottomY) * 0.7, 16)
+                  const targetX = renderedJunctionX
+                  const targetY = group.junctionY
 
-                  if (isStrictSingleParentSingleChild && singleChildNode) {
-                    const childCenterX = singleChildNode.x + singleChildNode.width / 2
-
-                    return (
+                  return (
+                    <g key={`${group.key}:${anchor.key}:parent`}>
                       <line
-                        key={`${group.key}:${anchor.key}:parent`}
                         x1={parentCenterX}
                         y1={parentBottomY}
-                        x2={childCenterX}
-                        y2={singleChildNode.y}
+                        x2={parentCenterX}
+                        y2={targetY}
                         stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'}
                         strokeWidth={highlighted ? 3.6 : 2.2}
                         strokeOpacity={faded ? 0.22 : 0.92}
                       />
-                    )
-                  }
-
-                  return (
-                    <path
-                      key={`${group.key}:${anchor.key}:parent`}
-                      d={`M ${parentCenterX} ${parentBottomY} Q ${parentCenterX} ${controlY} ${targetX} ${targetY}`}
-                      fill="none"
-                      stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'}
-                      strokeWidth={highlighted ? 3.6 : 2.2}
-                      strokeOpacity={faded ? 0.22 : 0.92}
-                    />
+                      {Math.abs(parentCenterX - targetX) <= 0.5 ? null : (
+                        <line
+                          x1={parentCenterX}
+                          y1={targetY}
+                          x2={targetX}
+                          y2={targetY}
+                          stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'}
+                          strokeWidth={highlighted ? 3.6 : 2.2}
+                          strokeOpacity={faded ? 0.22 : 0.92}
+                        />
+                      )}
+                    </g>
                   )
                 })}
 
@@ -442,11 +489,22 @@ export function Preview3TreeCanvas({
 
                 {group.childNodes.length > 1 ? <line x1={siblingMinX} y1={group.siblingY} x2={siblingMaxX} y2={group.siblingY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} /> : null}
 
-                {!isSingleChildGroup ? group.childNodes.map((node) => {
+                {group.childNodes.map((node) => {
                   const childCenterX = node.x + node.width / 2
                   const childTopY = node.y
-                  return <line key={`${group.key}:${node.id}:child`} x1={childCenterX} y1={group.childNodes.length > 1 ? group.siblingY : group.junctionY} x2={childCenterX} y2={childTopY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} />
-                }) : null}
+                  if (group.childNodes.length > 1) {
+                    return <line key={`${group.key}:${node.id}:child`} x1={childCenterX} y1={group.siblingY} x2={childCenterX} y2={childTopY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} />
+                  }
+
+                  return (
+                    <g key={`${group.key}:${node.id}:child`}>
+                      <line x1={renderedJunctionX} y1={group.junctionY} x2={renderedJunctionX} y2={childTopY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} />
+                      {Math.abs(childCenterX - renderedJunctionX) <= 0.5 ? null : (
+                        <line x1={renderedJunctionX} y1={childTopY} x2={childCenterX} y2={childTopY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} />
+                      )}
+                    </g>
+                  )
+                })}
               </g>
             )
           })}
@@ -492,7 +550,7 @@ export function Preview3TreeCanvas({
             const hasSources = (person.sourceLinks?.length ?? 0) > 0
 
             return (
-              <g key={person.id} onClick={(event) => onNodeSelect(event, person.id)} className="preview3-node-group">
+              <g key={person.id} data-person-id={person.id} onClick={(event) => onNodeSelect(event, person.id)} className="preview3-node-group">
                 {isMatched ? <rect x={node.x - 4} y={node.y - 4} rx={22} ry={22} width={node.width + 8} height={node.height + 8} fill="none" stroke="var(--preview3-tree-accent)" strokeOpacity={0.65} strokeWidth={2.4} /> : null}
                 <rect x={node.x} y={node.y} rx={18} ry={18} width={node.width} height={node.height} fill="var(--preview3-tree-node-fill)" stroke={isSelected ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-border)'} strokeWidth={isFocused || isSelected ? 3.5 : 1.6} opacity={isDimmed ? 0.28 : 1} />
                 <text x={node.x + 14} y={node.y + 24} className="preview3-svg-name">{person.name}</text>

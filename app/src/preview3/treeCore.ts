@@ -9,6 +9,7 @@ import type {
   UUID,
   ValidationResult,
 } from '../graph'
+import { resolveContinuationOwner } from './continuation'
 import type { Preview3HouseAnchorVerticalAlignment } from './modes'
 import { comparePersonsForLayout } from '../graph'
 
@@ -772,11 +773,23 @@ export function resolveNodeCollisions2D(
   options?: {
     minimumGap?: number
     maxIterations?: number
+    rasterColumnStep?: number
+    rasterColumnOrigin?: number
   },
 ): LayoutResult {
   const minimumGap = options?.minimumGap ?? 20
   const maxIterations = options?.maxIterations ?? 6
+  const rasterColumnStep = options?.rasterColumnStep
+  const rasterColumnOrigin = options?.rasterColumnOrigin ?? 0
   const adjustedNodes = new Map(layout.nodes)
+
+  const snapToRaster = (value: number): number => {
+    if (!Number.isFinite(value) || rasterColumnStep === undefined || rasterColumnStep <= 0) {
+      return value
+    }
+
+    return rasterColumnOrigin + Math.round((value - rasterColumnOrigin) / rasterColumnStep) * rasterColumnStep
+  }
 
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
     let moved = false
@@ -798,7 +811,7 @@ export function resolveNodeCollisions2D(
           continue
         }
 
-        const requiredRightX = leftCurrent.x + leftCurrent.width + minimumGap
+        const requiredRightX = snapToRaster(leftCurrent.x + leftCurrent.width + minimumGap)
         if (rightCurrent.x >= requiredRightX) {
           continue
         }
@@ -1729,6 +1742,10 @@ export function placeMarriagePairsLocally(
     preferSameRow?: boolean
     allowPairMidpointFallback?: boolean
     allowAnchoredFallbackPlacement?: boolean
+    rasterColumnStep?: number
+    rasterColumnOrigin?: number
+    rasterRowStep?: number
+    rasterRowOrigin?: number
   },
 ): LayoutResult {
   const adjustedNodes = new Map(layout.nodes)
@@ -1739,7 +1756,19 @@ export function placeMarriagePairsLocally(
   const preferSameRow = options?.preferSameRow ?? false
   const allowPairMidpointFallback = options?.allowPairMidpointFallback ?? true
   const allowAnchoredFallbackPlacement = options?.allowAnchoredFallbackPlacement ?? true
+  const rasterColumnStep = options?.rasterColumnStep
+  const rasterColumnOrigin = options?.rasterColumnOrigin ?? 0
+  const rasterRowStep = options?.rasterRowStep
+  const rasterRowOrigin = options?.rasterRowOrigin ?? 0
   const biologicalDegree = buildBiologicalDegreeMap(biologicalRelations)
+
+  const snapToRaster = (value: number, origin: number, step?: number): number => {
+    if (!Number.isFinite(value) || step === undefined || step <= 0) {
+      return value
+    }
+
+    return origin + Math.round((value - origin) / step) * step
+  }
 
   for (const relation of relations.filter((candidate) => candidate.type === 'marriage').sort((left, right) => left.id.localeCompare(right.id))) {
     const firstNode = adjustedNodes.get(relation.from)
@@ -1764,13 +1793,13 @@ export function placeMarriagePairsLocally(
       biologicalDegree,
     )
 
-    const candidateY = anchorNode.y
+    const candidateY = snapToRaster(anchorNode.y, rasterRowOrigin, rasterRowStep)
 
     if (Math.abs(currentGap - targetGap) < 1) {
       if (Math.abs(movingNode.y - candidateY) > 0.5) {
         adjustedNodes.set(movingNode.id, {
           ...movingNode,
-          y: candidateY,
+            y: candidateY,
         })
       }
       continue
@@ -1790,8 +1819,8 @@ export function placeMarriagePairsLocally(
     if (anchorPlacement) {
       adjustedNodes.set(movingNode.id, {
         ...movingNode,
-        x: anchorPlacement.x,
-        y: anchorPlacement.y,
+          x: snapToRaster(anchorPlacement.x, rasterColumnOrigin, rasterColumnStep),
+          y: snapToRaster(anchorPlacement.y, rasterRowOrigin, rasterRowStep),
       })
       continue
     }
@@ -1799,7 +1828,7 @@ export function placeMarriagePairsLocally(
     if (allowAnchoredFallbackPlacement && anchoredNodeIds.has(leftNode.id) && !anchoredNodeIds.has(rightNode.id)) {
       adjustedNodes.set(rightNode.id, {
         ...rightNode,
-        x: leftNode.x + leftNode.width + targetGap,
+        x: snapToRaster(leftNode.x + leftNode.width + targetGap, rasterColumnOrigin, rasterColumnStep),
         y: rightNode.id === movingNode.id ? candidateY : rightNode.y,
       })
       continue
@@ -1808,7 +1837,7 @@ export function placeMarriagePairsLocally(
     if (allowAnchoredFallbackPlacement && anchoredNodeIds.has(rightNode.id) && !anchoredNodeIds.has(leftNode.id)) {
       adjustedNodes.set(leftNode.id, {
         ...leftNode,
-        x: rightNode.x - targetGap - leftNode.width,
+        x: snapToRaster(rightNode.x - targetGap - leftNode.width, rasterColumnOrigin, rasterColumnStep),
         y: leftNode.id === movingNode.id ? candidateY : leftNode.y,
       })
       continue
@@ -1824,12 +1853,12 @@ export function placeMarriagePairsLocally(
 
     adjustedNodes.set(leftNode.id, {
       ...leftNode,
-      x: nextLeftX,
+      x: snapToRaster(nextLeftX, rasterColumnOrigin, rasterColumnStep),
       y: leftNode.id === movingNode.id ? candidateY : leftNode.y,
     })
     adjustedNodes.set(rightNode.id, {
       ...rightNode,
-      x: nextLeftX + leftNode.width + targetGap,
+      x: snapToRaster(nextLeftX + leftNode.width + targetGap, rasterColumnOrigin, rasterColumnStep),
       y: rightNode.id === movingNode.id ? candidateY : rightNode.y,
     })
   }
@@ -2353,53 +2382,11 @@ function resolveProjectedMarriageOwner({
   validation: ValidationResult
   spouseOwnerOverrides: Record<string, UUID>
 }): UUID {
-  const continuationOwner = relation.attributes?.layout?.continuationOwner
-
-  if (continuationOwner === 'from') {
-    return relation.from
-  }
-
-  if (continuationOwner === 'to') {
-    return relation.to
-  }
-
-  const overrideOwnerId = spouseOwnerOverrides[relation.id]
-
-  if (overrideOwnerId === relation.from || overrideOwnerId === relation.to) {
-    return overrideOwnerId
-  }
-
-  const fromGender = normalizeGender(validation.personById.get(relation.from)?.gender)
-  const toGender = normalizeGender(validation.personById.get(relation.to)?.gender)
-
-  if (fromGender === 'male' && toGender !== 'male') {
-    return relation.from
-  }
-
-  if (toGender === 'male' && fromGender !== 'male') {
-    return relation.to
-  }
-
-  // Deterministic fallback when no override and no clear gender-based owner exists.
-  return relation.from
-}
-
-function normalizeGender(value: string | null | undefined): 'male' | 'female' | 'other' {
-  if (!value) {
-    return 'other'
-  }
-
-  const normalized = value.trim().toLowerCase()
-
-  if (normalized === 'male' || normalized === 'm' || normalized === 'mann' || normalized === 'männlich') {
-    return 'male'
-  }
-
-  if (normalized === 'female' || normalized === 'f' || normalized === 'frau' || normalized === 'weiblich') {
-    return 'female'
-  }
-
-  return 'other'
+  return resolveContinuationOwner({
+    relation,
+    validation,
+    spouseOwnerOverrides,
+  })
 }
 
 export function expandCameraBounds(camera: CameraView, projections: SpouseProjectionNode[], houseAnchors: HouseAnchor[]): CameraView {

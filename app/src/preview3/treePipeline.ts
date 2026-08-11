@@ -17,6 +17,13 @@ import type {
 } from '../graph'
 import type { Preview3ModeDefinition, Preview3PipelineStage } from './modes'
 import { buildModeR2Layout } from './rasterModeR2'
+import { buildModeR3Layout, getModeR3LayoutArtifacts } from './r3/layout'
+import { buildModeR3BiologicalChildGroups, buildModeR3HouseAnchors } from './r3/render'
+import {
+  R2_RASTER_COLUMN_SIZE,
+  R2_RASTER_OUTER_PADDING,
+  R2_RASTER_ROW_HEIGHT,
+} from './rasterModeR2'
 
 import {
   applyHouseSubtreeOffsets,
@@ -80,15 +87,25 @@ export type Preview3TreePipelineResult = {
   debugData: Preview3TreeDebugData
 }
 
-export async function buildPreview3TreePipeline(dataset: LoadedDataset, modeDefinition: Preview3ModeDefinition): Promise<Preview3TreePipelineResult> {
+export async function buildPreview3TreePipeline(
+  dataset: LoadedDataset,
+  modeDefinition: Preview3ModeDefinition,
+  options?: {
+    followRulerLine?: boolean
+  },
+): Promise<Preview3TreePipelineResult> {
+  const followRulerLine = options?.followRulerLine ?? false
   const validation = validateDataset(dataset)
-  const useVirtualGridLayout = modeDefinition.id === 'modeR' || modeDefinition.id === 'modeR2'
+  const useVirtualGridLayout = modeDefinition.id === 'modeR' || modeDefinition.id === 'modeR2' || modeDefinition.id === 'modeR3'
   const useModeRLayout = modeDefinition.id === 'modeR'
   const useModeR2Layout = modeDefinition.id === 'modeR2'
+  const useModeR3Layout = modeDefinition.id === 'modeR3'
   const marriagePairMaxCenterYDelta = useModeR2Layout ? 220 : 28
   const useElkFirstLayoutPasses = modeDefinition.id === 'modeC'
   const useExperimentalLayoutPasses = modeDefinition.id === 'modeD'
-  const rawLayout = useModeR2Layout
+  const rawLayout = useModeR3Layout
+    ? buildModeR3Layout(validation, dataset.houseDefinitions, { followRulerLine })
+    : useModeR2Layout
     ? buildModeR2Layout(validation, dataset.houseDefinitions)
     : useVirtualGridLayout
       ? buildVirtualGridLayout(validation, dataset.houseDefinitions)
@@ -276,13 +293,15 @@ export async function buildPreview3TreePipeline(dataset: LoadedDataset, modeDefi
     )
   }
 
-  let houseAnchors = buildHouseAnchors(validation, layout, dataset.houseDefinitions, {
-    strategy: modeDefinition.pipeline.houseAnchorStrategy,
-    applyHouseLayoutYOffset: modeDefinition.pipeline.applyHouseAnchorYOffset,
-    houseYOffsetUnit: effectiveHouseYOffsetUnit,
-    preserveIdealCenterX: modeDefinition.pipeline.strictAnchorCentering,
-    verticalAlignment: modeDefinition.pipeline.houseAnchorVerticalAlignment,
-  })
+  let houseAnchors = modeDefinition.id === 'modeR3'
+    ? buildModeR3HouseAnchors(validation, layout, dataset.houseDefinitions, { allowFallback: false })
+    : buildHouseAnchors(validation, layout, dataset.houseDefinitions, {
+        strategy: modeDefinition.pipeline.houseAnchorStrategy,
+        applyHouseLayoutYOffset: modeDefinition.pipeline.applyHouseAnchorYOffset,
+        houseYOffsetUnit: effectiveHouseYOffsetUnit,
+        preserveIdealCenterX: modeDefinition.pipeline.strictAnchorCentering,
+        verticalAlignment: modeDefinition.pipeline.houseAnchorVerticalAlignment,
+      })
 
   if (useModeRLayout) {
     if (houseAnchors.length > 0) {
@@ -303,7 +322,15 @@ export async function buildPreview3TreePipeline(dataset: LoadedDataset, modeDefi
     }
   }
 
-  const debugData = buildPreview3TreeDebugData(validation, layout, dataset.houseDefinitions, houseAnchors, modeDefinition, effectiveHouseYOffsetUnit)
+  const debugData = buildPreview3TreeDebugData(
+    validation,
+    layout,
+    dataset.houseDefinitions,
+    houseAnchors,
+    modeDefinition,
+    effectiveHouseYOffsetUnit,
+    followRulerLine,
+  )
   const initialCamera = expandCameraBounds(getGraphBounds(layout.nodes), [], houseAnchors)
 
   return {
@@ -363,13 +390,15 @@ export function buildPreview3RenderedTree({
         projectedMarriageIds: new Set<UUID>(),
         nodes: [],
       }
-  const houseAnchors = buildHouseAnchors(validation, layout, houseDefinitions, {
-    strategy: modeDefinition.pipeline.houseAnchorStrategy,
-    applyHouseLayoutYOffset: modeDefinition.pipeline.applyHouseAnchorYOffset,
-    houseYOffsetUnit: effectiveHouseYOffsetUnit,
-    preserveIdealCenterX: modeDefinition.pipeline.strictAnchorCentering,
-    verticalAlignment: modeDefinition.pipeline.houseAnchorVerticalAlignment,
-  })
+  const houseAnchors = modeDefinition.id === 'modeR3'
+    ? buildModeR3HouseAnchors(validation, layout, houseDefinitions, { allowFallback: false })
+    : buildHouseAnchors(validation, layout, houseDefinitions, {
+        strategy: modeDefinition.pipeline.houseAnchorStrategy,
+        applyHouseLayoutYOffset: modeDefinition.pipeline.applyHouseAnchorYOffset,
+        houseYOffsetUnit: effectiveHouseYOffsetUnit,
+        preserveIdealCenterX: modeDefinition.pipeline.strictAnchorCentering,
+        verticalAlignment: modeDefinition.pipeline.houseAnchorVerticalAlignment,
+      })
 
   const biologicalRelations = validation.validBiologicalRelations
     .filter((relation) => !shouldHideNode(relation.from) && !shouldHideNode(relation.to))
@@ -381,7 +410,9 @@ export function buildPreview3RenderedTree({
       .filter((relation) => !spouseProjectionPolicy.enabled || !spouseProjection.projectedMarriageIds.has(relation.id))
     : []
 
-  const biologicalChildGroups = buildBiologicalChildGroups(biologicalRelations, layout)
+  const biologicalChildGroups = modeDefinition.id === 'modeR3'
+    ? buildModeR3BiologicalChildGroups(validation, biologicalRelations, layout, { allowFallback: false })
+    : buildBiologicalChildGroups(biologicalRelations, layout)
   const groupParentAnchorsByKey = buildGroupParentAnchorsByKey({
     biologicalChildGroups,
     layout,
@@ -943,6 +974,10 @@ function applyModeR2PostLayoutPasses({
       preferSameRow: true,
       allowPairMidpointFallback: false,
       allowAnchoredFallbackPlacement: false,
+      rasterColumnStep: R2_RASTER_COLUMN_SIZE,
+      rasterColumnOrigin: R2_RASTER_OUTER_PADDING,
+      rasterRowStep: R2_RASTER_ROW_HEIGHT,
+      rasterRowOrigin: R2_RASTER_OUTER_PADDING,
     },
   )
 
@@ -982,6 +1017,8 @@ function applyModeR2PostLayoutPasses({
   const collisionResolvedLayout = resolveNodeCollisions2D(finalRowDeoverlappedLayout, {
     minimumGap: 20,
     maxIterations: 8,
+    rasterColumnStep: R2_RASTER_COLUMN_SIZE,
+    rasterColumnOrigin: R2_RASTER_OUTER_PADDING,
   })
 
   // Final R2 stabilization: enforce hard biological axes (1..2 parents, n children)
@@ -998,10 +1035,150 @@ function applyModeR2PostLayoutPasses({
     solvedLayout = resolveNodeCollisions2D(axisLockedLayout, {
       minimumGap: 20,
       maxIterations: 4,
+      rasterColumnStep: R2_RASTER_COLUMN_SIZE,
+      rasterColumnOrigin: R2_RASTER_OUTER_PADDING,
     })
   }
 
-  return solvedLayout
+  return snapLayoutToRaster(solvedLayout, {
+    columnStep: R2_RASTER_COLUMN_SIZE,
+    rowStep: R2_RASTER_ROW_HEIGHT,
+    originX: R2_RASTER_OUTER_PADDING,
+    originY: R2_RASTER_OUTER_PADDING,
+    biologicalRelations,
+  })
+}
+
+function snapLayoutToRaster(
+  layout: LayoutResult,
+  options: {
+    columnStep: number
+    rowStep: number
+    originX: number
+    originY: number
+    biologicalRelations: Relation[]
+  },
+): LayoutResult {
+  const adjustedNodes = new Map(layout.nodes)
+  const secondaryOriginX = options.originX + options.columnStep / 2
+  const cellColumnStep = options.columnStep / 2
+  const nodePhaseById = new Map<UUID, 0 | 1>()
+
+  const snap = (value: number, origin: number, step: number): number => {
+    if (!Number.isFinite(value) || step <= 0) {
+      return value
+    }
+
+    return origin + Math.round((value - origin) / step) * step
+  }
+
+  const getNearestPhase = (value: number): 0 | 1 => {
+    const snappedPrimary = snap(value, options.originX, options.columnStep)
+    const snappedSecondary = snap(value, secondaryOriginX, options.columnStep)
+    const primaryDistance = Math.abs(value - snappedPrimary)
+    const secondaryDistance = Math.abs(value - snappedSecondary)
+
+    if (secondaryDistance < primaryDistance) {
+      return 1
+    }
+
+    return 0
+  }
+
+  const biologicalGroups = buildBiologicalChildGroups(options.biologicalRelations, layout)
+    .sort((left, right) => left.key.localeCompare(right.key))
+
+  for (const group of biologicalGroups) {
+    const parentCenters = group.parentIds
+      .map((parentId) => adjustedNodes.get(parentId))
+      .filter((node): node is PositionedNode => node !== undefined)
+      .map((node) => node.x + node.width / 2)
+
+    const fallbackCenters = group.childIds
+      .map((childId) => adjustedNodes.get(childId))
+      .filter((node): node is PositionedNode => node !== undefined)
+      .map((node) => node.x + node.width / 2)
+
+    if (parentCenters.length === 0 && fallbackCenters.length === 0) {
+      continue
+    }
+
+    const referenceCenters = parentCenters.length > 0 ? parentCenters : fallbackCenters
+    const familyCenter = referenceCenters.reduce((sum, centerX) => sum + centerX, 0) / referenceCenters.length
+    const basePhase = getNearestPhase(familyCenter)
+    const childPhase: 0 | 1 = group.childIds.length % 2 === 0 ? basePhase : (basePhase === 0 ? 1 : 0)
+
+    for (const childId of group.childIds) {
+      if (!nodePhaseById.has(childId)) {
+        nodePhaseById.set(childId, childPhase)
+      }
+    }
+
+    for (const parentId of group.parentIds) {
+      if (!nodePhaseById.has(parentId)) {
+        nodePhaseById.set(parentId, basePhase)
+      }
+    }
+  }
+
+  for (const node of adjustedNodes.values()) {
+    const phase = nodePhaseById.get(node.id) ?? getNearestPhase(node.x)
+    const phaseOriginX = phase === 0 ? options.originX : secondaryOriginX
+
+    adjustedNodes.set(node.id, {
+      ...node,
+      x: snap(node.x, phaseOriginX, options.columnStep),
+      y: snap(node.y, options.originY, options.rowStep),
+    })
+  }
+
+  // Final hard-cell pass (Excel model): one row/column slot can hold only one person.
+  const occupiedCells = new Set<string>()
+  const sortedNodes = [...adjustedNodes.values()].sort((left, right) => left.y - right.y || left.x - right.x || left.id.localeCompare(right.id))
+
+  const toRowIndex = (value: number) => Math.round((value - options.originY) / options.rowStep)
+  const toColumnIndex = (value: number) => Math.round((value - options.originX) / cellColumnStep)
+  const toX = (columnIndex: number) => options.originX + columnIndex * cellColumnStep
+  const toY = (rowIndex: number) => options.originY + rowIndex * options.rowStep
+  const cellKey = (rowIndex: number, columnIndex: number) => `${rowIndex}:${columnIndex}`
+
+  const findFreeColumn = (rowIndex: number, preferredColumnIndex: number): number => {
+    const directKey = cellKey(rowIndex, preferredColumnIndex)
+    if (!occupiedCells.has(directKey)) {
+      return preferredColumnIndex
+    }
+
+    for (let offset = 1; offset < 2048; offset += 1) {
+      const right = preferredColumnIndex + offset
+      const rightKey = cellKey(rowIndex, right)
+      if (!occupiedCells.has(rightKey)) {
+        return right
+      }
+
+      const left = preferredColumnIndex - offset
+      const leftKey = cellKey(rowIndex, left)
+      if (!occupiedCells.has(leftKey)) {
+        return left
+      }
+    }
+
+    return preferredColumnIndex
+  }
+
+  for (const node of sortedNodes) {
+    const rowIndex = toRowIndex(node.y)
+    const preferredColumnIndex = toColumnIndex(node.x)
+    const assignedColumnIndex = findFreeColumn(rowIndex, preferredColumnIndex)
+    occupiedCells.add(cellKey(rowIndex, assignedColumnIndex))
+
+    adjustedNodes.set(node.id, {
+      ...node,
+      x: toX(assignedColumnIndex),
+      y: toY(rowIndex),
+    })
+  }
+
+  return { nodes: adjustedNodes }
 }
 
 function applyModeRStartHouseSubtreeOffsets(
@@ -1172,30 +1349,44 @@ function buildPreview3TreeDebugData(
   houseAnchors: HouseAnchor[],
   modeDefinition: Preview3ModeDefinition,
   effectiveHouseYOffsetUnit: number,
+  followRulerLine: boolean,
 ): Preview3TreeDebugData {
+  const r3Artifacts = modeDefinition.id === 'modeR3'
+    ? getModeR3LayoutArtifacts(layout)
+    : null
+
+  const strategySummary = [
+    `Layout: ${modeDefinition.pipeline.layoutStrategy}`,
+    `House anchors: ${modeDefinition.pipeline.houseAnchorStrategy}`,
+    `Spouse projection: ${modeDefinition.render.spouseProjection.enabled ? 'on' : 'off'}`,
+    `Marriage overlay: ${modeDefinition.render.marriageOverlayStyle}`,
+    `Curated person order: ${modeDefinition.pipeline.applyCuratedPersonOrder ? 'on' : 'off'}`,
+    `Curated person offsets: ${modeDefinition.pipeline.applyCuratedPersonOffsets ? 'on' : 'off'}`,
+    `Layout component spacing: ${Math.round(modeDefinition.pipeline.layoutComponentSpacing)}px`,
+    `Layout X scale: ${modeDefinition.pipeline.layoutXScale.toFixed(2)}x`,
+    `Layout Y scale: ${modeDefinition.pipeline.layoutYScale.toFixed(2)}x`,
+    `House subtree offsets: ${modeDefinition.pipeline.applyHouseSubtreeOffsets ? 'on' : 'off'}`,
+    `House subtree vertical yOffset: ${modeDefinition.pipeline.applyHouseSubtreeVerticalOffset ? 'on' : 'off'}`,
+    `House anchor yOffset: ${modeDefinition.pipeline.applyHouseAnchorYOffset ? 'on' : 'off'} (${Math.round(effectiveHouseYOffsetUnit)}px per unit, ${modeDefinition.pipeline.houseYOffsetUnitSource})`,
+    `House anchor vertical alignment: ${modeDefinition.pipeline.houseAnchorVerticalAlignment}`,
+    `Anchor centering: ${modeDefinition.pipeline.strictAnchorCentering ? 'strict founder-centered' : 'collision-safe'}`,
+    `House order X resolution: ${modeDefinition.pipeline.applyHouseOrderXResolution ? 'on' : 'off'}`,
+    `Horizontal de-overlap: ${modeDefinition.pipeline.applyHorizontalDeoverlap ? 'on' : 'off'}`,
+    `Disconnected component packing: ${modeDefinition.pipeline.applyDisconnectedComponentPacking ? 'on' : 'off'}`,
+  ]
+
+  if (modeDefinition.id === 'modeR3') {
+    strategySummary.push(`FollowRulerLine: ${followRulerLine ? 'on' : 'off'}`)
+    strategySummary.push(`R3 artifacts present: ${r3Artifacts ? 'yes' : 'no'}`)
+    strategySummary.push(`R3 family placements: ${r3Artifacts?.familyPlacements.length ?? 0}`)
+    strategySummary.push(`R3 house anchor placements: ${r3Artifacts?.houseAnchorPlacements.length ?? 0}`)
+  }
+
   return {
     modeId: modeDefinition.id,
     modeLabel: modeDefinition.label,
     modeSummary: modeDefinition.summary,
-    strategySummary: [
-      `Layout: ${modeDefinition.pipeline.layoutStrategy}`,
-      `House anchors: ${modeDefinition.pipeline.houseAnchorStrategy}`,
-      `Spouse projection: ${modeDefinition.render.spouseProjection.enabled ? 'on' : 'off'}`,
-      `Marriage overlay: ${modeDefinition.render.marriageOverlayStyle}`,
-      `Curated person order: ${modeDefinition.pipeline.applyCuratedPersonOrder ? 'on' : 'off'}`,
-      `Curated person offsets: ${modeDefinition.pipeline.applyCuratedPersonOffsets ? 'on' : 'off'}`,
-      `Layout component spacing: ${Math.round(modeDefinition.pipeline.layoutComponentSpacing)}px`,
-      `Layout X scale: ${modeDefinition.pipeline.layoutXScale.toFixed(2)}x`,
-      `Layout Y scale: ${modeDefinition.pipeline.layoutYScale.toFixed(2)}x`,
-      `House subtree offsets: ${modeDefinition.pipeline.applyHouseSubtreeOffsets ? 'on' : 'off'}`,
-      `House subtree vertical yOffset: ${modeDefinition.pipeline.applyHouseSubtreeVerticalOffset ? 'on' : 'off'}`,
-      `House anchor yOffset: ${modeDefinition.pipeline.applyHouseAnchorYOffset ? 'on' : 'off'} (${Math.round(effectiveHouseYOffsetUnit)}px per unit, ${modeDefinition.pipeline.houseYOffsetUnitSource})`,
-      `House anchor vertical alignment: ${modeDefinition.pipeline.houseAnchorVerticalAlignment}`,
-      `Anchor centering: ${modeDefinition.pipeline.strictAnchorCentering ? 'strict founder-centered' : 'collision-safe'}`,
-      `House order X resolution: ${modeDefinition.pipeline.applyHouseOrderXResolution ? 'on' : 'off'}`,
-      `Horizontal de-overlap: ${modeDefinition.pipeline.applyHorizontalDeoverlap ? 'on' : 'off'}`,
-      `Disconnected component packing: ${modeDefinition.pipeline.applyDisconnectedComponentPacking ? 'on' : 'off'}`,
-    ],
+    strategySummary,
     activeStages: modeDefinition.pipeline.stages,
     houseAnchors: buildHouseAnchorDebugEntries(validation, layout, houseDefinitions, houseAnchors, {
       strategy: modeDefinition.pipeline.houseAnchorStrategy,

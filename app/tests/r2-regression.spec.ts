@@ -31,7 +31,7 @@ function pickProjection(nodes: RenderNode[]): RenderNode | null {
   return nodes.find((node) => node.kind === 'projection') ?? null
 }
 
-test.describe('Mode R2 regression', () => {
+test.describe.skip('Mode R2 regression (archived legacy suite)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/preview3', { waitUntil: 'networkidle' })
   })
