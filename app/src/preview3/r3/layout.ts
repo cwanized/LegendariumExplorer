@@ -29,6 +29,9 @@ const SINGLE_PARENT_TWO_CHILD_SPAN_COMPRESSION = 0.24
 const MULTI_SIBLING_SPAN_COMPRESSION = 0.42
 const SINGLE_PARENT_MULTI_SIBLING_SPAN_COMPRESSION = 0.34
 const ROW_DEOVERLAP_MIN_GAP = 20
+const SIBLING_REBALANCE_MIN_EDGE_GAP = 40
+const SIBLING_REBALANCE_MAX_EDGE_GAP = 300
+const SIBLING_REBALANCE_MAX_SHIFT = 220
 const r3ArtifactsByNodes = new WeakMap<Map<UUID, PositionedNode>, R3LayoutArtifacts>()
 
 export function buildModeR3Layout(
@@ -63,6 +66,8 @@ export function buildModeR3LayoutWithArtifacts(
   const positionedNodes = new Map<UUID, PositionedNode>()
   const subtreeSpanCache = new Map<UUID, number>()
   const placedPersons = new Set<UUID>()
+  const spouseAttachedToOwnerLineageIds = new Set<UUID>()
+  const spouseAttachedByOwnerId = new Map<UUID, Set<UUID>>()
   const familyPlacements = new Map<string, R3FamilyPlacement>()
   const houseAnchorPlacements = new Map<string, R3HouseAnchorPlacement>()
   const sortedClusters = buildClusters({
@@ -89,6 +94,8 @@ export function buildModeR3LayoutWithArtifacts(
         placementPlan,
         positionedNodes,
         placedPersons,
+        spouseAttachedToOwnerLineageIds,
+        spouseAttachedByOwnerId,
         subtreeSpanCache,
         familyPlacements,
       })
@@ -96,7 +103,13 @@ export function buildModeR3LayoutWithArtifacts(
     }
 
     if (cluster.house && cluster.rootIds.length > 0) {
-      const rootNodes = cluster.rootIds
+      const anchorRootIds = resolveHouseAnchorRootIds({
+        rootIds: cluster.rootIds,
+        houseTier: cluster.house.tier,
+        placementPlan,
+        validation,
+      })
+      const rootNodes = anchorRootIds
         .map((rootId) => positionedNodes.get(rootId))
         .filter((node): node is PositionedNode => node !== undefined)
 
@@ -105,7 +118,7 @@ export function buildModeR3LayoutWithArtifacts(
         const maxRootCenterX = Math.max(...rootNodes.map((node) => node.x + node.width / 2))
         const centerX = (minRootCenterX + maxRootCenterX) / 2
         const centerColumn = centerX / COLUMN_WIDTH
-        const rootRow = Math.min(...cluster.rootIds.map((rootId) => placementPlan.rowByPersonId.get(rootId) ?? 1))
+        const rootRow = Math.min(...anchorRootIds.map((rootId) => placementPlan.rowByPersonId.get(rootId) ?? 1))
         const width = Math.max(176, cluster.house.displayName.length * 8 + 42)
         const key = `house:${cluster.house.id}`
 
@@ -114,7 +127,7 @@ export function buildModeR3LayoutWithArtifacts(
           houseId: cluster.house.id,
           displayName: cluster.house.displayName,
           memberIds: [...cluster.rootIds],
-          connectorNodeIds: [...cluster.rootIds],
+          connectorNodeIds: anchorRootIds.filter((rootId) => !spouseAttachedToOwnerLineageIds.has(rootId)),
           centerColumn,
           rootRow,
           width,
@@ -134,6 +147,16 @@ export function buildModeR3LayoutWithArtifacts(
     const row = placementPlan.rowByPersonId.get(personId) ?? 1
     positionedNodes.set(personId, createNode(personId, clusterCursor, row))
     clusterCursor += ROOT_GAP_COLUMNS
+  }
+
+  applyCappedSiblingFamilyRebalance(validation, positionedNodes, spouseAttachedByOwnerId)
+  alignSingleChildrenToTwoParentMidpoint(placementPlan.families, validation, positionedNodes, spouseAttachedByOwnerId)
+
+  for (const [anchorKey, placement] of houseAnchorPlacements.entries()) {
+    houseAnchorPlacements.set(anchorKey, {
+      ...placement,
+      connectorNodeIds: placement.connectorNodeIds.filter((nodeId) => !spouseAttachedToOwnerLineageIds.has(nodeId)),
+    })
   }
 
   applyRowDeoverlap(positionedNodes)
@@ -166,6 +189,8 @@ function placePersonBranch({
   placedPersons,
   subtreeSpanCache,
   familyPlacements,
+  spouseAttachedToOwnerLineageIds,
+  spouseAttachedByOwnerId,
 }: {
   personId: UUID
   centerColumn: number
@@ -174,6 +199,8 @@ function placePersonBranch({
   placementPlan: R3PlacementPlan
   positionedNodes: Map<UUID, PositionedNode>
   placedPersons: Set<UUID>
+  spouseAttachedToOwnerLineageIds: Set<UUID>
+  spouseAttachedByOwnerId: Map<UUID, Set<UUID>>
   subtreeSpanCache: Map<UUID, number>
   familyPlacements: Map<string, R3FamilyPlacement>
 }): void {
@@ -198,6 +225,13 @@ function placePersonBranch({
     const spouseFollowsOwnerLineage = spouseId
       ? shouldAttachSpouseToOwnerLineage(spouseId, validation)
       : false
+
+    if (spouseId && spouseFollowsOwnerLineage) {
+      spouseAttachedToOwnerLineageIds.add(spouseId)
+      const spouseIds = spouseAttachedByOwnerId.get(personId) ?? new Set<UUID>()
+      spouseIds.add(spouseId)
+      spouseAttachedByOwnerId.set(personId, spouseIds)
+    }
 
     if (spouseId && spouseFollowsOwnerLineage && !positionedNodes.has(spouseId)) {
       positionedNodes.set(
@@ -228,6 +262,8 @@ function placePersonBranch({
         placementPlan,
         positionedNodes,
         placedPersons,
+        spouseAttachedToOwnerLineageIds,
+        spouseAttachedByOwnerId,
         subtreeSpanCache,
         familyPlacements,
       })
@@ -265,6 +301,8 @@ function placePersonBranch({
       placementPlan,
       positionedNodes,
       placedPersons,
+      spouseAttachedToOwnerLineageIds,
+      spouseAttachedByOwnerId,
       subtreeSpanCache,
       familyPlacements,
     })
@@ -436,6 +474,174 @@ function resolveChildPlacementSpan(subtreeSpan: number, family: R3FamilyGroup): 
   return 1 + (subtreeSpan - 1) * compression
 }
 
+function resolveHouseAnchorRootIds({
+  rootIds,
+  houseTier,
+  placementPlan,
+  validation,
+}: {
+  rootIds: UUID[]
+  houseTier: 'start' | 'later'
+  placementPlan: R3PlacementPlan
+  validation: ValidationResult
+}): UUID[] {
+  if (rootIds.length <= 1 || houseTier !== 'start') {
+    return [...rootIds]
+  }
+
+  const topRow = Math.min(...rootIds.map((rootId) => placementPlan.rowByPersonId.get(rootId) ?? 1))
+  const founderIds = rootIds
+    .filter((rootId) => (placementPlan.rowByPersonId.get(rootId) ?? 1) === topRow)
+    .sort((left, right) => left.localeCompare(right))
+
+  if (founderIds.length <= 1) {
+    return founderIds.length === 1 ? founderIds : [...rootIds]
+  }
+
+  const marriages = validation.validOverlayRelations.filter((relation) => relation.type === 'marriage')
+  for (const relation of marriages) {
+    if (founderIds.includes(relation.from) && founderIds.includes(relation.to)) {
+      return [relation.from, relation.to].sort((left, right) => left.localeCompare(right))
+    }
+  }
+
+  return founderIds
+}
+
+function applyCappedSiblingFamilyRebalance(
+  validation: ValidationResult,
+  positionedNodes: Map<UUID, PositionedNode>,
+  spouseAttachedByOwnerId: Map<UUID, Set<UUID>>,
+): void {
+  for (const childIds of validation.childrenByParent.values()) {
+    if (childIds.length < 4) {
+      continue
+    }
+
+    const children = childIds
+      .map((childId) => positionedNodes.get(childId))
+      .filter((node): node is PositionedNode => node !== undefined)
+      .sort((left, right) => left.x - right.x || left.id.localeCompare(right.id))
+
+    if (children.length < 4) {
+      continue
+    }
+
+    const minRowY = Math.min(...children.map((node) => node.y))
+    const maxRowY = Math.max(...children.map((node) => node.y))
+    if (maxRowY - minRowY > 4) {
+      continue
+    }
+
+    const gaps = children.slice(1).map((node, index) => node.x - (children[index].x + children[index].width))
+    const minGap = Math.min(...gaps)
+    const maxGap = Math.max(...gaps)
+    if (minGap >= SIBLING_REBALANCE_MIN_EDGE_GAP || maxGap <= SIBLING_REBALANCE_MAX_EDGE_GAP) {
+      continue
+    }
+
+    const firstX = children[0].x
+    const lastX = children[children.length - 1].x
+
+    for (let index = 1; index < children.length - 1; index += 1) {
+      const childNode = children[index]
+      const desiredX = firstX + ((lastX - firstX) * index) / (children.length - 1)
+      const rawShift = desiredX - childNode.x
+      const shift = Math.max(-SIBLING_REBALANCE_MAX_SHIFT, Math.min(SIBLING_REBALANCE_MAX_SHIFT, rawShift))
+      if (Math.abs(shift) < 1) {
+        continue
+      }
+
+      const subtreeIds = collectShiftNodeIds(childNode.id, validation.childrenByParent, spouseAttachedByOwnerId)
+      for (const subtreeId of subtreeIds) {
+        const subtreeNode = positionedNodes.get(subtreeId)
+        if (!subtreeNode) {
+          continue
+        }
+
+        positionedNodes.set(subtreeId, {
+          ...subtreeNode,
+          x: subtreeNode.x + shift,
+        })
+      }
+    }
+  }
+}
+
+function collectShiftNodeIds(
+  rootId: UUID,
+  childrenByParent: Map<UUID, UUID[]>,
+  spouseAttachedByOwnerId: Map<UUID, Set<UUID>>,
+): Set<UUID> {
+  const visited = new Set<UUID>()
+  const queue: UUID[] = [rootId]
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()
+    if (!currentId || visited.has(currentId)) {
+      continue
+    }
+
+    visited.add(currentId)
+    for (const spouseId of spouseAttachedByOwnerId.get(currentId) ?? []) {
+      if (!visited.has(spouseId)) {
+        queue.push(spouseId)
+      }
+    }
+
+    for (const childId of childrenByParent.get(currentId) ?? []) {
+      if (!visited.has(childId)) {
+        queue.push(childId)
+      }
+    }
+  }
+
+  return visited
+}
+
+function alignSingleChildrenToTwoParentMidpoint(
+  families: R3FamilyGroup[],
+  validation: ValidationResult,
+  positionedNodes: Map<UUID, PositionedNode>,
+  spouseAttachedByOwnerId: Map<UUID, Set<UUID>>,
+): void {
+  for (const family of families) {
+    if (family.parentIds.length !== 2 || family.childIds.length !== 1) {
+      continue
+    }
+
+    const [firstParentId, secondParentId] = family.parentIds
+    const childId = family.childIds[0]
+    const firstParent = positionedNodes.get(firstParentId)
+    const secondParent = positionedNodes.get(secondParentId)
+    const childNode = positionedNodes.get(childId)
+
+    if (!firstParent || !secondParent || !childNode) {
+      continue
+    }
+
+    const parentMidX = (firstParent.x + firstParent.width / 2 + secondParent.x + secondParent.width / 2) / 2
+    const childCenterX = childNode.x + childNode.width / 2
+    const shiftX = parentMidX - childCenterX
+    if (Math.abs(shiftX) < 1) {
+      continue
+    }
+
+    const shiftNodeIds = collectShiftNodeIds(childId, validation.childrenByParent, spouseAttachedByOwnerId)
+    for (const shiftNodeId of shiftNodeIds) {
+      const node = positionedNodes.get(shiftNodeId)
+      if (!node) {
+        continue
+      }
+
+      positionedNodes.set(shiftNodeId, {
+        ...node,
+        x: node.x + shiftX,
+      })
+    }
+  }
+}
+
 function applyRowDeoverlap(positionedNodes: Map<UUID, PositionedNode>): void {
   const rowBuckets = new Map<number, PositionedNode[]>()
 
@@ -596,9 +802,11 @@ function positionCoupleAroundFamilyAxis({
   const halfPairSpan = (NODE_WIDTH + PARTNER_GAP) / 2
   const ownerNode = positionedNodes.get(ownerId)
   const ownerCenterX = ownerNode ? ownerNode.x + ownerNode.width / 2 : centerX - (spouseSide === 'left' ? -halfPairSpan : halfPairSpan)
-  const spouseCenterX = Math.abs(ownerCenterX - centerX) < 0.01
+  const spouseCenterX = ownerNode
     ? ownerCenterX + spouseDeltaX
-    : 2 * centerX - ownerCenterX
+    : Math.abs(ownerCenterX - centerX) < 0.01
+      ? ownerCenterX + spouseDeltaX
+      : 2 * centerX - ownerCenterX
 
   if (!ownerNode) {
     positionedNodes.set(ownerId, {

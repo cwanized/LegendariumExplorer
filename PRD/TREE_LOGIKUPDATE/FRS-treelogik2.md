@@ -726,3 +726,64 @@ Die Demo-Beispiele in diesem Dokument sind absichtlich aus dem vorhandenen Daten
 Ergaenzende Leitentscheidung aus der aktuellen Session und dem genealogytree-Manual:
 
 - Die naechste belastbare Evolutionsstufe der Tree-Logik ist kein weiteres heuristisches Nachschieben einzelner Personen, sondern eine explizite Doppelraster-Architektur mit Personenraster, Familienraster, Familienbloecken, typisierten Abstaenden und reservierten Leerslots.
+
+## 11. Ergaenzende Implementations-Praezisierungen (zusatzlich, nicht ersetzend)
+
+Dieser Abschnitt ergaenzt die bestehenden FRS-Regeln um verbindliche Praezisierungen, die in den R3-Iterationen als notwendig verifiziert wurden.
+
+Die Inhalte dieses Abschnitts ersetzen keine vorherigen Kapitel, sondern konkretisieren sie fuer Implementierung, Review und Regression-Absicherung.
+
+### 11.1 Connector-Routing-Contract
+
+- Eltern-Kind-Verbindungen im R3-Pfad folgen einem expliziten Routing-Contract pro Familiengruppe.
+- Connector-Segmente sind standardmaessig orthogonal (vertikal/horizontal) und nicht implizit diagonal.
+- Die Routing-Regel wird nach Falltyp angewandt:
+   1. 1 Parent -> 1 Child: Junction-Pfad mit vertikalem Stamm und optionalem horizontalem Endsegment.
+   2. 1 Parent -> n Children: Stammsegment zur Sibling-Linie plus vertikale Child-Drops.
+   3. 2 Parents -> 1 Child: beide Parents verbinden zur Familien-Junction, danach Child-Pfad.
+   4. 2 Parents -> n Children: Parent-Segmente zur Junction, Stamm zur Sibling-Linie, Child-Drops.
+- Der Contract ist als Geometrie-Policy zu verstehen, nicht als rein visuelle Stilfrage.
+
+### 11.2 Anchor-Selection-Contract bei Projektionen
+
+- Wenn fuer einen Parent mehrere darstellbare Anchors existieren (Main-Node und/oder Projection-Node), muss die Auswahl deterministisch erfolgen.
+- Die Auswahl erfolgt gruppenlokal je Familiengruppe und darf nicht von transienten UI-Zustaenden abhaengen.
+- Die Auswahl darf auf Distanzkriterien zur Kindgruppe basieren, muss aber stabil sortiert und reproduzierbar sein.
+- Die Auswahlregel ist Teil der Tree-/Render-Model-Logik, nicht der Canvas-Interaktion.
+
+### 11.3 Pass-Order- und Final-Axis-Contract
+
+- Nach jeder horizontalen oder vertikalen Nachbearbeitung, die Parent-Positionen verschiebt, ist die Familienachse final neu zu normalisieren.
+- Exportierte Familienartefakte (Achsen/Junction-Bezug) muessen auf finalen Node-Positionen basieren.
+- Eine spaete De-Overlap-Phase ohne anschliessende Axis-Re-Normalisierung gilt als unvollstaendig.
+
+### 11.4 Verantwortungsgrenze Core/Pipeline vs Canvas
+
+- Connector-Policy, Junction-Geometrie und Segment-Topologie werden in Core/Pipeline bzw. R3-Render-Model berechnet.
+- Canvas zeichnet bereitgestellte Segmente und verarbeitet Interaktion/Styling.
+- Canvas darf keine mode-spezifischen Geometrie-Entscheidungen als implizite Fachlogik nachfuehren.
+- Inline-Heuristiken im Canvas sind nur als kurzfristige Uebergangslogik zulaessig und muessen in nachfolgenden Schritten in das Render-Model ueberfuehrt werden.
+
+### 11.5 Regression-Contract fuer Layout-Geometrie
+
+- Fuer den R3-Pfad ist eine Smoke-Regression mit numerischen Toleranzen verbindlich.
+- Regressionen muessen mindestens pruefen:
+   - keine ungewollten Node-Ueberlappungen,
+   - stabile Familienachsen in Referenzfaellen,
+   - konsistente Projektion bei Cross-Line-Couples,
+   - erwartete Connector-Topologie gemaess Routing-Contract.
+- Visuelle Kritikfaelle aus dem Demo-Datensatz sind als dauerhafte Referenzfaelle zu behandeln.
+
+### 11.6 Fallback-Contract (Artifact-First)
+
+- Im R3-Produktionspfad gilt Artifact-First fuer Familien- und Anchor-Geometrie.
+- Fallback-Rekonstruktion aus generischen Relationen ist nur fuer Diagnose oder explizit freigeschaltete Modi zulaessig.
+- Ein stiller Fallback im Regelbetrieb ist unzulaessig, wenn dadurch die deterministische R3-Policy unterlaufen wird.
+
+### 11.7 Stabilitaetsprinzip fuer Iterationen
+
+- Reihenfolge der Umsetzung bei komplexen Geometrieaenderungen:
+   1. Stabilitaet und Regression-Freiheit herstellen.
+   2. Architekturgrenzen in Core/Pipeline nachziehen.
+   3. Uebergangsheuristiken entfernen.
+- Dieses Prinzip ist zulaessig, solange Schritt 2 und 3 nicht ausgesetzt werden.

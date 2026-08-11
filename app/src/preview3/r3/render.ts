@@ -25,19 +25,35 @@ export function buildModeR3HouseAnchors(
   },
 ): HouseAnchor[] {
   const allowFallback = options?.allowFallback ?? false
+  const startHouseIds = new Set(
+    houseDefinitions.houses
+      .filter((house) => house.anchor.enabled && house.tier === 'start')
+      .map((house) => house.id),
+  )
   const artifacts = getModeR3LayoutArtifacts(layout)
   if (artifacts && artifacts.houseAnchorPlacements.length > 0) {
     return artifacts.houseAnchorPlacements
-      .map((placement) => ({
-        houseId: placement.houseId,
-        displayName: placement.displayName,
-        memberIds: placement.memberIds,
-        connectorNodeIds: placement.connectorNodeIds,
-        x: placement.centerColumn * R3_COLUMN_WIDTH - artifacts.normalizationOffsetX - placement.width / 2,
-        y: placement.rootRow * R3_ROW_HEIGHT - artifacts.normalizationOffsetY - 94,
-        width: placement.width,
-        height: placement.height,
-      }))
+      .map((placement) => {
+        const connectorNodeIds = resolveAnchorConnectorNodeIds({
+          baseConnectorNodeIds: placement.connectorNodeIds,
+          houseId: placement.houseId,
+          startHouseIds,
+          houseDefinitions,
+          validation,
+          layout,
+        })
+
+        return {
+          houseId: placement.houseId,
+          displayName: placement.displayName,
+          memberIds: placement.memberIds,
+          connectorNodeIds,
+          x: placement.centerColumn * R3_COLUMN_WIDTH - artifacts.normalizationOffsetX - placement.width / 2,
+          y: placement.rootRow * R3_ROW_HEIGHT - artifacts.normalizationOffsetY - 94,
+          width: placement.width,
+          height: placement.height,
+        }
+      })
       .sort((left, right) => left.y - right.y || left.houseId.localeCompare(right.houseId))
   }
 
@@ -238,4 +254,77 @@ function buildChildGroupsFromPlacements(
     })
     .filter((group): group is BiologicalChildGroup => group !== null)
     .sort((left, right) => left.junctionY - right.junctionY || left.key.localeCompare(right.key))
+}
+
+function resolveAnchorConnectorNodeIds({
+  baseConnectorNodeIds,
+  houseId,
+  startHouseIds,
+  houseDefinitions,
+  validation,
+  layout,
+}: {
+  baseConnectorNodeIds: UUID[]
+  houseId: string
+  startHouseIds: Set<string>
+  houseDefinitions: HouseDefinitions
+  validation: ValidationResult
+  layout: LayoutResult
+}): UUID[] {
+  if (!startHouseIds.has(houseId)) {
+    return baseConnectorNodeIds
+  }
+
+  const houseLookup = createHouseLookup(houseDefinitions, validation.personById)
+
+  const connectorNodeIds = new Set(baseConnectorNodeIds)
+  const marriages = validation.validOverlayRelations.filter((relation) => relation.type === 'marriage')
+
+  for (const nodeId of baseConnectorNodeIds) {
+    const node = layout.nodes.get(nodeId)
+    if (!node) {
+      continue
+    }
+
+    const nodeParentCount = (validation.parentsByChild.get(nodeId) ?? []).length
+    if (nodeParentCount !== 0) {
+      continue
+    }
+
+    const partnerCandidateIds = new Set<UUID>()
+
+    for (const marriage of marriages) {
+      if (marriage.from !== nodeId && marriage.to !== nodeId) {
+        continue
+      }
+
+      const partnerId = marriage.from === nodeId ? marriage.to : marriage.from
+      partnerCandidateIds.add(partnerId)
+    }
+
+    for (const partnerId of partnerCandidateIds) {
+      const partnerNode = layout.nodes.get(partnerId)
+      if (!partnerNode) {
+        continue
+      }
+
+      const partnerParentCount = (validation.parentsByChild.get(partnerId) ?? []).length
+      if (partnerParentCount !== 0) {
+        continue
+      }
+
+      if (Math.abs(partnerNode.y - node.y) > 4) {
+        continue
+      }
+
+      const partnerHouseId = houseLookup.getPrimaryHouse(partnerId)?.id ?? null
+      if (partnerHouseId !== houseId) {
+        continue
+      }
+
+      connectorNodeIds.add(partnerId)
+    }
+  }
+
+  return sortPersonIdsForR3([...connectorNodeIds], validation.personById)
 }

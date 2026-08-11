@@ -17,6 +17,7 @@ import type {
 } from '../graph'
 import type { Preview3ModeDefinition, Preview3PipelineStage } from './modes'
 import { buildModeR2Layout } from './rasterModeR2'
+import { buildModeR3ConnectorModel, type R3ConnectorAnchor, type R3ConnectorGroupModel } from './r3/connectorModel'
 import { buildModeR3Layout, getModeR3LayoutArtifacts } from './r3/layout'
 import { buildModeR3BiologicalChildGroups, buildModeR3HouseAnchors } from './r3/render'
 import {
@@ -58,15 +59,7 @@ import {
   type SpouseProjectionState,
 } from './treeCore'
 
-export type Preview3GroupParentAnchor = {
-  key: string
-  parentId: UUID
-  x: number
-  y: number
-  width: number
-  height: number
-  isProjection: boolean
-}
+export type Preview3GroupParentAnchor = R3ConnectorAnchor
 
 export type Preview3TreeDebugData = {
   modeId: Preview3ModeDefinition['id']
@@ -355,6 +348,7 @@ export type Preview3RenderedTree = {
   overlayRelations: Relation[]
   biologicalChildGroups: BiologicalChildGroup[]
   groupParentAnchorsByKey: Map<string, Preview3GroupParentAnchor[]>
+  r3ConnectorModelByKey: Map<string, R3ConnectorGroupModel>
 }
 
 export function buildPreview3RenderedTree({
@@ -419,6 +413,9 @@ export function buildPreview3RenderedTree({
     overlayEnabled,
     spouseProjection,
   })
+  const r3ConnectorModelByKey = modeDefinition.id === 'modeR3'
+    ? buildModeR3ConnectorModel(biologicalChildGroups, groupParentAnchorsByKey)
+    : new Map<string, R3ConnectorGroupModel>()
 
   return {
     spouseProjection,
@@ -427,6 +424,7 @@ export function buildPreview3RenderedTree({
     overlayRelations,
     biologicalChildGroups,
     groupParentAnchorsByKey,
+    r3ConnectorModelByKey,
   }
 }
 

@@ -1138,6 +1138,7 @@ export default function Preview3App() {
     overlayRelations,
     biologicalChildGroups,
     groupParentAnchorsByKey,
+    r3ConnectorModelByKey,
   } = renderedTree
   const selectedCount = selectedIds.length
   const rightPanelShift = !rightPanel.collapsed && !rightPanel.undocked && !wideMode && !compactLayout ? rightPanel.width + 28 : 0
@@ -1930,6 +1931,7 @@ export default function Preview3App() {
         svgRef={svgRef}
         biologicalChildGroups={biologicalChildGroups}
         groupParentAnchorsByKey={groupParentAnchorsByKey}
+        r3ConnectorModelByKey={r3ConnectorModelByKey}
         overlayRelations={overlayRelations}
         spouseProjection={spouseProjection}
         renderPrimaryPanel={renderPrimaryPanel}

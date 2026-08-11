@@ -3,6 +3,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 
 import type { CameraView, LayoutResult, UUID, ValidationResult, PositionedNode } from '../../graph'
 import type { Preview3ModeDefinition, Preview3ModeOption } from '../modes'
+import type { R3ConnectorGroupModel } from '../r3/connectorModel'
 import type { Preview3GroupParentAnchor, Preview3TreeDebugData } from '../treePipeline'
 import {
   R2_RASTER_COLUMN_SIZE,
@@ -56,6 +57,7 @@ type Preview3TreeCanvasProps = {
   svgRef: RefObject<SVGSVGElement | null>
   biologicalChildGroups: BiologicalChildGroup[]
   groupParentAnchorsByKey: Map<string, Preview3GroupParentAnchor[]>
+  r3ConnectorModelByKey: Map<string, R3ConnectorGroupModel>
   overlayRelations: ValidationResult['validOverlayRelations']
   spouseProjection: { nodes: SpouseProjectionNode[] }
   renderPrimaryPanel: (side: 'left' | 'right') => ReactElement | null
@@ -118,6 +120,7 @@ export function Preview3TreeCanvas({
   svgRef,
   biologicalChildGroups,
   groupParentAnchorsByKey,
+  r3ConnectorModelByKey,
   overlayRelations,
   spouseProjection,
   renderPrimaryPanel,
@@ -405,49 +408,67 @@ export function Preview3TreeCanvas({
             if (parentAnchors.length === 0) {
               return null
             }
+            const connectorModel = modeDefinition.id === 'modeR3'
+              ? (r3ConnectorModelByKey.get(group.key) ?? null)
+              : null
 
             const childCenters = group.childNodes.map((node) => node.x + node.width / 2)
             const siblingMinX = Math.min(...childCenters)
             const siblingMaxX = Math.max(...childCenters)
             const parentCenters = parentAnchors.map((anchor) => anchor.x + anchor.width / 2)
-            const renderedJunctionX = parentCenters.length === 1
-              ? parentCenters[0]
-              : (Math.min(...parentCenters) + Math.max(...parentCenters)) / 2
+            const renderedJunctionX = connectorModel
+              ? connectorModel.renderedJunctionX
+              : parentCenters.length === 1
+                ? parentCenters[0]
+                : (Math.min(...parentCenters) + Math.max(...parentCenters)) / 2
             const isSingleChildGroup = group.childNodes.length === 1
 
             return (
               <g key={group.key}>
-                {parentAnchors.map((anchor) => {
-                  const parentCenterX = anchor.x + anchor.width / 2
-                  const parentBottomY = anchor.y + anchor.height
-                  const targetX = renderedJunctionX
-                  const targetY = group.junctionY
+                {connectorModel
+                  ? connectorModel.parentSegments.map((segment, index) => (
+                    <line
+                      key={`${group.key}:parent-segment:${index}`}
+                      x1={segment.x1}
+                      y1={segment.y1}
+                      x2={segment.x2}
+                      y2={segment.y2}
+                      stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'}
+                      strokeWidth={highlighted ? 3.6 : 2.2}
+                      strokeOpacity={faded ? 0.22 : 0.92}
+                    />
+                  ))
+                  : parentAnchors.map((anchor) => {
+                    const parentCenterX = anchor.x + anchor.width / 2
+                    const parentBottomY = anchor.y + anchor.height
+                    const targetX = renderedJunctionX
+                    const targetY = group.junctionY
 
-                  return (
-                    <g key={`${group.key}:${anchor.key}:parent`}>
-                      <line
-                        x1={parentCenterX}
-                        y1={parentBottomY}
-                        x2={parentCenterX}
-                        y2={targetY}
-                        stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'}
-                        strokeWidth={highlighted ? 3.6 : 2.2}
-                        strokeOpacity={faded ? 0.22 : 0.92}
-                      />
-                      {Math.abs(parentCenterX - targetX) <= 0.5 ? null : (
+                    return (
+                      <g key={`${group.key}:${anchor.key}:parent`}>
                         <line
                           x1={parentCenterX}
-                          y1={targetY}
-                          x2={targetX}
+                          y1={parentBottomY}
+                          x2={parentCenterX}
                           y2={targetY}
                           stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'}
                           strokeWidth={highlighted ? 3.6 : 2.2}
                           strokeOpacity={faded ? 0.22 : 0.92}
                         />
-                      )}
-                    </g>
-                  )
-                })}
+                        {Math.abs(parentCenterX - targetX) <= 0.5 ? null : (
+                          <line
+                            x1={parentCenterX}
+                            y1={targetY}
+                            x2={targetX}
+                            y2={targetY}
+                            stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'}
+                            strokeWidth={highlighted ? 3.6 : 2.2}
+                            strokeOpacity={faded ? 0.22 : 0.92}
+                          />
+                        )}
+                      </g>
+                    )
+                  })}
 
                 {!overlayEnabled ? null : parentAnchors.map((anchor) => {
                   if (!anchor.isProjection) {
@@ -485,26 +506,73 @@ export function Preview3TreeCanvas({
                   )
                 })}
 
-                {!isSingleChildGroup && group.siblingY > group.junctionY ? <line x1={renderedJunctionX} y1={group.junctionY} x2={renderedJunctionX} y2={group.siblingY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} /> : null}
-
-                {group.childNodes.length > 1 ? <line x1={siblingMinX} y1={group.siblingY} x2={siblingMaxX} y2={group.siblingY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} /> : null}
-
-                {group.childNodes.map((node) => {
-                  const childCenterX = node.x + node.width / 2
-                  const childTopY = node.y
-                  if (group.childNodes.length > 1) {
-                    return <line key={`${group.key}:${node.id}:child`} x1={childCenterX} y1={group.siblingY} x2={childCenterX} y2={childTopY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} />
-                  }
-
-                  return (
-                    <g key={`${group.key}:${node.id}:child`}>
-                      <line x1={renderedJunctionX} y1={group.junctionY} x2={renderedJunctionX} y2={childTopY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} />
-                      {Math.abs(childCenterX - renderedJunctionX) <= 0.5 ? null : (
-                        <line x1={renderedJunctionX} y1={childTopY} x2={childCenterX} y2={childTopY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} />
+                {connectorModel
+                  ? (
+                    <>
+                      {!connectorModel.trunkSegment ? null : (
+                        <line
+                          x1={connectorModel.trunkSegment.x1}
+                          y1={connectorModel.trunkSegment.y1}
+                          x2={connectorModel.trunkSegment.x2}
+                          y2={connectorModel.trunkSegment.y2}
+                          stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'}
+                          strokeWidth={highlighted ? 3.6 : 2.2}
+                          strokeOpacity={faded ? 0.22 : 0.92}
+                        />
                       )}
-                    </g>
+                      {!connectorModel.siblingSegment ? null : (
+                        <line
+                          x1={connectorModel.siblingSegment.x1}
+                          y1={connectorModel.siblingSegment.y1}
+                          x2={connectorModel.siblingSegment.x2}
+                          y2={connectorModel.siblingSegment.y2}
+                          stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'}
+                          strokeWidth={highlighted ? 3.6 : 2.2}
+                          strokeOpacity={faded ? 0.22 : 0.92}
+                        />
+                      )}
+                      {connectorModel.childConnectors.map((childConnector) => (
+                        <g key={`${group.key}:${childConnector.childId}:child`}>
+                          {childConnector.segments.map((segment, index) => (
+                            <line
+                              key={`${group.key}:${childConnector.childId}:segment:${index}`}
+                              x1={segment.x1}
+                              y1={segment.y1}
+                              x2={segment.x2}
+                              y2={segment.y2}
+                              stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'}
+                              strokeWidth={highlighted ? 3.6 : 2.2}
+                              strokeOpacity={faded ? 0.22 : 0.92}
+                            />
+                          ))}
+                        </g>
+                      ))}
+                    </>
                   )
-                })}
+                  : (
+                    <>
+                      {!isSingleChildGroup && group.siblingY > group.junctionY ? <line x1={renderedJunctionX} y1={group.junctionY} x2={renderedJunctionX} y2={group.siblingY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} /> : null}
+
+                      {group.childNodes.length > 1 ? <line x1={siblingMinX} y1={group.siblingY} x2={siblingMaxX} y2={group.siblingY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} /> : null}
+
+                      {group.childNodes.map((node) => {
+                        const childCenterX = node.x + node.width / 2
+                        const childTopY = node.y
+                        if (group.childNodes.length > 1) {
+                          return <line key={`${group.key}:${node.id}:child`} x1={childCenterX} y1={group.siblingY} x2={childCenterX} y2={childTopY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} />
+                        }
+
+                        return (
+                          <g key={`${group.key}:${node.id}:child`}>
+                            <line x1={renderedJunctionX} y1={group.junctionY} x2={renderedJunctionX} y2={childTopY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} />
+                            {Math.abs(childCenterX - renderedJunctionX) <= 0.5 ? null : (
+                              <line x1={renderedJunctionX} y1={childTopY} x2={childCenterX} y2={childTopY} stroke={highlighted ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-edge)'} strokeWidth={highlighted ? 3.6 : 2.2} strokeOpacity={faded ? 0.22 : 0.92} />
+                            )}
+                          </g>
+                        )
+                      })}
+                    </>
+                  )}
               </g>
             )
           })}

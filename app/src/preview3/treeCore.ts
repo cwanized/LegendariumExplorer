@@ -2208,6 +2208,7 @@ export function buildSpouseProjectionState(
     height: node.height,
   }))
   const marriages = validation.validOverlayRelations.filter((relation) => relation.type === 'marriage').sort((left, right) => left.id.localeCompare(right.id))
+  const marriagePartnerIdsByPerson = buildMarriagePartnerIdsByPerson(marriages)
 
   for (const relation of marriages) {
     const fromNode = layout.nodes.get(relation.from)
@@ -2219,6 +2220,7 @@ export function buildSpouseProjectionState(
 
     const fromParentCount = (validation.parentsByChild.get(relation.from) ?? []).length
     const toParentCount = (validation.parentsByChild.get(relation.to) ?? []).length
+    const hasSingleAnchoredSpouse = (fromParentCount === 0) !== (toParentCount === 0)
     if (suppressProjectionWhenEitherPartnerParentless && (fromParentCount === 0 || toParentCount === 0)) {
       continue
     }
@@ -2243,7 +2245,6 @@ export function buildSpouseProjectionState(
     const height = 54
     const horizontalGap = 28
     const ownerPartnerId = ownerId === relation.from ? relation.to : relation.from
-    const hasSingleAnchoredSpouse = (fromParentCount === 0) !== (toParentCount === 0)
     const placements = hasSingleAnchoredSpouse
       ? (() => {
           const anchorId = fromParentCount > 0 ? relation.from : relation.to
@@ -2269,7 +2270,14 @@ export function buildSpouseProjectionState(
         continue
       }
 
-      const side = partnerNode.x >= anchorNode.x ? 'right' : 'left'
+      const side = resolveProjectionSide({
+        anchorId: placementTarget.anchorId,
+        companionId: placementTarget.companionId,
+        anchorNode,
+        partnerNode,
+        marriagePartnerIdsByPerson,
+        layout,
+      })
       const placement = findProjectionPlacement(anchorNode, side, width, height, horizontalGap, occupiedRects, preferSameRowPlacement)
 
       occupiedRects.push({
@@ -2305,6 +2313,8 @@ function findProjectionPlacement(
   occupiedRects: ProjectionRect[],
   preferSameRowPlacement: boolean,
 ): { x: number; y: number } {
+  const sameRowCollisionPadding = 96
+  const fallbackCollisionPadding = 10
   const sideSign = side === 'right' ? 1 : -1
   const oppositeSideSign = -sideSign
   const baseX = side === 'right' ? anchorNode.x + anchorNode.width + horizontalGap : anchorNode.x - width - horizontalGap
@@ -2314,32 +2324,28 @@ function findProjectionPlacement(
   const offsets = [0, -(height + 18), height + 18, -2 * (height + 18), 2 * (height + 18), -3 * (height + 18), 3 * (height + 18)]
 
   // Keep projected spouses on the same visual row and choose the nearest free slot.
-  const sameRowCandidates = [
-    ...horizontalSteps.map((step) => ({ x: baseX + sideSign * step, y: baseY, step, sidePenalty: 0 })),
-    ...horizontalSteps.map((step) => ({ x: oppositeBaseX + oppositeSideSign * step, y: baseY, step, sidePenalty: 24 })),
-  ].sort((left, right) => {
-    const leftScore = left.step + left.sidePenalty
-    const rightScore = right.step + right.sidePenalty
-    return leftScore - rightScore
-  })
+  const sameRowCandidates = horizontalSteps.flatMap((step) => ([
+    { x: baseX + sideSign * step, y: baseY },
+    { x: oppositeBaseX + oppositeSideSign * step, y: baseY },
+  ]))
 
   for (const candidate of sameRowCandidates) {
     const rect = { x: candidate.x, y: candidate.y, width, height }
-    if (!occupiedRects.some((occupiedRect) => rectsOverlap(rect, occupiedRect, 10))) {
+    if (!occupiedRects.some((occupiedRect) => rectsOverlap(rect, occupiedRect, sameRowCollisionPadding))) {
       return { x: rect.x, y: rect.y }
     }
   }
 
-  if (preferSameRowPlacement) {
-    // In Mode R2, keep spouses on one row even when space is tight.
-    return { x: baseX, y: baseY }
-  }
-
   for (const offsetY of offsets) {
     const candidate = { x: baseX, y: baseY + offsetY, width, height }
-    if (!occupiedRects.some((occupiedRect) => rectsOverlap(candidate, occupiedRect, 10))) {
+    if (!occupiedRects.some((occupiedRect) => rectsOverlap(candidate, occupiedRect, fallbackCollisionPadding))) {
       return { x: candidate.x, y: candidate.y }
     }
+  }
+
+  if (preferSameRowPlacement) {
+    // As last resort keep spouse projection on the anchor row.
+    return { x: baseX, y: baseY }
   }
 
   return { x: baseX, y: baseY + 4 * (height + 18) }
@@ -2371,6 +2377,72 @@ function getSharedChildren(firstParentId: UUID, secondParentId: UUID, validation
   const secondChildren = validation.childrenByParent.get(secondParentId) ?? []
 
   return secondChildren.filter((childId) => firstChildren.has(childId)).sort((left, right) => left.localeCompare(right))
+}
+
+function buildMarriagePartnerIdsByPerson(marriages: Relation[]): Map<UUID, UUID[]> {
+  const partnerIdsByPerson = new Map<UUID, Set<UUID>>()
+
+  for (const relation of marriages) {
+    const fromPartnerIds = partnerIdsByPerson.get(relation.from) ?? new Set<UUID>()
+    fromPartnerIds.add(relation.to)
+    partnerIdsByPerson.set(relation.from, fromPartnerIds)
+
+    const toPartnerIds = partnerIdsByPerson.get(relation.to) ?? new Set<UUID>()
+    toPartnerIds.add(relation.from)
+    partnerIdsByPerson.set(relation.to, toPartnerIds)
+  }
+
+  const result = new Map<UUID, UUID[]>()
+  for (const [personId, partnerIds] of partnerIdsByPerson) {
+    result.set(personId, Array.from(partnerIds).sort((left, right) => left.localeCompare(right)))
+  }
+
+  return result
+}
+
+function resolveProjectionSide({
+  anchorId,
+  companionId,
+  anchorNode,
+  partnerNode,
+  marriagePartnerIdsByPerson,
+  layout,
+}: {
+  anchorId: UUID
+  companionId: UUID
+  anchorNode: { x: number; y: number; width: number; height: number }
+  partnerNode: { x: number; y: number; width: number; height: number }
+  marriagePartnerIdsByPerson: Map<UUID, UUID[]>
+  layout: LayoutResult
+}): 'left' | 'right' {
+  const partnerIds = marriagePartnerIdsByPerson.get(anchorId) ?? []
+  if (partnerIds.length < 2) {
+    return partnerNode.x >= anchorNode.x ? 'right' : 'left'
+  }
+
+  const orderedPartnerIds = partnerIds
+    .map((partnerId) => {
+      const node = layout.nodes.get(partnerId)
+      return {
+        partnerId,
+        x: node ? node.x + node.width / 2 : Number.POSITIVE_INFINITY,
+      }
+    })
+    .sort((left, right) => {
+      if (left.x !== right.x) {
+        return left.x - right.x
+      }
+
+      return left.partnerId.localeCompare(right.partnerId)
+    })
+    .map((entry) => entry.partnerId)
+
+  const partnerIndex = orderedPartnerIds.indexOf(companionId)
+  if (partnerIndex === 0) {
+    return 'left'
+  }
+
+  return 'right'
 }
 
 function resolveProjectedMarriageOwner({

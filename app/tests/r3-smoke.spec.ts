@@ -443,4 +443,53 @@ test.describe('Mode R3 smoke', () => {
 
     expect(Math.abs(luthien.x - parentMidX)).toBeLessThan(Math.abs(luthien.x - beren.x))
   })
+
+  test('keeps Ingwion centered under Ingwe/Ilwen', async ({ page }) => {
+    const result = await page.locator('svg.preview3-graph').evaluate((svg) => {
+      const findCenterByName = (needle: string) => {
+        const labels = Array.from(svg.querySelectorAll('text'))
+        const match = labels.find((label) => (label.textContent || '').trim().toLowerCase() === needle)
+        if (!match) {
+          return null
+        }
+
+        const group = match.closest('g')
+        const rect = group?.querySelector('rect[rx="18"]') as SVGRectElement | null
+        if (!rect) {
+          return null
+        }
+
+        const x = Number(rect.getAttribute('x') ?? 'NaN')
+        const y = Number(rect.getAttribute('y') ?? 'NaN')
+        const width = Number(rect.getAttribute('width') ?? 'NaN')
+        const height = Number(rect.getAttribute('height') ?? 'NaN')
+        if (![x, y, width, height].every(Number.isFinite)) {
+          return null
+        }
+
+        return {
+          centerX: x + width / 2,
+          centerY: y + height / 2,
+        }
+      }
+
+      const ingwe = findCenterByName('ingwë')
+      const ilwen = findCenterByName('ilwen')
+      const ingwion = findCenterByName('ingwion')
+
+      if (!ingwe || !ilwen || !ingwion) {
+        return null
+      }
+
+      const parentMidX = (ingwe.centerX + ilwen.centerX) / 2
+      return {
+        parentMidX,
+        ingwionX: ingwion.centerX,
+        delta: ingwion.centerX - parentMidX,
+      }
+    })
+
+    expect(result).not.toBeNull()
+    expect(Math.abs(result?.delta ?? Number.NaN)).toBeLessThanOrEqual(1)
+  })
 })
