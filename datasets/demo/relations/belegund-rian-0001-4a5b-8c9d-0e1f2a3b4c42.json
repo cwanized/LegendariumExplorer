@@ -1,0 +1,12 @@
+{
+  "id": "belegund-rian-0001-4a5b-8c9d-0e1f2a3b4c42",
+  "type": "biological_parent",
+  "from": "550e8400-e29b-41d4-a716-446655440032",
+  "to": "6eaf1023-d415-4179-8ca5-4c6b8fa90006",
+  "attributes": {
+    "date": {
+      "era": "First Age",
+      "year": 450
+    }
+  }
+}

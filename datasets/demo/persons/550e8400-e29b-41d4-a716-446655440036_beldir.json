@@ -1,0 +1,24 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440036",
+  "name": "Beldir",
+  "gender": "male",
+  "birth": {
+    "era": "First Age",
+    "year": 315
+  },
+  "death": null,
+  "houses": [
+    "House of Bëor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Beldir"
+    }
+  ],
+  "metadata": {
+    "description": "Son of Belen, father of Belemir. Grandfather of Beren.",
+    "yOffset": 0
+  },
+  "species": "Man"
+}

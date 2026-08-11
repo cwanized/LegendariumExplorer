@@ -1,0 +1,24 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440033",
+  "name": "Belemir",
+  "gender": "male",
+  "birth": {
+    "era": "First Age",
+    "year": 340
+  },
+  "death": null,
+  "houses": [
+    "House of Bëor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Belemir"
+    }
+  ],
+  "metadata": {
+    "description": "Son of Beldir, father of Beren and Adanel. Grandfather of Emeldir.",
+    "yOffset": 0
+  },
+  "species": "Man"
+}

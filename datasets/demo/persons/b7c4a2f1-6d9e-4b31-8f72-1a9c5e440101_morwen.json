@@ -6,7 +6,10 @@
     "era": "First Age",
     "year": 443
   },
-  "death": null,
+  "death": {
+    "era": "First Age",
+    "year": 499
+  },
   "houses": [
     "House of Bëor",
     "House of Hador"
@@ -18,7 +21,8 @@
     }
   ],
   "metadata": {
-    "description": "Morwen Eledhwen, wife of Hurin and mother of Turin and Nienor."
+    "description": "Morwen Eledhwen, daughter of Baragund, wife of Húrin, mother of Túrin Turambar, Urwen, and Nienor. Died in grief after finding her children.",
+    "yOffset": 72
   },
   "species": "Man"
 }

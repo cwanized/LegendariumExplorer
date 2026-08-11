@@ -1,0 +1,24 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440035",
+  "name": "Belen",
+  "gender": "male",
+  "birth": {
+    "era": "First Age",
+    "year": 292
+  },
+  "death": null,
+  "houses": [
+    "House of Bëor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Belen"
+    }
+  ],
+  "metadata": {
+    "description": "Youngest son of Bëor the Old, brother of Baran. Father of Beldir. Received Bëor's wisdom and lore. Ancestor of Emeldir.",
+    "yOffset": 0
+  },
+  "species": "Man"
+}

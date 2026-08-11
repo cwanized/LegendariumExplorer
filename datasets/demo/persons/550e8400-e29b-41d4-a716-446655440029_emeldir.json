@@ -2,7 +2,10 @@
   "id": "550e8400-e29b-41d4-a716-446655440029",
   "name": "Emeldir",
   "gender": "female",
-  "birth": null,
+  "birth": {
+    "era": "First Age",
+    "year": 406
+  },
   "death": null,
   "houses": [
     "House of Bëor"
@@ -10,11 +13,12 @@
   "sourceLinks": [
     {
       "label": "Tolkien Gateway",
-      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Emeldir"
+      "url": "https://tolkiengateway.net/wiki/Emeldir"
     }
   ],
   "metadata": {
-    "description": "Wife of Barahir and mother of Beren"
+    "description": "Daughter of Beren (son of Belemir), wife of Barahir, mother of Beren Erchamion and Hiril. Known as 'Emeldir the Manhearted' for leading the women and children of the House of Bëor to safety after the Dagor Bragollach.",
+    "yOffset": 72
   },
   "species": "Man"
 }

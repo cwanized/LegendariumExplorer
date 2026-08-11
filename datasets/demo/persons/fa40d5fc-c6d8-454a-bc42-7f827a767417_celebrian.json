@@ -5,7 +5,7 @@
   "species": "Elf",
   "birth": {
     "era": "Second Age",
-    "year": null
+    "year": 300
   },
   "death": null,
   "houses": [
@@ -14,10 +14,11 @@
   "sourceLinks": [
     {
       "label": "Tolkien Gateway",
-      "url": "https://tolkiengateway.net/wiki/Special:Search?search=Celebrian"
+      "url": "https://tolkiengateway.net/wiki/Celebr%C3%ADan"
     }
   ],
   "metadata": {
-    "description": "Daughter of Galadriel and Celeborn, wife of Elrond, mother of Arwen, Elladan, and Elrohir."
+    "description": "Daughter of Galadriel and Celeborn, wife of Elrond, mother of Arwen, Elladan, and Elrohir. Born in Eregion early in the Second Age.",
+    "yOffset": -72
   }
 }

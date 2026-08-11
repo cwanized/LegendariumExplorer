@@ -1,0 +1,12 @@
+{
+  "id": "celeborn-celebrian-0001-4a5b-8c9d-0e1f2a3b4c71",
+  "type": "biological_parent",
+  "from": "12285381-b101-4bdb-8534-825508def1db",
+  "to": "fa40d5fc-c6d8-454a-bc42-7f827a767417",
+  "attributes": {
+    "date": {
+      "era": "Second Age",
+      "year": 300
+    }
+  }
+}

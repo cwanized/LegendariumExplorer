@@ -2,7 +2,10 @@
   "id": "550e8400-e29b-41d4-a716-446655440030",
   "name": "Bregolas",
   "gender": "male",
-  "birth": null,
+  "birth": {
+    "era": "First Age",
+    "year": 393
+  },
   "death": {
     "era": "First Age",
     "year": 455
@@ -17,7 +20,8 @@
     }
   ],
   "metadata": {
-    "description": "Son of Bregor, father of Baragund and Belegund."
+    "description": "Third Lord of Ladros. Son of Bregor, father of Baragund, Belegund, and Beleth. Killed in the Dagor Bragollach defending Dorthonion.",
+    "yOffset": 72
   },
   "species": "Man"
 }

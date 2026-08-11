@@ -1,10 +1,10 @@
 {
-  "id": "550e8400-e29b-41d4-a716-446655440031",
-  "name": "Baragund",
+  "id": "550e8400-e29b-41d4-a716-446655440032",
+  "name": "Belegund",
   "gender": "male",
   "birth": {
     "era": "First Age",
-    "year": 420
+    "year": 422
   },
   "death": {
     "era": "First Age",
@@ -16,11 +16,11 @@
   "sourceLinks": [
     {
       "label": "Tolkien Gateway",
-      "url": "https://tolkiengateway.net/wiki/Baragund"
+      "url": "https://tolkiengateway.net/wiki/Belegund"
     }
   ],
   "metadata": {
-    "description": "Elder son of Bregolas, father of Barahir, grandfather of Beren. One of Barahir's twelve followers.",
+    "description": "Younger son of Bregolas, father of Rían. One of Barahir's twelve followers. Killed in the Dagor Bragollach.",
     "yOffset": 72
   },
   "species": "Man"

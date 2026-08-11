@@ -1,0 +1,24 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440034",
+  "name": "Beren",
+  "gender": "male",
+  "birth": {
+    "era": "First Age",
+    "year": 380
+  },
+  "death": null,
+  "houses": [
+    "House of Bëor"
+  ],
+  "sourceLinks": [
+    {
+      "label": "Tolkien Gateway",
+      "url": "https://tolkiengateway.net/wiki/Beren_(son_of_Belemir)"
+    }
+  ],
+  "metadata": {
+    "description": "Son of Belemir, father of Emeldir and Hiril. Grandfather of Beren Erchamion.",
+    "yOffset": 72
+  },
+  "species": "Man"
+}

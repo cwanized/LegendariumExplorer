@@ -8,19 +8,20 @@
   },
   "death": {
     "era": "First Age",
-    "year": 472
+    "year": 473
   },
   "sourceLinks": [
     {
       "label": "Tolkien Gateway",
-      "url": "https://tolkiengateway.net/wiki/Special:Search?search=R%C3%ADan"
+      "url": "https://tolkiengateway.net/wiki/R%C3%ADan"
     }
   ],
   "metadata": {
-    "description": "Mother of Tuor"
+    "description": "Daughter of Belegund, wife of Huor, mother of Tuor. Singer and maker of songs. Died of grief on Haudh-en-Ndengin.",
+    "yOffset": 72
   },
   "species": "Man",
   "houses": [
-    "House of Hador"
+    "House of Bëor"
   ]
 }
