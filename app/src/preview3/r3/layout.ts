@@ -26,6 +26,8 @@ const PROJECTION_HORIZONTAL_GAP = 28
 const PROJECTION_NODE_WIDTH = 152
 const TWO_CHILD_SPAN_COMPRESSION = 0.28
 const SINGLE_PARENT_TWO_CHILD_SPAN_COMPRESSION = 0.24
+const TWO_CHILD_HEAVY_BRANCH_RATIO_THRESHOLD = 2.6
+const TWO_CHILD_LIGHT_BRANCH_MAX_SPAN = 1.35
 const MULTI_SIBLING_SPAN_COMPRESSION = 0.42
 const SINGLE_PARENT_MULTI_SIBLING_SPAN_COMPRESSION = 0.34
 const ROW_DEOVERLAP_MIN_GAP = 20
@@ -159,6 +161,8 @@ export function buildModeR3LayoutWithArtifacts(
     })
   }
 
+  applyRowDeoverlap(positionedNodes)
+  alignTwoParentChildBandsToMidpoint(placementPlan.families, validation, positionedNodes, spouseAttachedByOwnerId)
   applyRowDeoverlap(positionedNodes)
   finalizeFamilyPlacementAxes(familyPlacements, positionedNodes)
 
@@ -336,7 +340,6 @@ function buildPlacementPlan({
   const normalizedFamilies = biologicalFamilies.map((family) => {
     const normalizedOwnerId = resolveAnchoredFamilyOwnerId({
       family,
-      rowByPersonId,
       validation,
     })
 
@@ -367,11 +370,9 @@ function buildPlacementPlan({
 
 function resolveAnchoredFamilyOwnerId({
   family,
-  rowByPersonId,
   validation,
 }: {
   family: R3FamilyGroup
-  rowByPersonId: Map<UUID, number>
   validation: ValidationResult
 }): UUID {
   if (family.parentIds.length !== 2) {
@@ -385,12 +386,6 @@ function resolveAnchoredFamilyOwnerId({
   // Prefer the partner already anchored by known ancestry over a parentless root candidate.
   if (leftHasBiologicalParents !== rightHasBiologicalParents) {
     return leftHasBiologicalParents ? leftParentId : rightParentId
-  }
-
-  const leftRow = rowByPersonId.get(leftParentId) ?? 1
-  const rightRow = rowByPersonId.get(rightParentId) ?? 1
-  if (leftRow !== rightRow) {
-    return leftRow > rightRow ? leftParentId : rightParentId
   }
 
   return family.ownerId
@@ -437,6 +432,43 @@ function buildChildColumns(
   placementPlan: R3PlacementPlan,
   subtreeSpanCache: Map<UUID, number>,
 ): number[] {
+  if (family.parentIds.length === 2 && childIds.length === 2) {
+    const rawSpans = childIds.map((childId) => getPersonSubtreeSpan(childId, placementPlan, subtreeSpanCache))
+    const effectiveSpans = rawSpans.map((rawSpan) => resolveChildPlacementSpan(rawSpan, family))
+
+    const continuationCompanionFlags = childIds.map((childId) => isNonOwnerMarriageParentWithChildren(childId, placementPlan.families))
+    const continuationCompanionCount = continuationCompanionFlags.filter(Boolean).length
+    if (continuationCompanionCount === 1) {
+      const centeredIndex = continuationCompanionFlags[0] ? 1 : 0
+      const offsetIndex = centeredIndex === 0 ? 1 : 0
+      const centeredSpan = effectiveSpans[centeredIndex]
+      const offsetSpan = effectiveSpans[offsetIndex]
+      const columns: number[] = [familyCenter, familyCenter]
+      const centerDistance = (centeredSpan + offsetSpan) / 2 + CHILD_GAP_COLUMNS
+      const offsetToRight = offsetIndex > centeredIndex
+      columns[offsetIndex] = familyCenter + (offsetToRight ? centerDistance : -centerDistance)
+      return columns
+    }
+
+    const lightIndex = effectiveSpans[0] <= effectiveSpans[1] ? 0 : 1
+    const heavyIndex = lightIndex === 0 ? 1 : 0
+    const lightSpan = effectiveSpans[lightIndex]
+    const heavySpan = effectiveSpans[heavyIndex]
+
+    // Keep the lightweight continuation sibling pinned to the family axis
+    // when the opposite branch has a very large downstream footprint.
+    if (
+      lightSpan <= TWO_CHILD_LIGHT_BRANCH_MAX_SPAN
+      && heavySpan >= lightSpan * TWO_CHILD_HEAVY_BRANCH_RATIO_THRESHOLD
+    ) {
+      const columns: number[] = [familyCenter, familyCenter]
+      const centerDistance = (lightSpan + heavySpan) / 2 + CHILD_GAP_COLUMNS
+      const lightIsLeft = lightIndex < heavyIndex
+      columns[heavyIndex] = familyCenter + (lightIsLeft ? centerDistance : -centerDistance)
+      return columns
+    }
+  }
+
   const totalWidth = childIds.reduce((sum, childId, index) => {
     const subtreeSpan = getPersonSubtreeSpan(childId, placementPlan, subtreeSpanCache)
     const next = sum + resolveChildPlacementSpan(subtreeSpan, family)
@@ -453,6 +485,15 @@ function buildChildColumns(
   }
 
   return columns
+}
+
+function isNonOwnerMarriageParentWithChildren(personId: UUID, families: R3FamilyGroup[]): boolean {
+  return families.some((family) => (
+    family.parentIds.length === 2
+    && family.ownerId !== personId
+    && family.parentIds.includes(personId)
+    && family.childIds.length > 0
+  ))
 }
 
 function resolveChildPlacementSpan(subtreeSpan: number, family: R3FamilyGroup): number {
@@ -642,6 +683,112 @@ function alignSingleChildrenToTwoParentMidpoint(
   }
 }
 
+function alignTwoParentChildBandsToMidpoint(
+  families: R3FamilyGroup[],
+  validation: ValidationResult,
+  positionedNodes: Map<UUID, PositionedNode>,
+  spouseAttachedByOwnerId: Map<UUID, Set<UUID>>,
+): void {
+  const familiesByParentRow = families
+    .slice()
+    .sort((left, right) => {
+      const leftParentNodes = left.parentIds
+        .map((parentId) => positionedNodes.get(parentId))
+        .filter((node): node is PositionedNode => node !== undefined)
+      const rightParentNodes = right.parentIds
+        .map((parentId) => positionedNodes.get(parentId))
+        .filter((node): node is PositionedNode => node !== undefined)
+      const leftTopY = leftParentNodes.length > 0 ? Math.min(...leftParentNodes.map((node) => node.y)) : Number.MAX_SAFE_INTEGER
+      const rightTopY = rightParentNodes.length > 0 ? Math.min(...rightParentNodes.map((node) => node.y)) : Number.MAX_SAFE_INTEGER
+
+      if (leftTopY !== rightTopY) {
+        return leftTopY - rightTopY
+      }
+
+      return left.key.localeCompare(right.key)
+    })
+
+  for (const family of familiesByParentRow) {
+    if (family.parentIds.length !== 2 || family.childIds.length === 0) {
+      continue
+    }
+
+    const [firstParentId, secondParentId] = family.parentIds
+    const firstParent = positionedNodes.get(firstParentId)
+    const secondParent = positionedNodes.get(secondParentId)
+    const ownerNode = positionedNodes.get(family.ownerId)
+
+    if (!firstParent || !secondParent) {
+      continue
+    }
+
+    const childNodeById = new Map<UUID, PositionedNode>()
+    for (const childId of family.childIds) {
+      const node = positionedNodes.get(childId)
+      if (node) {
+        childNodeById.set(childId, node)
+      }
+    }
+
+    const childNodes = [...childNodeById.values()]
+
+    if (childNodes.length === 0) {
+      continue
+    }
+
+    const firstParentCenterX = firstParent.x + firstParent.width / 2
+    const secondParentCenterX = secondParent.x + secondParent.width / 2
+    const parentMidX = (firstParentCenterX + secondParentCenterX) / 2
+    const splitGenerationRows = Math.abs(firstParent.y - secondParent.y) / ROW_HEIGHT
+    const ownerCenterX = ownerNode ? ownerNode.x + ownerNode.width / 2 : null
+    const targetAnchorX = splitGenerationRows >= 8 && ownerCenterX !== null
+      ? ownerCenterX
+      : parentMidX
+    const continuationCompanionFlags = family.childIds.map((childId) => isNonOwnerMarriageParentWithChildren(childId, familiesByParentRow))
+    const continuationCompanionCount = continuationCompanionFlags.filter(Boolean).length
+    const preferredCenteredChildId = family.childIds.length === 2 && continuationCompanionCount === 1
+      ? family.childIds[continuationCompanionFlags[0] ? 1 : 0]
+      : null
+
+    const preferredCenterX = preferredCenteredChildId
+      ? (() => {
+          const preferredNode = childNodeById.get(preferredCenteredChildId)
+          return preferredNode ? preferredNode.x + preferredNode.width / 2 : null
+        })()
+      : null
+
+    const childCenters = childNodes.map((node) => node.x + node.width / 2)
+    const childBandMidX = childNodes.length === 1
+      ? childCenters[0]
+      : (Math.min(...childCenters) + Math.max(...childCenters)) / 2
+    const currentAnchorX = preferredCenterX ?? childBandMidX
+    const shiftX = targetAnchorX - currentAnchorX
+
+    if (Math.abs(shiftX) < 1) {
+      continue
+    }
+
+    const shiftNodeIds = new Set<UUID>()
+    for (const childId of family.childIds) {
+      for (const shiftNodeId of collectShiftNodeIds(childId, validation.childrenByParent, spouseAttachedByOwnerId)) {
+        shiftNodeIds.add(shiftNodeId)
+      }
+    }
+
+    for (const shiftNodeId of shiftNodeIds) {
+      const node = positionedNodes.get(shiftNodeId)
+      if (!node) {
+        continue
+      }
+
+      positionedNodes.set(shiftNodeId, {
+        ...node,
+        x: node.x + shiftX,
+      })
+    }
+  }
+}
+
 function applyRowDeoverlap(positionedNodes: Map<UUID, PositionedNode>): void {
   const rowBuckets = new Map<number, PositionedNode[]>()
 
@@ -746,10 +893,19 @@ function resolveFamilyAxisColumn({
     const partnerNode = partnerId ? positionedNodes.get(partnerId) : null
 
     if (ownerNode && partnerNode) {
-      // Child axis follows the displayed local couple geometry (owner + projection)
-      // to keep child links compact and symmetric in projection-driven rendering.
       const ownerCenterX = ownerNode.x + ownerNode.width / 2
       const partnerCenterX = partnerNode.x + partnerNode.width / 2
+      const ownerPartnerDistanceColumns = Math.abs(ownerCenterX - partnerCenterX) / COLUMN_WIDTH
+
+      // Use projection axis only when the biological partner is already visually local.
+      // For distant anchored partners, parent midpoint preserves lineage symmetry.
+      if (ownerPartnerDistanceColumns > SPOUSE_STEP_COLUMNS + 0.75) {
+        const parentMidX = (leftParent.x + leftParent.width / 2 + rightParent.x + rightParent.width / 2) / 2
+        return parentMidX / COLUMN_WIDTH
+      }
+
+      // Child axis follows the displayed local couple geometry (owner + projection)
+      // to keep child links compact and symmetric in projection-driven rendering.
       const sideSign = partnerCenterX >= ownerCenterX ? 1 : -1
       const ownerToProjectionCenter = ownerNode.width / 2 + PROJECTION_HORIZONTAL_GAP + PROJECTION_NODE_WIDTH / 2
       const localCoupleMidpointX = ownerCenterX + sideSign * (ownerToProjectionCenter / 2)

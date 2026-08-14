@@ -12,6 +12,17 @@ import type {
 import { resolveContinuationOwner } from './continuation'
 import type { Preview3HouseAnchorVerticalAlignment } from './modes'
 import { comparePersonsForLayout } from '../graph'
+import {
+  INLINE_MARRIAGE_MAX_CENTER_Y_DELTA,
+  INLINE_MARRIAGE_MAX_GAP_FACTOR,
+  SPOUSE_PROJECTION_FALLBACK_COLLISION_PADDING,
+  SPOUSE_PROJECTION_HORIZONTAL_GAP,
+  SPOUSE_PROJECTION_NODE_HEIGHT,
+  SPOUSE_PROJECTION_NODE_WIDTH,
+  SPOUSE_PROJECTION_SAME_ROW_COLLISION_PADDING,
+  SPOUSE_PROJECTION_VERTICAL_ANCHOR_OFFSET,
+  SPOUSE_PROJECTION_VERTICAL_STEP_GAP,
+} from './ruleConstants'
 
 const PERSON_Y_OFFSET_UNIT = 72
 const HOUSE_Y_OFFSET_UNIT = 170
@@ -2241,9 +2252,9 @@ export function buildSpouseProjectionState(
       }
     }
 
-    const width = 152
-    const height = 54
-    const horizontalGap = 28
+    const width = SPOUSE_PROJECTION_NODE_WIDTH
+    const height = SPOUSE_PROJECTION_NODE_HEIGHT
+    const horizontalGap = SPOUSE_PROJECTION_HORIZONTAL_GAP
     const ownerPartnerId = ownerId === relation.from ? relation.to : relation.from
     const placements = hasSingleAnchoredSpouse
       ? (() => {
@@ -2313,15 +2324,16 @@ function findProjectionPlacement(
   occupiedRects: ProjectionRect[],
   preferSameRowPlacement: boolean,
 ): { x: number; y: number } {
-  const sameRowCollisionPadding = 96
-  const fallbackCollisionPadding = 10
+  const sameRowCollisionPadding = SPOUSE_PROJECTION_SAME_ROW_COLLISION_PADDING
+  const fallbackCollisionPadding = SPOUSE_PROJECTION_FALLBACK_COLLISION_PADDING
   const sideSign = side === 'right' ? 1 : -1
   const oppositeSideSign = -sideSign
   const baseX = side === 'right' ? anchorNode.x + anchorNode.width + horizontalGap : anchorNode.x - width - horizontalGap
   const oppositeBaseX = side === 'right' ? anchorNode.x - width - horizontalGap : anchorNode.x + anchorNode.width + horizontalGap
-  const baseY = anchorNode.y + 6
+  const baseY = anchorNode.y + SPOUSE_PROJECTION_VERTICAL_ANCHOR_OFFSET
   const horizontalSteps = [0, 36, 72, 112, 156, 220, 300, 420, 560, 720]
-  const offsets = [0, -(height + 18), height + 18, -2 * (height + 18), 2 * (height + 18), -3 * (height + 18), 3 * (height + 18)]
+  const verticalStep = height + SPOUSE_PROJECTION_VERTICAL_STEP_GAP
+  const offsets = [0, -verticalStep, verticalStep, -2 * verticalStep, 2 * verticalStep, -3 * verticalStep, 3 * verticalStep]
 
   // Keep projected spouses on the same visual row and choose the nearest free slot.
   const sameRowCandidates = horizontalSteps.flatMap((step) => ([
@@ -2348,7 +2360,7 @@ function findProjectionPlacement(
     return { x: baseX, y: baseY }
   }
 
-  return { x: baseX, y: baseY + 4 * (height + 18) }
+  return { x: baseX, y: baseY + 4 * verticalStep }
 }
 
 export function canRenderInlineMarriage(
@@ -2358,9 +2370,9 @@ export function canRenderInlineMarriage(
   const centerYDelta = Math.abs(firstNode.y + firstNode.height / 2 - (secondNode.y + secondNode.height / 2))
   const [leftNode, rightNode] = firstNode.x <= secondNode.x ? [firstNode, secondNode] : [secondNode, firstNode]
   const boxGap = rightNode.x - (leftNode.x + leftNode.width)
-  const maxInlineGap = Math.max(leftNode.width, rightNode.width) * 0.8
+  const maxInlineGap = Math.max(leftNode.width, rightNode.width) * INLINE_MARRIAGE_MAX_GAP_FACTOR
 
-  return centerYDelta <= 28 && boxGap >= 0 && boxGap <= maxInlineGap
+  return centerYDelta <= INLINE_MARRIAGE_MAX_CENTER_Y_DELTA && boxGap >= 0 && boxGap <= maxInlineGap
 }
 
 function rectsOverlap(first: ProjectionRect, second: ProjectionRect, padding: number): boolean {

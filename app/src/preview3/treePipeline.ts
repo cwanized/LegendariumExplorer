@@ -16,6 +16,7 @@ import type {
   ValidationResult,
 } from '../graph'
 import type { Preview3ModeDefinition, Preview3PipelineStage } from './modes'
+import { resolveContinuationOwner } from './continuation'
 import { buildModeR2Layout } from './rasterModeR2'
 import { buildModeR3ConnectorModel, type R3ConnectorAnchor, type R3ConnectorGroupModel } from './r3/connectorModel'
 import { buildModeR3Layout, getModeR3LayoutArtifacts } from './r3/layout'
@@ -412,6 +413,8 @@ export function buildPreview3RenderedTree({
     layout,
     overlayEnabled,
     spouseProjection,
+    validation,
+    spouseOwnerOverrides,
   })
   const r3ConnectorModelByKey = modeDefinition.id === 'modeR3'
     ? buildModeR3ConnectorModel(biologicalChildGroups, groupParentAnchorsByKey)
@@ -433,17 +436,81 @@ function buildGroupParentAnchorsByKey({
   layout,
   overlayEnabled,
   spouseProjection,
+  validation,
+  spouseOwnerOverrides,
 }: {
   biologicalChildGroups: BiologicalChildGroup[]
   layout: LayoutResult
   overlayEnabled: boolean
   spouseProjection: SpouseProjectionState
+  validation: ValidationResult
+  spouseOwnerOverrides: Record<string, UUID>
 }): Map<string, Preview3GroupParentAnchor[]> {
+  const MAX_PROJECTION_MAIN_ANCHOR_DELTA_X = 360
   const projectionsByCompanionId = new Map<UUID, typeof spouseProjection.nodes>()
   for (const projection of spouseProjection.nodes) {
     const projections = projectionsByCompanionId.get(projection.companionId) ?? []
     projections.push(projection)
     projectionsByCompanionId.set(projection.companionId, projections)
+  }
+
+  const marriageByParentPairKey = new Map<string, Relation>()
+  const ownerByMarriageId = new Map<string, UUID>()
+  for (const relation of validation.validOverlayRelations) {
+    if (relation.type !== 'marriage') {
+      continue
+    }
+
+    const pairKey = [relation.from, relation.to].sort((left, right) => left.localeCompare(right)).join('|')
+    marriageByParentPairKey.set(pairKey, relation)
+    ownerByMarriageId.set(
+      relation.id,
+      resolveContinuationOwner({ relation, validation, spouseOwnerOverrides }),
+    )
+  }
+
+  const distanceToChildren = (
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    childCenterX: number,
+    childTopY: number,
+  ) => {
+    const centerX = x + width / 2
+    const centerY = y + height / 2
+    return Math.hypot(centerX - childCenterX, centerY - childTopY)
+  }
+
+  const buildProjectionAnchor = (parentId: UUID, projection: SpouseProjectionState['nodes'][number]): Preview3GroupParentAnchor => ({
+    key: `projection:${projection.relationId}:${projection.ownerId}:${projection.companionId}`,
+    parentId,
+    x: projection.x,
+    y: projection.y,
+    width: projection.width,
+    height: projection.height,
+    isProjection: true,
+  })
+
+  const selectNearestProjection = (
+    parentId: UUID,
+    projectionCandidates: SpouseProjectionState['nodes'],
+    childCenterX: number,
+    childTopY: number,
+  ): Preview3GroupParentAnchor | null => {
+    if (projectionCandidates.length === 0) {
+      return null
+    }
+
+    const nearest = projectionCandidates
+      .slice()
+      .sort((left, right) => {
+        const leftDistance = distanceToChildren(left.x, left.y, left.width, left.height, childCenterX, childTopY)
+        const rightDistance = distanceToChildren(right.x, right.y, right.width, right.height, childCenterX, childTopY)
+        return leftDistance - rightDistance
+      })[0]
+
+    return buildProjectionAnchor(parentId, nearest)
   }
 
   const anchorsByKey = new Map<string, Preview3GroupParentAnchor[]>()
@@ -452,6 +519,20 @@ function buildGroupParentAnchorsByKey({
     const childTopY = Math.min(...group.childNodes.map((node) => node.y))
     const childCenters = group.childNodes.map((node) => node.x + node.width / 2)
     const childCenterX = (Math.min(...childCenters) + Math.max(...childCenters)) / 2
+
+    const groupOwnerId = (() => {
+      if (group.parentIds.length !== 2) {
+        return null
+      }
+
+      const pairKey = [...group.parentIds].sort((left, right) => left.localeCompare(right)).join('|')
+      const marriage = marriageByParentPairKey.get(pairKey)
+      if (!marriage) {
+        return null
+      }
+
+      return ownerByMarriageId.get(marriage.id) ?? null
+    })()
 
     const anchors = group.parentIds
       .map((parentId) => {
@@ -462,45 +543,51 @@ function buildGroupParentAnchorsByKey({
           ))
           : []
 
-        const candidates: Preview3GroupParentAnchor[] = []
+        const mainAnchor = mainNode
+          ? {
+              key: `main:${parentId}`,
+              parentId,
+              x: mainNode.x,
+              y: mainNode.y,
+              width: mainNode.width,
+              height: mainNode.height,
+              isProjection: false,
+            } satisfies Preview3GroupParentAnchor
+          : null
 
-        if (mainNode) {
-          candidates.push({
-            key: `main:${parentId}`,
-            parentId,
-            x: mainNode.x,
-            y: mainNode.y,
-            width: mainNode.width,
-            height: mainNode.height,
-            isProjection: false,
-          })
+        if (groupOwnerId && group.parentIds.length === 2) {
+          if (parentId === groupOwnerId) {
+            if (mainAnchor) {
+              return mainAnchor
+            }
+
+            return selectNearestProjection(parentId, projectionCandidates, childCenterX, childTopY)
+          }
+
+          const ownerDrivenProjections = projectionCandidates.filter((projection) => projection.ownerId === groupOwnerId)
+          const ownerProjectionAnchor = selectNearestProjection(parentId, ownerDrivenProjections, childCenterX, childTopY)
+          if (ownerProjectionAnchor && mainAnchor) {
+            const projectionCenterX = ownerProjectionAnchor.x + ownerProjectionAnchor.width / 2
+            const mainCenterX = mainAnchor.x + mainAnchor.width / 2
+            if (Math.abs(projectionCenterX - mainCenterX) <= MAX_PROJECTION_MAIN_ANCHOR_DELTA_X) {
+              return ownerProjectionAnchor
+            }
+          } else if (ownerProjectionAnchor) {
+            return ownerProjectionAnchor
+          }
+
+          if (mainAnchor) {
+            return mainAnchor
+          }
+
+          return selectNearestProjection(parentId, projectionCandidates, childCenterX, childTopY)
         }
 
-        for (const projection of projectionCandidates) {
-          candidates.push({
-            key: `projection:${projection.relationId}:${projection.ownerId}:${projection.companionId}`,
-            parentId,
-            x: projection.x,
-            y: projection.y,
-            width: projection.width,
-            height: projection.height,
-            isProjection: true,
-          })
+        if (mainAnchor) {
+          return mainAnchor
         }
 
-        if (candidates.length === 0) {
-          return null
-        }
-
-        candidates.sort((left, right) => {
-          const leftCenterX = left.x + left.width / 2
-          const rightCenterX = right.x + right.width / 2
-          const leftDistance = Math.hypot(leftCenterX - childCenterX, (left.y + left.height / 2) - childTopY)
-          const rightDistance = Math.hypot(rightCenterX - childCenterX, (right.y + right.height / 2) - childTopY)
-          return leftDistance - rightDistance
-        })
-
-        return candidates[0]
+        return selectNearestProjection(parentId, projectionCandidates, childCenterX, childTopY)
       })
       .filter((anchor): anchor is Preview3GroupParentAnchor => anchor !== null)
 
