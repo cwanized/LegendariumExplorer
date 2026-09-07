@@ -21,6 +21,14 @@ import { buildModeR2Layout } from './rasterModeR2'
 import { buildModeR3ConnectorModel, type R3ConnectorAnchor, type R3ConnectorGroupModel } from './r3/connectorModel'
 import { buildModeR3Layout, getModeR3LayoutArtifacts } from './r3/layout'
 import { buildModeR3BiologicalChildGroups, buildModeR3HouseAnchors } from './r3/render'
+import { buildModeR3BLayout, getModeR3BLayoutArtifacts } from './r3b/placement'
+import {
+  buildModeR3BBiologicalChildGroups,
+  buildModeR3BConnectorModel,
+  buildModeR3BHouseAnchors,
+  buildModeR3BParentAnchorsByKey,
+  buildModeR3BSpouseProjectionState,
+} from './r3b/renderModel'
 import {
   R2_RASTER_COLUMN_SIZE,
   R2_RASTER_OUTER_PADDING,
@@ -90,15 +98,18 @@ export async function buildPreview3TreePipeline(
 ): Promise<Preview3TreePipelineResult> {
   const followRulerLine = options?.followRulerLine ?? false
   const validation = validateDataset(dataset)
-  const useVirtualGridLayout = modeDefinition.id === 'modeR' || modeDefinition.id === 'modeR2' || modeDefinition.id === 'modeR3'
+  const useVirtualGridLayout = modeDefinition.id === 'modeR' || modeDefinition.id === 'modeR2' || modeDefinition.id === 'modeR3' || modeDefinition.id === 'modeR3B'
   const useModeRLayout = modeDefinition.id === 'modeR'
   const useModeR2Layout = modeDefinition.id === 'modeR2'
   const useModeR3Layout = modeDefinition.id === 'modeR3'
+  const useModeR3BLayout = modeDefinition.id === 'modeR3B'
   const marriagePairMaxCenterYDelta = useModeR2Layout ? 220 : 28
   const useElkFirstLayoutPasses = modeDefinition.id === 'modeC'
   const useExperimentalLayoutPasses = modeDefinition.id === 'modeD'
   const rawLayout = useModeR3Layout
     ? buildModeR3Layout(validation, dataset.houseDefinitions, { followRulerLine })
+    : useModeR3BLayout
+    ? buildModeR3BLayout(validation, dataset.houseDefinitions, { followRulerLine })
     : useModeR2Layout
     ? buildModeR2Layout(validation, dataset.houseDefinitions)
     : useVirtualGridLayout
@@ -289,6 +300,8 @@ export async function buildPreview3TreePipeline(
 
   let houseAnchors = modeDefinition.id === 'modeR3'
     ? buildModeR3HouseAnchors(validation, layout, dataset.houseDefinitions, { allowFallback: false })
+    : modeDefinition.id === 'modeR3B'
+    ? buildModeR3BHouseAnchors(validation, layout, dataset.houseDefinitions, { allowFallback: false })
     : buildHouseAnchors(validation, layout, dataset.houseDefinitions, {
         strategy: modeDefinition.pipeline.houseAnchorStrategy,
         applyHouseLayoutYOffset: modeDefinition.pipeline.applyHouseAnchorYOffset,
@@ -373,7 +386,13 @@ export function buildPreview3RenderedTree({
 }): Preview3RenderedTree {
   const effectiveHouseYOffsetUnit = resolveHouseYOffsetUnit(modeDefinition, layout, validation.validBiologicalRelations)
   const spouseProjectionPolicy = modeDefinition.render.spouseProjection
-  const spouseProjection = spouseProjectionPolicy.enabled
+  const spouseProjection = modeDefinition.id === 'modeR3B'
+    ? buildModeR3BSpouseProjectionState(validation, layout, selectedIds, spouseOwnerOverrides, {
+        collapseChildEdges: spouseProjectionPolicy.collapseChildEdges,
+        duplicateBothPartners: spouseProjectionPolicy.duplicateStrategy === 'double-sided',
+        preferSameRowPlacement: spouseProjectionPolicy.preferSameRowPlacement,
+      })
+    : spouseProjectionPolicy.enabled
     ? buildSpouseProjectionState(validation, layout, selectedIds, spouseOwnerOverrides, {
         collapseChildEdges: spouseProjectionPolicy.collapseChildEdges,
         duplicateBothPartners: spouseProjectionPolicy.duplicateStrategy === 'double-sided',
@@ -387,6 +406,8 @@ export function buildPreview3RenderedTree({
       }
   const houseAnchors = modeDefinition.id === 'modeR3'
     ? buildModeR3HouseAnchors(validation, layout, houseDefinitions, { allowFallback: false })
+    : modeDefinition.id === 'modeR3B'
+    ? buildModeR3BHouseAnchors(validation, layout, houseDefinitions, { allowFallback: false })
     : buildHouseAnchors(validation, layout, houseDefinitions, {
         strategy: modeDefinition.pipeline.houseAnchorStrategy,
         applyHouseLayoutYOffset: modeDefinition.pipeline.applyHouseAnchorYOffset,
@@ -407,17 +428,30 @@ export function buildPreview3RenderedTree({
 
   const biologicalChildGroups = modeDefinition.id === 'modeR3'
     ? buildModeR3BiologicalChildGroups(validation, biologicalRelations, layout, { allowFallback: false })
+    : modeDefinition.id === 'modeR3B'
+    ? buildModeR3BBiologicalChildGroups(validation, biologicalRelations, layout, { allowFallback: false })
     : buildBiologicalChildGroups(biologicalRelations, layout)
-  const groupParentAnchorsByKey = buildGroupParentAnchorsByKey({
-    biologicalChildGroups,
-    layout,
-    overlayEnabled,
-    spouseProjection,
-    validation,
-    spouseOwnerOverrides,
-  })
+  const groupParentAnchorsByKey = modeDefinition.id === 'modeR3B'
+    ? buildModeR3BParentAnchorsByKey({
+        biologicalChildGroups,
+        layout,
+        overlayEnabled,
+        spouseProjection,
+        validation,
+        spouseOwnerOverrides,
+      })
+    : buildGroupParentAnchorsByKey({
+        biologicalChildGroups,
+        layout,
+        overlayEnabled,
+        spouseProjection,
+        validation,
+        spouseOwnerOverrides,
+      })
   const r3ConnectorModelByKey = modeDefinition.id === 'modeR3'
     ? buildModeR3ConnectorModel(biologicalChildGroups, groupParentAnchorsByKey)
+    : modeDefinition.id === 'modeR3B'
+    ? buildModeR3BConnectorModel(biologicalChildGroups, groupParentAnchorsByKey)
     : new Map<string, R3ConnectorGroupModel>()
 
   return {
@@ -1438,6 +1472,8 @@ function buildPreview3TreeDebugData(
 ): Preview3TreeDebugData {
   const r3Artifacts = modeDefinition.id === 'modeR3'
     ? getModeR3LayoutArtifacts(layout)
+    : modeDefinition.id === 'modeR3B'
+    ? getModeR3BLayoutArtifacts(layout)
     : null
 
   const strategySummary = [
@@ -1460,7 +1496,7 @@ function buildPreview3TreeDebugData(
     `Disconnected component packing: ${modeDefinition.pipeline.applyDisconnectedComponentPacking ? 'on' : 'off'}`,
   ]
 
-  if (modeDefinition.id === 'modeR3') {
+  if (modeDefinition.id === 'modeR3' || modeDefinition.id === 'modeR3B') {
     strategySummary.push(`FollowRulerLine: ${followRulerLine ? 'on' : 'off'}`)
     strategySummary.push(`R3 artifacts present: ${r3Artifacts ? 'yes' : 'no'}`)
     strategySummary.push(`R3 family placements: ${r3Artifacts?.familyPlacements.length ?? 0}`)

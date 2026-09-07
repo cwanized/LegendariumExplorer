@@ -8,7 +8,7 @@ export type FilterLogic = 'and' | 'or'
 export type FadeMode = 'dim' | 'hide'
 export type PanelSide = 'left' | 'right'
 export type ExportScope = 'current' | 'all'
-export type PreviewTreeMode = 'mode0' | 'mode1' | 'mode2' | 'modeA' | 'modeC' | 'modeD' | 'modeR' | 'modeR2' | 'modeR3'
+export type PreviewTreeMode = 'mode0' | 'mode1' | 'mode2' | 'modeA' | 'modeC' | 'modeD' | 'modeR' | 'modeR2' | 'modeR3' | 'modeR3B'
 
 export type ThemePalette = {
   background: string

@@ -246,7 +246,7 @@ function isFadeMode(value: unknown): value is FadeMode {
 }
 
 function isPreviewTreeMode(value: unknown): value is PreviewTreeMode {
-  return value === 'mode0' || value === 'mode1' || value === 'mode2' || value === 'modeA' || value === 'modeC' || value === 'modeD' || value === 'modeR' || value === 'modeR2' || value === 'modeR3'
+  return value === 'mode0' || value === 'mode1' || value === 'mode2' || value === 'modeA' || value === 'modeC' || value === 'modeD' || value === 'modeR' || value === 'modeR2' || value === 'modeR3' || value === 'modeR3B'
 }
 
 function sanitizeThemeState(input: unknown, fallback: ThemeState): ThemeState {
