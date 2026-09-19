@@ -33,6 +33,7 @@ const SINGLE_PARENT_MULTI_SIBLING_SPAN_COMPRESSION = 0.34
 const ROW_DEOVERLAP_MIN_GAP = 20
 const TWO_CHILD_CONTINUATION_MIN_CENTER_DISTANCE = 640
 const PROJECTED_PAIR_MIN_SPAN_COLUMNS = 2.45
+const COUSIN_GROUP_MIN_GAP = 120
 const r3bArtifactsByNodes = new WeakMap<Map<UUID, PositionedNode>, R3BLayoutArtifacts>()
 
 export function buildModeR3BLayout(
@@ -182,6 +183,12 @@ export function buildModeR3BLayout(
     spouseAttachedByOwnerId,
   )
   applySingleParentSingleChildVerticalAlignment(
+    placementPlan.families,
+    validation,
+    positionedNodes,
+    spouseAttachedByOwnerId,
+  )
+  applySameRowCousinBlockSpacing(
     placementPlan.families,
     validation,
     positionedNodes,
@@ -966,6 +973,146 @@ function applyTwoChildContinuationSpacing(
       })
     }
   }
+}
+
+function applySameRowCousinBlockSpacing(
+  families: R3FamilyGroup[],
+  validation: ValidationResult,
+  positionedNodes: Map<UUID, PositionedNode>,
+  spouseAttachedByOwnerId: Map<UUID, Set<UUID>>,
+): void {
+  for (let iteration = 0; iteration < 4; iteration += 1) {
+    let changed = false
+    const blocksByRow = buildSameRowCousinBlocks(families, validation, positionedNodes)
+
+    for (const blocks of blocksByRow.values()) {
+      blocks.sort((left, right) => left.centerX - right.centerX || left.family.key.localeCompare(right.family.key))
+
+      for (let index = 1; index < blocks.length; index += 1) {
+        const left = blocks[index - 1]
+        const right = blocks[index]
+
+        if (!shouldSeparateSameRowCousinBlocks(left.family, right.family, validation)) {
+          continue
+        }
+
+        if (right.minCenterX >= left.maxCenterX - 1) {
+          continue
+        }
+
+        const shiftX = left.maxRight + COUSIN_GROUP_MIN_GAP - right.minX
+        if (shiftX <= 0) {
+          continue
+        }
+
+        const shiftNodeIds = collectShiftNodeIds(right.family.ownerId, validation.childrenByParent, spouseAttachedByOwnerId, families)
+        for (const shiftNodeId of shiftNodeIds) {
+          const node = positionedNodes.get(shiftNodeId)
+          if (!node) {
+            continue
+          }
+
+          positionedNodes.set(shiftNodeId, {
+            ...node,
+            x: node.x + shiftX,
+          })
+        }
+
+        right.minX += shiftX
+        right.maxRight += shiftX
+        right.minCenterX += shiftX
+        right.maxCenterX += shiftX
+        right.centerX += shiftX
+        changed = true
+      }
+    }
+
+    if (!changed) {
+      return
+    }
+  }
+}
+
+function buildSameRowCousinBlocks(
+  families: R3FamilyGroup[],
+  validation: ValidationResult,
+  positionedNodes: Map<UUID, PositionedNode>,
+): Map<number, Array<{
+  family: R3FamilyGroup
+  minX: number
+  maxRight: number
+  minCenterX: number
+  maxCenterX: number
+  centerX: number
+}>> {
+  const blocksByRow = new Map<number, Array<{
+    family: R3FamilyGroup
+    minX: number
+    maxRight: number
+    minCenterX: number
+    maxCenterX: number
+    centerX: number
+  }>>()
+
+  for (const family of families) {
+    if (family.childIds.length < 2) {
+      continue
+    }
+
+    const ownerParents = validation.parentsByChild.get(family.ownerId) ?? []
+    if (ownerParents.length === 0) {
+      continue
+    }
+
+    const childNodes = family.childIds
+      .map((childId) => positionedNodes.get(childId))
+      .filter((node): node is PositionedNode => node !== undefined)
+
+    if (childNodes.length !== family.childIds.length) {
+      continue
+    }
+
+    const minY = Math.min(...childNodes.map((node) => node.y))
+    const maxY = Math.max(...childNodes.map((node) => node.y))
+    if (maxY - minY > 1) {
+      continue
+    }
+
+    const centers = childNodes
+      .map((node) => node.x + node.width / 2)
+      .sort((left, right) => left - right)
+    const block = {
+      family,
+      minX: Math.min(...childNodes.map((node) => node.x)),
+      maxRight: Math.max(...childNodes.map((node) => node.x + node.width)),
+      minCenterX: centers[0],
+      maxCenterX: centers[centers.length - 1],
+      centerX: (centers[0] + centers[centers.length - 1]) / 2,
+    }
+    const rowBlocks = blocksByRow.get(minY) ?? []
+    rowBlocks.push(block)
+    blocksByRow.set(minY, rowBlocks)
+  }
+
+  return blocksByRow
+}
+
+function shouldSeparateSameRowCousinBlocks(
+  left: R3FamilyGroup,
+  right: R3FamilyGroup,
+  validation: ValidationResult,
+): boolean {
+  if (left.ownerId === right.ownerId) {
+    return false
+  }
+
+  const leftOwnerParents = validation.parentsByChild.get(left.ownerId) ?? []
+  const rightOwnerParents = validation.parentsByChild.get(right.ownerId) ?? []
+  if (leftOwnerParents.length === 0 || rightOwnerParents.length === 0) {
+    return false
+  }
+
+  return leftOwnerParents.some((parentId) => rightOwnerParents.includes(parentId))
 }
 
 function applyProjectedContinuationCorridorSpacing(

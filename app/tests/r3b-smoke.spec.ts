@@ -290,6 +290,90 @@ test.describe('Mode R3B smoke', () => {
     expect((positions.elrohir as { cx: number }).cx).toBeLessThan((positions.arwen as { cx: number }).cx)
   })
 
+  test('keeps Feanor descendants grouped apart from cousin blocks on the same row', async ({ page }) => {
+    const rowState = await page.locator('svg.preview3-graph').evaluate((svg) => {
+      const targetNames = new Set([
+        'Maedhros',
+        'Maglor',
+        'Celegorm',
+        'Caranthir',
+        'Curufin',
+        'Amrod',
+        'Amras',
+        'Fingon',
+        'Turgon',
+        'Aredhel',
+        'Angrod',
+        'Aegnor',
+        'Galadriel',
+      ])
+
+      const nodes = Array.from(svg.querySelectorAll('g[data-person-id]'))
+        .map((group) => {
+          const rect = group.querySelector('rect[rx="18"]') as SVGRectElement | null
+          const label = group.querySelector('text.preview3-svg-name')
+          if (!rect || !label) {
+            return null
+          }
+
+          const name = (label.textContent || '').trim()
+          if (!targetNames.has(name)) {
+            return null
+          }
+
+          const x = Number(rect.getAttribute('x') ?? 'NaN')
+          const y = Number(rect.getAttribute('y') ?? 'NaN')
+          const width = Number(rect.getAttribute('width') ?? 'NaN')
+          if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width)) {
+            return null
+          }
+
+          return {
+            name,
+            x,
+            y,
+            width,
+            cx: x + width / 2,
+          }
+        })
+        .filter((node): node is { name: string; x: number; y: number; width: number; cx: number } => node !== null)
+
+      const feanorChildren = nodes
+        .filter((node) => ['Maedhros', 'Maglor', 'Celegorm', 'Caranthir', 'Curufin', 'Amrod', 'Amras'].includes(node.name))
+        .sort((left, right) => left.cx - right.cx)
+
+      if (feanorChildren.length === 0) {
+        return null
+      }
+
+      const minCx = Math.min(...feanorChildren.map((node) => node.cx))
+      const maxCx = Math.max(...feanorChildren.map((node) => node.cx))
+      const rowY = feanorChildren[0].y
+      const intruders = nodes
+        .filter((node) => !['Maedhros', 'Maglor', 'Celegorm', 'Caranthir', 'Curufin', 'Amrod', 'Amras'].includes(node.name))
+        .filter((node) => Math.abs(node.y - rowY) < 1)
+        .filter((node) => node.cx > minCx && node.cx < maxCx)
+        .map((node) => node.name)
+
+      return {
+        feanorChildren: feanorChildren.map((node) => node.name),
+        intruders,
+      }
+    })
+
+    expect(rowState).not.toBeNull()
+    expect((rowState as { feanorChildren: string[] }).feanorChildren).toEqual([
+      'Maedhros',
+      'Maglor',
+      'Celegorm',
+      'Caranthir',
+      'Curufin',
+      'Amrod',
+      'Amras',
+    ])
+    expect((rowState as { intruders: string[] }).intruders).toEqual([])
+  })
+
   test('keeps Aragorn projection beside Arwen without overlapping Vardame', async ({ page }) => {
     const positions = await page.locator('svg.preview3-graph').evaluate((svg) => {
       const getNode = (personId: string) => {

@@ -1,8 +1,8 @@
 # Current State
 
-**Last Updated: 08. September 2026**
+**Last Updated: 19. September 2026**
 
-## R3B Handover Status (08. September 2026)
+## R3B Handover Status (19. September 2026)
 
 Current active branch:
 
@@ -29,18 +29,32 @@ What is already implemented on `fb/r3b-core`:
 - R3B has its own namespace under `app/src/preview3/r3b/`.
 - Slice 1 is in place: separate mode wiring and separate pipeline entry.
 - Slice 2 is in place: separate R3B spouse-projection handling and parent-anchor selection.
-- Slice 3 is partially in place: separate R3B layout path with asymmetric multi-marriage placement (`first left`, `second right`, `further right`) and intentionally reduced post-layout correction budget.
-- Slice 4 is in progress but not yet committed: R3B-specific render derivation for house anchors and biological child groups from R3B artifacts.
+- Slice 3 is in place: separate R3B layout path with asymmetric multi-marriage placement (`first left`, `second right`, `further right`) and intentionally reduced post-layout correction budget.
+- Slice 4 progressed substantially: R3B-specific render derivation for house anchors and biological child groups now consumes R3B artifacts instead of reconstructing them loosely from generic render state.
+- House-subtree offsets are now active in modeR3B, but without double-applying vertical house `yOffset`; generation seeding remains the source of the vertical house offset behavior.
+- R3B now keeps a central projection-placement resolver under `app/src/preview3/r3b/projections.ts` and explicit projection-placement decision metadata under `app/src/preview3/r3b/types.ts`.
+- R3B now carries early `visibleParentSlotsByFamily` artifacts in placement state. These slots are already used in the placement core for visible family midpoint / child-axis decisions.
+- Several targeted local core rules are now in place and green-validated:
+	- Hurin / Morwen child-band and Hurin / Huor projection corridor stabilization
+	- Elrond / Elros spacing plus Elros -> Vardame vertical alignment
+	- Aragorn / Arwen projection no longer overlapping Vardame
+	- final same-row de-overlap after later horizontal family passes
 
 Current uncommitted work on `fb/r3b-core`:
 
+- modified: `currentState.md`
+- modified: `app/src/App.tsx`
+- modified: `app/src/preview3/r3b/placement.ts`
+- modified: `app/src/preview3/r3b/projections.ts`
 - modified: `app/src/preview3/r3b/renderModel.ts`
+- modified: `app/src/preview3/r3b/types.ts`
 - modified: `app/tests/r3b-smoke.spec.ts`
 
 Current validation status:
 
-- `npm run build` in `app/` passed after the latest R3B slices.
-- `npx playwright test -c playwright.r3b.config.ts` passed with 5/5 tests in the latest focused R3B smoke run.
+- `npm run build` in `app/` is green on the current local R3B core state.
+- `npx playwright test -c playwright.r3b.config.ts` is green with 9/9 tests on the current local R3B smoke suite.
+- Important workflow note: for manual browser review on `http://127.0.0.1:4173/preview3`, rebuild first; otherwise Vite preview can still serve an older bundle than the last Playwright run.
 
 Important current product/architecture decisions for the next agent:
 
@@ -51,10 +65,10 @@ Important current product/architecture decisions for the next agent:
 
 Most important current finding about visual quality:
 
-- The current R3B overall appearance can look worse than prior R3 because `app/src/preview3/r3b/placement.ts` intentionally removed several post-layout stabilization passes that existed in R3.
-- In particular, the stronger sibling rebalance and two-parent child-band recenter passes are currently absent from the R3B layout path.
-- This was intentional to avoid blindly reintroducing global post-filters, but it likely explains why whole family groups currently feel less well placed.
-- If readability needs to improve, the preferred direction is selective reintroduction as explicit core rules, not wholesale restoration of all old post-layout passes.
+- The current R3B overall appearance is materially improved over the earlier `fb/r3b-core` checkpoint, but one category remains open: dense same-generation cousin/group spacing, especially in the Finwe / Finarfin / Fingolfin / Feanor descendant row.
+- The hard overlap problem in R3B is largely reduced. The remaining issue is mostly visual grouping semantics (`siblings should read as tighter local cohorts than cousins`), not generic collision resolution.
+- A broad same-row family-gap pass was tried and explicitly rejected because it reopened already-green Hurin/Rian and Elrond/Celebrian cases.
+- The preferred direction remains: local explicit core rules, not global post-filters.
 
 What R3B currently already respects versus not yet:
 
@@ -62,28 +76,32 @@ What R3B currently already respects versus not yet:
 	- person ordering through shared R3 ordering helpers
 	- house `anchor.order` through shared cluster helpers
 	- house `layout.yOffset` as seeded generation/row input through shared generation helpers
+- already newly respected:
+	- visible family midpoint from early `visibleParentSlotsByFamily` artifacts in placement
+	- projection-first local spouse corridors for the validated Hurin / Huor and Aragorn / Arwen classes
+	- Elros / Vardame local vertical single-parent alignment
 - not yet active in modeR3B:
-	- `applyHouseSubtreeOffsets`
 	- `applyHouseSubtreeVerticalOffset`
 	- `applyHouseOrderXResolution`
 	- broader disconnected-component or global stabilization passes
+	- a robust generic sibling-cohort / cousin-cohort grouping rule for dense shared generation rows
 
 Recommended next working mode:
 
-- Prefer visual review and targeted feedback before additional large R3B slices.
-- Use 3-5 concrete bad examples and classify whether the issue is:
+- Keep working from concrete visual examples and classify whether the issue is:
 	- sibling spread
 	- child-band centering
 	- cluster spacing
 	- house-anchor/house-cluster positioning
 	- projection/suppression policy
+- The current primary unresolved category is sibling/cousin cohort spacing on dense shared generation rows.
 
 Recommended next implementation priorities after visual feedback:
 
-1. Expand House-cluster and house-anchor stabilization first, especially the still-disabled subtree-offset and house-order-X behaviors in modeR3B.
-2. Refine the parent-pair / projection-suppression matrix before adding broader corrective behavior.
-3. Finish and commit the in-progress R3B render/house-anchor artifact changes.
-4. Only after that decide whether specific former R3 stabilization passes should return as explicit R3B core rules.
+1. Keep the current green R3B baseline stable and avoid broad new global end-passes.
+2. Continue using early `visibleParentSlotsByFamily` in the placement core before expanding their direct render-model authority again.
+3. Tackle dense same-generation cohort spacing with a narrower, biologically grouped placement rule instead of a global same-row spacing pass.
+4. Only after that reconsider whether any former R3 stabilization behavior should return as an explicit, local R3B core rule.
 
 ## Preview3 Cleanup Checkpoint (Deferred, 09. August 2026)
 
