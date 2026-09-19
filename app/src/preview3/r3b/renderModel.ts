@@ -1,10 +1,16 @@
-import type { HouseDefinitions, LayoutResult, Relation, UUID, ValidationResult } from '../../graph'
+import type { HouseDefinitions, LayoutResult, PositionedNode, Relation, UUID, ValidationResult } from '../../graph'
 import { resolveContinuationOwner } from '../continuation'
 import type { BiologicalChildGroup, HouseAnchor, SpouseProjectionState } from '../treeCore'
-import { buildSpouseProjectionState, canRenderInlineMarriage } from '../treeCore'
 import { buildModeR3ConnectorModel } from '../r3/connectorModel'
 import type { R3ConnectorAnchor, R3ConnectorGroupModel } from '../r3/connectorModel'
-import { buildModeR3BiologicalChildGroups, buildModeR3HouseAnchors } from '../r3/render'
+import { createHouseLookup } from '../r3/houses'
+import { sortPersonIdsForR3 } from '../r3/sorting'
+import type { R3FamilyPlacement } from '../r3/types'
+import { getModeR3BLayoutArtifacts } from './placement'
+import { resolveR3BProjectionPlacements } from './projections'
+
+const R3B_ROW_HEIGHT = 192
+const R3B_NODE_HEIGHT = 64
 
 export function buildModeR3BHouseAnchors(
   validation: ValidationResult,
@@ -14,7 +20,92 @@ export function buildModeR3BHouseAnchors(
     allowFallback?: boolean
   },
 ): HouseAnchor[] {
-  return buildModeR3HouseAnchors(validation, layout, houseDefinitions, options)
+  const allowFallback = options?.allowFallback ?? false
+  const startHouseIds = new Set(
+    houseDefinitions.houses
+      .filter((house) => house.anchor.enabled && house.tier === 'start')
+      .map((house) => house.id),
+  )
+  const artifacts = getModeR3BLayoutArtifacts(layout)
+  if (artifacts && artifacts.houseAnchorPlacements.length > 0) {
+    return artifacts.houseAnchorPlacements
+      .map((placement) => {
+        const connectorNodeIds = resolveAnchorConnectorNodeIds({
+          baseConnectorNodeIds: placement.connectorNodeIds,
+          houseId: placement.houseId,
+          startHouseIds,
+          houseDefinitions,
+          validation,
+          layout,
+        })
+        const anchorNodeIds = connectorNodeIds.length > 0 ? connectorNodeIds : placement.memberIds
+        const anchorNodes = anchorNodeIds
+          .map((nodeId) => layout.nodes.get(nodeId))
+          .filter((node): node is PositionedNode => node !== undefined)
+
+        if (anchorNodes.length === 0) {
+          return null
+        }
+
+        const centerX = (Math.min(...anchorNodes.map((node) => node.x + node.width / 2)) + Math.max(...anchorNodes.map((node) => node.x + node.width / 2))) / 2
+        const topY = Math.min(...anchorNodes.map((node) => node.y))
+
+        return {
+          houseId: placement.houseId,
+          displayName: placement.displayName,
+          memberIds: placement.memberIds,
+          connectorNodeIds,
+          x: centerX - placement.width / 2,
+          y: topY - 94,
+          width: placement.width,
+          height: placement.height,
+        }
+      })
+      .filter((anchor): anchor is HouseAnchor => anchor !== null)
+      .sort((left, right) => left.y - right.y || left.houseId.localeCompare(right.houseId))
+  }
+
+  if (!allowFallback) {
+    return []
+  }
+
+  const houseLookup = createHouseLookup(houseDefinitions, validation.personById)
+  const startHouses = houseDefinitions.houses
+    .filter((house) => house.anchor.enabled && house.tier === 'start')
+    .sort((left, right) => left.anchor.order - right.anchor.order || left.id.localeCompare(right.id))
+
+  return startHouses
+    .map((house) => {
+      const memberIds = validation.persons
+        .filter((person) => houseLookup.getPrimaryHouse(person.id)?.id === house.id)
+        .map((person) => person.id)
+      const rootIds = sortPersonIdsForR3(
+        memberIds.filter((personId) => (validation.parentsByChild.get(personId) ?? []).length === 0),
+        validation.personById,
+      )
+      const rootNodes = rootIds
+        .map((personId) => layout.nodes.get(personId))
+        .filter((node): node is PositionedNode => node !== undefined)
+
+      if (rootNodes.length === 0) {
+        return null
+      }
+
+      const centerX = (Math.min(...rootNodes.map((node) => node.x + node.width / 2)) + Math.max(...rootNodes.map((node) => node.x + node.width / 2))) / 2
+      const width = Math.max(176, house.displayName.length * 8 + 42)
+
+      return {
+        houseId: house.id,
+        displayName: house.displayName,
+        memberIds: rootIds,
+        connectorNodeIds: rootIds,
+        x: centerX - width / 2,
+        y: Math.min(...rootNodes.map((node) => node.y)) - 94,
+        width,
+        height: 64,
+      }
+    })
+    .filter((anchor): anchor is HouseAnchor => anchor !== null)
 }
 
 export function buildModeR3BBiologicalChildGroups(
@@ -25,7 +116,87 @@ export function buildModeR3BBiologicalChildGroups(
     allowFallback?: boolean
   },
 ): BiologicalChildGroup[] {
-  return buildModeR3BiologicalChildGroups(validation, relations, layout, options)
+  const allowFallback = options?.allowFallback ?? false
+  const artifacts = getModeR3BLayoutArtifacts(layout)
+  if (artifacts) {
+    return buildChildGroupsFromPlacements(validation, relations, layout, artifacts.familyPlacements, artifacts.normalizationOffsetY)
+  }
+
+  if (!allowFallback) {
+    return []
+  }
+
+  const relationsByChild = new Map<UUID, Relation[]>()
+
+  for (const relation of relations) {
+    const childRelations = relationsByChild.get(relation.to) ?? []
+    childRelations.push(relation)
+    childRelations.sort((left, right) => left.id.localeCompare(right.id))
+    relationsByChild.set(relation.to, childRelations)
+  }
+
+  const groupedChildren = new Map<string, { parentIds: UUID[]; childIds: UUID[]; relationIds: UUID[] }>()
+
+  for (const [childId, childRelations] of relationsByChild.entries()) {
+    const parentIds = sortPersonIdsForR3(childRelations.map((relation) => relation.from), validation.personById)
+    const groupKey = parentIds.join('|')
+    const group = groupedChildren.get(groupKey)
+    const relationIds = childRelations.map((relation) => relation.id).sort((left, right) => left.localeCompare(right))
+
+    if (group) {
+      group.childIds.push(childId)
+      group.childIds = sortPersonIdsForR3(group.childIds, validation.personById)
+      group.relationIds.push(...relationIds)
+      group.relationIds.sort((left, right) => left.localeCompare(right))
+      continue
+    }
+
+    groupedChildren.set(groupKey, {
+      parentIds,
+      childIds: [childId],
+      relationIds,
+    })
+  }
+
+  return [...groupedChildren.entries()]
+    .map(([groupKey, group]) => {
+      const parentNodes = group.parentIds
+        .map((parentId) => layout.nodes.get(parentId))
+        .filter((node): node is PositionedNode => node !== undefined)
+        .sort((left, right) => left.x - right.x || left.id.localeCompare(right.id))
+      const orderedChildIds = sortPersonIdsForR3(group.childIds, validation.personById)
+      const childNodes = orderedChildIds
+        .map((childId) => layout.nodes.get(childId))
+        .filter((node): node is PositionedNode => node !== undefined)
+
+      if (parentNodes.length === 0 || childNodes.length === 0) {
+        return null
+      }
+
+      const childCenters = childNodes.map((node) => node.x + node.width / 2)
+      const childTopY = Math.min(...childNodes.map((node) => node.y))
+      const parentBottomY = Math.max(...parentNodes.map((node) => node.y + node.height))
+      const gap = Math.max(childTopY - parentBottomY, 36)
+      const junctionY = parentBottomY + Math.min(Math.max(gap * 0.22, 18), 34)
+      const siblingY = Math.max(junctionY + 18, childTopY - 20)
+      const junctionX = childNodes.length === 1
+        ? childCenters[0]
+        : (Math.min(...childCenters) + Math.max(...childCenters)) / 2
+
+      return {
+        key: groupKey,
+        parentIds: group.parentIds,
+        childIds: orderedChildIds,
+        relationIds: group.relationIds,
+        junctionX,
+        junctionY,
+        siblingY,
+        parentNodes,
+        childNodes,
+      }
+    })
+    .filter((group): group is BiologicalChildGroup => group !== null)
+    .sort((left, right) => left.junctionY - right.junctionY || left.key.localeCompare(right.key))
 }
 
 export function buildModeR3BConnectorModel(
@@ -38,7 +209,7 @@ export function buildModeR3BConnectorModel(
 export function buildModeR3BSpouseProjectionState(
   validation: ValidationResult,
   layout: LayoutResult,
-  selectedIds: UUID[],
+  _selectedIds: UUID[],
   spouseOwnerOverrides: Record<string, UUID>,
   options?: {
     collapseChildEdges?: boolean
@@ -46,32 +217,20 @@ export function buildModeR3BSpouseProjectionState(
     preferSameRowPlacement?: boolean
   },
 ): SpouseProjectionState {
-  const baseState = buildSpouseProjectionState(validation, layout, selectedIds, spouseOwnerOverrides, {
-    collapseChildEdges: options?.collapseChildEdges,
-    duplicateBothPartners: options?.duplicateBothPartners,
-    preferSameRowPlacement: options?.preferSameRowPlacement,
-    suppressProjectionWhenEitherPartnerParentless: false,
-  })
-
-  const keptRelationIds = new Set<UUID>()
-  const nodes = baseState.nodes.filter((node) => {
-    const relation = validation.validOverlayRelations.find((candidate) => candidate.id === node.relationId)
-    if (!relation || relation.type !== 'marriage') {
-      return false
-    }
-
-    if (shouldSuppressProjectionForMarriage(relation, validation, layout)) {
-      return false
-    }
-
-    keptRelationIds.add(relation.id)
-    return true
+  const collapseChildEdges = options?.collapseChildEdges ?? false
+  const duplicateBothPartners = options?.duplicateBothPartners ?? false
+  const resolved = resolveR3BProjectionPlacements({
+    validation,
+    layout,
+    spouseOwnerOverrides,
+    collapseChildEdges,
+    duplicateBothPartners,
   })
 
   return {
-    hiddenChildEdgeKeys: options?.collapseChildEdges ? filterHiddenChildEdgeKeys(baseState, keptRelationIds) : new Set<string>(),
-    projectedMarriageIds: keptRelationIds,
-    nodes,
+    hiddenChildEdgeKeys: collapseChildEdges ? resolved.hiddenChildEdgeKeys : new Set<string>(),
+    projectedMarriageIds: resolved.projectedMarriageIds,
+    nodes: resolved.nodes,
   }
 }
 
@@ -156,39 +315,6 @@ export function buildModeR3BParentAnchorsByKey({
   return anchorsByKey
 }
 
-function shouldSuppressProjectionForMarriage(
-  relation: Relation,
-  validation: ValidationResult,
-  layout: LayoutResult,
-): boolean {
-  const fromNode = layout.nodes.get(relation.from)
-  const toNode = layout.nodes.get(relation.to)
-  if (!fromNode || !toNode) {
-    return false
-  }
-
-  const fromParentCount = (validation.parentsByChild.get(relation.from) ?? []).length
-  const toParentCount = (validation.parentsByChild.get(relation.to) ?? []).length
-  const hasSingleParentlessPartner = (fromParentCount === 0) !== (toParentCount === 0)
-
-  if (!hasSingleParentlessPartner) {
-    return false
-  }
-
-  return canRenderInlineMarriage(fromNode, toNode)
-}
-
-function filterHiddenChildEdgeKeys(
-  baseState: SpouseProjectionState,
-  keptRelationIds: Set<string>,
-): Set<string> {
-  if (keptRelationIds.size === baseState.projectedMarriageIds.size) {
-    return baseState.hiddenChildEdgeKeys
-  }
-
-  return new Set<string>()
-}
-
 function buildMainAnchor(parentId: UUID, layout: LayoutResult): R3ConnectorAnchor | null {
   const mainNode = layout.nodes.get(parentId)
   if (!mainNode) {
@@ -250,4 +376,142 @@ function selectProjectedCompanionAnchor({
 
 function buildParentPairKey(leftId: UUID, rightId: UUID): string {
   return [leftId, rightId].sort((left, right) => left.localeCompare(right)).join('|')
+}
+
+function buildChildGroupsFromPlacements(
+  validation: ValidationResult,
+  relations: Relation[],
+  layout: LayoutResult,
+  placements: R3FamilyPlacement[],
+  normalizationOffsetY: number,
+): BiologicalChildGroup[] {
+  const relationIdsByEndpoints = new Map<string, string[]>()
+  for (const relation of relations) {
+    const key = `${relation.from}|${relation.to}`
+    const relationIds = relationIdsByEndpoints.get(key) ?? []
+    relationIds.push(relation.id)
+    relationIdsByEndpoints.set(key, relationIds)
+  }
+
+  return placements
+    .map((placement) => {
+      const parentNodes = placement.parentIds
+        .map((parentId) => layout.nodes.get(parentId))
+        .filter((node): node is PositionedNode => node !== undefined)
+        .sort((left, right) => left.x - right.x || left.id.localeCompare(right.id))
+      const orderedChildIds = sortPersonIdsForR3(placement.childIds, validation.personById)
+      const childNodes = orderedChildIds
+        .map((childId) => layout.nodes.get(childId))
+        .filter((node): node is PositionedNode => node !== undefined)
+
+      if (parentNodes.length === 0 || childNodes.length === 0) {
+        return null
+      }
+
+      const relationIds = new Set<string>()
+      for (const parentId of placement.parentIds) {
+        for (const childId of orderedChildIds) {
+          for (const relationId of relationIdsByEndpoints.get(`${parentId}|${childId}`) ?? []) {
+            relationIds.add(relationId)
+          }
+        }
+      }
+
+      const childTopYFromRows = placement.childRow * R3B_ROW_HEIGHT - normalizationOffsetY
+      const parentBottomYFromRows = placement.parentRow * R3B_ROW_HEIGHT + R3B_NODE_HEIGHT - normalizationOffsetY
+      const childTopY = Math.min(childTopYFromRows, ...childNodes.map((node) => node.y))
+      const parentBottomY = Math.max(parentBottomYFromRows, ...parentNodes.map((node) => node.y + node.height))
+      const gap = Math.max(childTopY - parentBottomY, 36)
+      const junctionY = parentBottomY + Math.min(Math.max(gap * 0.22, 18), 34)
+      const siblingY = Math.max(junctionY + 18, childTopY - 20)
+      const parentCenters = parentNodes.map((node) => node.x + node.width / 2)
+      const junctionX = parentCenters.length === 1
+        ? parentCenters[0]
+        : (Math.min(...parentCenters) + Math.max(...parentCenters)) / 2
+
+      return {
+        key: placement.key,
+        parentIds: placement.parentIds,
+        childIds: orderedChildIds,
+        relationIds: [...relationIds].sort((left, right) => left.localeCompare(right)),
+        junctionX,
+        junctionY,
+        siblingY,
+        parentNodes,
+        childNodes,
+      }
+    })
+    .filter((group): group is BiologicalChildGroup => group !== null)
+    .sort((left, right) => left.junctionY - right.junctionY || left.key.localeCompare(right.key))
+}
+
+function resolveAnchorConnectorNodeIds({
+  baseConnectorNodeIds,
+  houseId,
+  startHouseIds,
+  houseDefinitions,
+  validation,
+  layout,
+}: {
+  baseConnectorNodeIds: UUID[]
+  houseId: string
+  startHouseIds: Set<string>
+  houseDefinitions: HouseDefinitions
+  validation: ValidationResult
+  layout: LayoutResult
+}): UUID[] {
+  if (!startHouseIds.has(houseId)) {
+    return baseConnectorNodeIds
+  }
+
+  const houseLookup = createHouseLookup(houseDefinitions, validation.personById)
+  const connectorNodeIds = new Set(baseConnectorNodeIds)
+  const marriages = validation.validOverlayRelations.filter((relation) => relation.type === 'marriage')
+
+  for (const nodeId of baseConnectorNodeIds) {
+    const node = layout.nodes.get(nodeId)
+    if (!node) {
+      continue
+    }
+
+    const nodeParentCount = (validation.parentsByChild.get(nodeId) ?? []).length
+    if (nodeParentCount !== 0) {
+      continue
+    }
+
+    const partnerCandidateIds = new Set<UUID>()
+    for (const marriage of marriages) {
+      if (marriage.from !== nodeId && marriage.to !== nodeId) {
+        continue
+      }
+
+      const partnerId = marriage.from === nodeId ? marriage.to : marriage.from
+      partnerCandidateIds.add(partnerId)
+    }
+
+    for (const partnerId of partnerCandidateIds) {
+      const partnerNode = layout.nodes.get(partnerId)
+      if (!partnerNode) {
+        continue
+      }
+
+      const partnerParentCount = (validation.parentsByChild.get(partnerId) ?? []).length
+      if (partnerParentCount !== 0) {
+        continue
+      }
+
+      if (Math.abs(partnerNode.y - node.y) > 4) {
+        continue
+      }
+
+      const partnerHouseId = houseLookup.getPrimaryHouse(partnerId)?.id ?? null
+      if (partnerHouseId !== houseId) {
+        continue
+      }
+
+      connectorNodeIds.add(partnerId)
+    }
+  }
+
+  return sortPersonIdsForR3([...connectorNodeIds], validation.personById)
 }

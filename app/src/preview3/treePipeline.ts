@@ -21,7 +21,7 @@ import { buildModeR2Layout } from './rasterModeR2'
 import { buildModeR3ConnectorModel, type R3ConnectorAnchor, type R3ConnectorGroupModel } from './r3/connectorModel'
 import { buildModeR3Layout, getModeR3LayoutArtifacts } from './r3/layout'
 import { buildModeR3BiologicalChildGroups, buildModeR3HouseAnchors } from './r3/render'
-import { buildModeR3BLayout, getModeR3BLayoutArtifacts } from './r3b/placement'
+import { buildModeR3BLayout, getModeR3BLayoutArtifacts, transferModeR3BLayoutArtifacts } from './r3b/placement'
 import {
   buildModeR3BBiologicalChildGroups,
   buildModeR3BConnectorModel,
@@ -166,14 +166,23 @@ export async function buildPreview3TreePipeline(
         houseYOffsetUnit: effectiveHouseYOffsetUnit,
       })
     : personOffsetLayout
+  if (useModeR3BLayout && subtreeAdjustedLayout !== personOffsetLayout) {
+    transferModeR3BLayoutArtifacts(personOffsetLayout, subtreeAdjustedLayout)
+  }
   const orderResolvedLayout = modeDefinition.pipeline.applyHouseOrderXResolution
     ? resolveHouseOrderXConflicts(validation, subtreeAdjustedLayout, dataset.houseDefinitions, {
         strategy: modeDefinition.pipeline.houseAnchorStrategy,
       })
     : subtreeAdjustedLayout
+  if (useModeR3BLayout && orderResolvedLayout !== subtreeAdjustedLayout) {
+    transferModeR3BLayoutArtifacts(subtreeAdjustedLayout, orderResolvedLayout)
+  }
   const packedLayout = modeDefinition.pipeline.applyDisconnectedComponentPacking
     ? packDisconnectedComponents(orderResolvedLayout, validation.validBiologicalRelations)
     : orderResolvedLayout
+  if (useModeR3BLayout && packedLayout !== orderResolvedLayout) {
+    transferModeR3BLayoutArtifacts(orderResolvedLayout, packedLayout)
+  }
   const preAnchorLayout = useExperimentalLayoutPasses
     ? (() => {
         const deoverlappedLayout = modeDefinition.pipeline.applyHorizontalDeoverlap
@@ -282,11 +291,16 @@ export async function buildPreview3TreePipeline(
         const deoverlappedLayout = modeDefinition.pipeline.applyHorizontalDeoverlap
           ? resolveHorizontalNodeOverlaps(packedLayout)
           : packedLayout
-
-        return scaleLayoutY(
+        const scaledLayout = scaleLayoutY(
           scaleLayoutX(deoverlappedLayout, modeDefinition.pipeline.layoutXScale),
           modeDefinition.pipeline.layoutYScale,
         )
+
+        if (useModeR3BLayout && scaledLayout !== packedLayout) {
+          transferModeR3BLayoutArtifacts(packedLayout, scaledLayout)
+        }
+
+        return scaledLayout
       })()
   let layout = preAnchorLayout
   if (useModeRLayout) {

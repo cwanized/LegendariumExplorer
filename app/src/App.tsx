@@ -36,6 +36,8 @@ import {
   type SpouseProjectionNode,
 } from './legacy/treeRules'
 
+const Preview3PersonTilePage = Preview3App
+
 type HouseAnchor = {
   houseId: string
   displayName: string
@@ -88,9 +90,14 @@ function getAppRequestPath(relativePath: string): string {
 
 function App() {
   const currentPath = typeof window === 'undefined' ? '/' : window.location.pathname.toLocaleLowerCase()
+  const isPreview3PersonTilePage = /\/preview3\/persontile(?:\/|$)/.test(currentPath)
   const isPreview3Page = /\/preview3(?:\/|$)/.test(currentPath)
   const isPreview2Page = /\/preview2(?:\/|$)/.test(currentPath)
   const isPreviewPage = /\/preview(?:\/|$)/.test(currentPath)
+
+  if (isPreview3PersonTilePage) {
+    return <Preview3PersonTilePage />
+  }
 
   if (isPreview3Page) {
     return <Preview3App />

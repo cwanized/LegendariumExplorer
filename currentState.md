@@ -1,6 +1,89 @@
 # Current State
 
-**Last Updated: 09. August 2026**
+**Last Updated: 08. September 2026**
+
+## R3B Handover Status (08. September 2026)
+
+Current active branch:
+
+- `fb/r3b-core`
+
+Relevant recent branch/commit state:
+
+- `fb/r3b-core` contains:
+	- `97ad298` `docs(r3b): add frs v1 and implementation plan`
+	- `8ea1987` `feat(r3b): add initial mode and layout slices`
+- `preview3-hard-grid-raster` remains the pre-R3B baseline at `5b81373` (`after clean up, stable`)
+- `fb/person-tile-styles-preview3` contains the separate person-tile demo/style work
+- One stash still exists on the person-tile branch:
+	- `stash@{0}`: `person-tile-preview3-split`
+
+Current R3B document anchors:
+
+- `PRD/TREE_LOGIKUPDATE/R3B-FRS-V1.md`
+- `PRD/TREE_LOGIKUPDATE/R3B-implementation-plan.md`
+
+What is already implemented on `fb/r3b-core`:
+
+- R3B exists as a separate selectable Preview3 mode.
+- R3B has its own namespace under `app/src/preview3/r3b/`.
+- Slice 1 is in place: separate mode wiring and separate pipeline entry.
+- Slice 2 is in place: separate R3B spouse-projection handling and parent-anchor selection.
+- Slice 3 is partially in place: separate R3B layout path with asymmetric multi-marriage placement (`first left`, `second right`, `further right`) and intentionally reduced post-layout correction budget.
+- Slice 4 is in progress but not yet committed: R3B-specific render derivation for house anchors and biological child groups from R3B artifacts.
+
+Current uncommitted work on `fb/r3b-core`:
+
+- modified: `app/src/preview3/r3b/renderModel.ts`
+- modified: `app/tests/r3b-smoke.spec.ts`
+
+Current validation status:
+
+- `npm run build` in `app/` passed after the latest R3B slices.
+- `npx playwright test -c playwright.r3b.config.ts` passed with 5/5 tests in the latest focused R3B smoke run.
+
+Important current product/architecture decisions for the next agent:
+
+- `genealogytree.pdf` is a technical reference for family-tree representation patterns, but the R3B FRS is the binding project-specific source of truth.
+- In R3B, spouse projection is the default for marriage contexts.
+- Projection suppression is allowed only for explicit special cases, notably local clean inline cases such as Silmarien/Elatan.
+- R3B is intended to become a separate implementation, not just a permanent alias of R3.
+
+Most important current finding about visual quality:
+
+- The current R3B overall appearance can look worse than prior R3 because `app/src/preview3/r3b/placement.ts` intentionally removed several post-layout stabilization passes that existed in R3.
+- In particular, the stronger sibling rebalance and two-parent child-band recenter passes are currently absent from the R3B layout path.
+- This was intentional to avoid blindly reintroducing global post-filters, but it likely explains why whole family groups currently feel less well placed.
+- If readability needs to improve, the preferred direction is selective reintroduction as explicit core rules, not wholesale restoration of all old post-layout passes.
+
+What R3B currently already respects versus not yet:
+
+- already respected:
+	- person ordering through shared R3 ordering helpers
+	- house `anchor.order` through shared cluster helpers
+	- house `layout.yOffset` as seeded generation/row input through shared generation helpers
+- not yet active in modeR3B:
+	- `applyHouseSubtreeOffsets`
+	- `applyHouseSubtreeVerticalOffset`
+	- `applyHouseOrderXResolution`
+	- broader disconnected-component or global stabilization passes
+
+Recommended next working mode:
+
+- Prefer visual review and targeted feedback before additional large R3B slices.
+- Use 3-5 concrete bad examples and classify whether the issue is:
+	- sibling spread
+	- child-band centering
+	- cluster spacing
+	- house-anchor/house-cluster positioning
+	- projection/suppression policy
+
+Recommended next implementation priorities after visual feedback:
+
+1. Expand House-cluster and house-anchor stabilization first, especially the still-disabled subtree-offset and house-order-X behaviors in modeR3B.
+2. Refine the parent-pair / projection-suppression matrix before adding broader corrective behavior.
+3. Finish and commit the in-progress R3B render/house-anchor artifact changes.
+4. Only after that decide whether specific former R3 stabilization passes should return as explicit R3B core rules.
 
 ## Preview3 Cleanup Checkpoint (Deferred, 09. August 2026)
 

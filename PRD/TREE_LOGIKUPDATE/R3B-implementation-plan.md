@@ -213,6 +213,28 @@ Abnahme:
 - keine impliziten Connector-Heuristiken mehr im UI fuer R3B
 - gleiche Kernentscheidung erzeugt gleiche Segmentgeometrie
 
+### 7.6 Spaeterer Qualitaets-Slice: Selektive Stabilisierung als Kernregel
+
+Ziel:
+
+- nur die wirklich noetigen frueheren R3-Stabilisierungen gezielt und kontrolliert in R3B zurueckholen
+- keine blinde Rueckkehr zu globalen Nachfilter-Paessen
+
+Minimaler Umfang:
+
+- gezielte Bewertung einzelner Kandidaten wie child-band recenter oder sibling rebalance
+- Uebernahme nur dann, wenn die Regel als explizite Kernlogik formulierbar ist
+- keine offenen globalen Rebalance-Schleifen
+
+Prioritaet:
+
+- dieser Slice ist bewusst nach House-Cluster-Stabilisierung und nach der Verfeinerung der Elternpaar-/Projektionsmatrix eingeordnet
+
+Abnahme:
+
+- verbesserte Lesbarkeit in konkret benannten Problemfaellen
+- keine verdeckte Rueckkehr zu breit streuender Post-Processing-Logik
+
 ## 8. Erster empfohlener Arbeitsumfang
 
 Der erste sinnvolle Implementationsstart ist Slice 1 plus ein schmaler Teil von Slice 2.
@@ -306,6 +328,8 @@ Die beste Startreihenfolge ist:
 1. R3B als neuen Mode technisch einhaengen.
 2. Einen minimalen eigenen R3B-Core-Namespace anlegen.
 3. Danach Elternpaar-/Projektionswahl explizit modellieren.
-4. Erst dann Platzierung, House-Cluster und Connectoren fachlich neu aufbauen.
+4. Danach House-Cluster und House-Anker als echte Kernartefakte stabilisieren.
+5. Danach Connectoren und Render-Modell weiter vom UI entkoppeln.
+6. Selektive fruehere R3-Stabilisierungen erst spaeter und nur regelbasiert pruefen.
 
 Diese Reihenfolge ist konservativ genug, um das Projekt nicht zu destabilisieren, und klar genug, um nicht weiter in der jetzigen R3-Mischlogik zu investieren.

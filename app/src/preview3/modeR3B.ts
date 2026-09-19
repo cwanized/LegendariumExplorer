@@ -22,7 +22,7 @@ export function createModeR3BDefinition(): Preview3ModeDefinition {
       layoutComponentSpacing: 96,
       layoutXScale: 1,
       layoutYScale: 1,
-      applyHouseSubtreeOffsets: false,
+      applyHouseSubtreeOffsets: true,
       applyHouseSubtreeVerticalOffset: false,
       applyHouseAnchorYOffset: true,
       houseYOffsetUnit: 1,
