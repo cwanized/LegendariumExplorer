@@ -4,6 +4,7 @@ import {
   SPOUSE_PROJECTION_NODE_HEIGHT,
   SPOUSE_PROJECTION_NODE_WIDTH,
   SPOUSE_PROJECTION_VERTICAL_ANCHOR_OFFSET,
+  SPOUSE_PROJECTION_VERTICAL_STEP_GAP,
 } from '../ruleConstants'
 import { resolveContinuationOwner } from '../continuation'
 import { canRenderInlineMarriage, type SpouseProjectionNode } from '../treeCore'
@@ -301,19 +302,33 @@ function applyProjectionCollisionClearance(
 
   for (const decision of sorted) {
     let x = decision.x
+    let y = decision.y
     let resolutionMode = decision.resolutionMode
     let blockingNodeId: UUID | undefined
     let shiftEligibility: R3BProjectionShiftEligibility | undefined
     const direction = decision.resolvedSide === 'right' ? 1 : -1
 
     for (let iteration = 0; iteration < 8; iteration += 1) {
-      const rect = { x, y: decision.y, width: decision.width, height: decision.height }
+      const rect = { x, y, width: decision.width, height: decision.height }
       const overlappingLayoutNode = occupied.find((candidate) => rectsOverlap(rect, candidate))
       if (!overlappingLayoutNode) {
-        const hasProjectionOverlap = adjusted
-          .map((entry) => ({ x: entry.x, y: entry.y, width: entry.width, height: entry.height }))
-          .some((candidate) => rectsOverlap(rect, candidate))
+        const hasProjectionOverlap = adjusted.some((entry) => rectsOverlap(rect, entry))
         if (!hasProjectionOverlap) {
+          break
+        }
+
+        const localVerticalShift = findAvailableLocalProjectionPlacement({
+          x: decision.x,
+          y: decision.y,
+          width: decision.width,
+          height: decision.height,
+          occupied,
+          adjusted,
+        })
+        if (localVerticalShift) {
+          x = localVerticalShift.x
+          y = localVerticalShift.y
+          resolutionMode = 'shifted-local-branch'
           break
         }
 
@@ -324,6 +339,21 @@ function applyProjectionCollisionClearance(
 
       blockingNodeId = overlappingLayoutNode.id
       shiftEligibility = classifyShiftEligibility(overlappingLayoutNode.id, layout)
+
+      const localVerticalShift = findAvailableLocalProjectionPlacement({
+        x: decision.x,
+        y: decision.y,
+        width: decision.width,
+        height: decision.height,
+        occupied,
+        adjusted,
+      })
+      if (localVerticalShift) {
+        x = localVerticalShift.x
+        y = localVerticalShift.y
+        resolutionMode = 'shifted-local-branch'
+        break
+      }
 
       if (shiftEligibility === 'ineligible') {
         x += direction * (decision.width + 20)
@@ -338,6 +368,7 @@ function applyProjectionCollisionClearance(
     adjusted.push({
       ...decision,
       x,
+      y,
       resolutionMode,
       blockingNodeId,
       shiftEligibility,
@@ -357,6 +388,45 @@ function classifyShiftEligibility(
   }
 
   return 'single-child-continuation'
+}
+
+function findAvailableLocalProjectionPlacement({
+  x,
+  y,
+  width,
+  height,
+  occupied,
+  adjusted,
+}: {
+  x: number
+  y: number
+  width: number
+  height: number
+  occupied: Array<{ id: UUID; x: number; y: number; width: number; height: number }>
+  adjusted: R3BProjectionPlacementDecision[]
+}): { x: number; y: number } | null {
+  for (let lane = 1; lane <= 3; lane += 1) {
+    const candidate = {
+      x,
+      y: y + lane * (height + SPOUSE_PROJECTION_VERTICAL_STEP_GAP),
+      width,
+      height,
+    }
+
+    const overlapsLayout = occupied.some((entry) => rectsOverlap(candidate, entry))
+    if (overlapsLayout) {
+      continue
+    }
+
+    const overlapsProjection = adjusted.some((entry) => rectsOverlap(candidate, entry))
+    if (overlapsProjection) {
+      continue
+    }
+
+    return { x: candidate.x, y: candidate.y }
+  }
+
+  return null
 }
 
 function rectsOverlap(

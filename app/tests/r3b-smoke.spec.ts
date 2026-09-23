@@ -341,6 +341,7 @@ test.describe('Mode R3B smoke', () => {
       const feanorChildren = nodes
         .filter((node) => ['Maedhros', 'Maglor', 'Celegorm', 'Caranthir', 'Curufin', 'Amrod', 'Amras'].includes(node.name))
         .sort((left, right) => left.cx - right.cx)
+      const firstCousin = nodes.find((node) => node.name === 'Fingon' && Math.abs(node.y - (feanorChildren[0]?.y ?? Number.NaN)) < 1) ?? null
 
       if (feanorChildren.length === 0) {
         return null
@@ -354,10 +355,14 @@ test.describe('Mode R3B smoke', () => {
         .filter((node) => Math.abs(node.y - rowY) < 1)
         .filter((node) => node.cx > minCx && node.cx < maxCx)
         .map((node) => node.name)
+      const siblingEdgeGaps = feanorChildren.slice(1).map((node, index) => node.x - (feanorChildren[index].x + feanorChildren[index].width))
+      const cousinEdgeGap = firstCousin ? firstCousin.x - (feanorChildren[feanorChildren.length - 1].x + feanorChildren[feanorChildren.length - 1].width) : null
 
       return {
         feanorChildren: feanorChildren.map((node) => node.name),
         intruders,
+        siblingEdgeGaps,
+        cousinEdgeGap,
       }
     })
 
@@ -372,6 +377,9 @@ test.describe('Mode R3B smoke', () => {
       'Amras',
     ])
     expect((rowState as { intruders: string[] }).intruders).toEqual([])
+    expect(Math.max(...(rowState as { siblingEdgeGaps: number[] }).siblingEdgeGaps)).toBeLessThan(160)
+    expect((rowState as { cousinEdgeGap: number | null }).cousinEdgeGap).not.toBeNull()
+    expect((rowState as { cousinEdgeGap: number }).cousinEdgeGap).toBeGreaterThan(120)
   })
 
   test('keeps Aragorn projection beside Arwen without overlapping Vardame', async ({ page }) => {
@@ -441,6 +449,86 @@ test.describe('Mode R3B smoke', () => {
       positions.aragornProjectionNearArwen as { x: number; width: number },
       positions.vardame as { x: number; width: number },
     )).toBe(false)
+  })
+
+  test('keeps parentless partner projections local to their anchored branches', async ({ page }) => {
+    const positions = await page.locator('svg.preview3-graph').evaluate((svg) => {
+      const getMainByLabel = (labelText: string) => {
+        const groups = Array.from(svg.querySelectorAll('g[data-person-id]'))
+        for (const group of groups) {
+          const rect = group.querySelector('rect[rx="18"]') as SVGRectElement | null
+          const label = group.querySelector('text.preview3-svg-name')
+          if (!rect || !label || (label.textContent || '').trim() !== labelText) {
+            continue
+          }
+
+          const x = Number(rect.getAttribute('x') ?? 'NaN')
+          const y = Number(rect.getAttribute('y') ?? 'NaN')
+          const width = Number(rect.getAttribute('width') ?? 'NaN')
+          const height = Number(rect.getAttribute('height') ?? 'NaN')
+          if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
+            continue
+          }
+
+          return { x, y, width, height, cx: x + width / 2, cy: y + height / 2 }
+        }
+
+        return null
+      }
+
+      const getProjection = (labelText: string) => {
+        const matches = Array.from(svg.querySelectorAll('g')).flatMap((group) => {
+          const transform = group.getAttribute('transform') ?? ''
+          const rect = group.querySelector(':scope > rect[rx="16"]') as SVGRectElement | null
+          const label = group.querySelector(':scope > text.preview3-svg-name')
+          if (!transform.startsWith('translate(') || !rect || !label || (label.textContent || '').trim() !== labelText) {
+            return []
+          }
+
+          const match = /translate\(([-0-9.]+)\s+([-0-9.]+)\)/.exec(transform)
+          if (!match) {
+            return []
+          }
+
+          const x = Number(match[1])
+          const y = Number(match[2])
+          const width = Number(rect.getAttribute('width') ?? 'NaN')
+          const height = Number(rect.getAttribute('height') ?? 'NaN')
+          if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
+            return []
+          }
+
+          return [{ x, y, width, height, cx: x + width / 2, cy: y + height / 2 }]
+        })
+
+        return matches.sort((left, right) => left.x - right.x || left.y - right.y)[0] ?? null
+      }
+
+      return {
+        galadriel: getMainByLabel('Galadriel'),
+        celebornProjection: getProjection('Celeborn'),
+        aredhel: getMainByLabel('Aredhel'),
+        eolProjection: getProjection('Eöl'),
+        turgon: getMainByLabel('Turgon'),
+        elenweProjection: getProjection('Elenwë'),
+      }
+    })
+
+    expect(positions.galadriel).not.toBeNull()
+    expect(positions.celebornProjection).not.toBeNull()
+    expect(positions.aredhel).not.toBeNull()
+    expect(positions.eolProjection).not.toBeNull()
+    expect(positions.turgon).not.toBeNull()
+    expect(positions.elenweProjection).not.toBeNull()
+
+    expect((positions.celebornProjection as { cx: number }).cx).toBeGreaterThan((positions.galadriel as { cx: number }).cx)
+    expect((positions.celebornProjection as { x: number }).x - ((positions.galadriel as { x: number; width: number }).x + (positions.galadriel as { width: number }).width)).toBeLessThan(180)
+
+    expect((positions.eolProjection as { cx: number }).cx).toBeGreaterThan((positions.aredhel as { cx: number }).cx)
+    expect((positions.eolProjection as { x: number }).x - ((positions.aredhel as { x: number; width: number }).x + (positions.aredhel as { width: number }).width)).toBeLessThan(180)
+
+    expect((positions.elenweProjection as { cx: number }).cx).toBeGreaterThan((positions.turgon as { cx: number }).cx)
+    expect((positions.elenweProjection as { x: number }).x - ((positions.turgon as { x: number; width: number }).x + (positions.turgon as { width: number }).width)).toBeLessThan(180)
   })
 
   test('keeps projection as the default for cross-line couples', async ({ page }) => {

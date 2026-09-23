@@ -33,7 +33,8 @@ const SINGLE_PARENT_MULTI_SIBLING_SPAN_COMPRESSION = 0.34
 const ROW_DEOVERLAP_MIN_GAP = 20
 const TWO_CHILD_CONTINUATION_MIN_CENTER_DISTANCE = 640
 const PROJECTED_PAIR_MIN_SPAN_COLUMNS = 2.45
-const COUSIN_GROUP_MIN_GAP = 120
+const SIBLING_GROUP_TARGET_GAP = 44
+const COUSIN_GROUP_MIN_GAP = 160
 const r3bArtifactsByNodes = new WeakMap<Map<UUID, PositionedNode>, R3BLayoutArtifacts>()
 
 export function buildModeR3BLayout(
@@ -187,6 +188,19 @@ export function buildModeR3BLayout(
     validation,
     positionedNodes,
     spouseAttachedByOwnerId,
+  )
+  applySameRowSiblingSubtreeCompaction(
+    placementPlan.families,
+    validation,
+    positionedNodes,
+    spouseAttachedByOwnerId,
+  )
+  applyVisibleTwoParentChildBandRecentering(
+    placementPlan.families,
+    validation,
+    positionedNodes,
+    spouseAttachedByOwnerId,
+    marriagePartnerIdsByPerson,
   )
   applySameRowCousinBlockSpacing(
     placementPlan.families,
@@ -996,10 +1010,6 @@ function applySameRowCousinBlockSpacing(
           continue
         }
 
-        if (right.minCenterX >= left.maxCenterX - 1) {
-          continue
-        }
-
         const shiftX = left.maxRight + COUSIN_GROUP_MIN_GAP - right.minX
         if (shiftX <= 0) {
           continue
@@ -1029,6 +1039,64 @@ function applySameRowCousinBlockSpacing(
 
     if (!changed) {
       return
+    }
+  }
+}
+
+function applySameRowSiblingSubtreeCompaction(
+  families: R3FamilyGroup[],
+  validation: ValidationResult,
+  positionedNodes: Map<UUID, PositionedNode>,
+  spouseAttachedByOwnerId: Map<UUID, Set<UUID>>,
+): void {
+  for (const family of families) {
+    if (family.childIds.length < 2) {
+      continue
+    }
+
+    const childNodes = family.childIds
+      .map((childId) => positionedNodes.get(childId))
+      .filter((node): node is PositionedNode => node !== undefined)
+      .sort((left, right) => left.x - right.x || left.id.localeCompare(right.id))
+    if (childNodes.length !== family.childIds.length) {
+      continue
+    }
+
+    const minY = Math.min(...childNodes.map((node) => node.y))
+    const maxY = Math.max(...childNodes.map((node) => node.y))
+    if (maxY - minY > 1) {
+      continue
+    }
+
+    let previousBounds = collectSubtreeBounds(
+      collectShiftNodeIds(childNodes[0].id, validation.childrenByParent, spouseAttachedByOwnerId, families),
+      positionedNodes,
+    )
+
+    for (let index = 1; index < childNodes.length; index += 1) {
+      const currentChildId = childNodes[index].id
+      const shiftNodeIds = collectShiftNodeIds(currentChildId, validation.childrenByParent, spouseAttachedByOwnerId, families)
+      const currentBounds = collectSubtreeBounds(shiftNodeIds, positionedNodes)
+      const shiftX = previousBounds.maxRight + SIBLING_GROUP_TARGET_GAP - currentBounds.minX
+
+      if (shiftX < -1) {
+        for (const shiftNodeId of shiftNodeIds) {
+          const node = positionedNodes.get(shiftNodeId)
+          if (!node) {
+            continue
+          }
+
+          positionedNodes.set(shiftNodeId, {
+            ...node,
+            x: node.x + shiftX,
+          })
+        }
+
+        currentBounds.minX += shiftX
+        currentBounds.maxRight += shiftX
+      }
+
+      previousBounds = currentBounds
     }
   }
 }
@@ -1095,6 +1163,20 @@ function buildSameRowCousinBlocks(
   }
 
   return blocksByRow
+}
+
+function collectSubtreeBounds(
+  nodeIds: Set<UUID>,
+  positionedNodes: Map<UUID, PositionedNode>,
+): { minX: number; maxRight: number } {
+  const nodes = [...nodeIds]
+    .map((nodeId) => positionedNodes.get(nodeId))
+    .filter((node): node is PositionedNode => node !== undefined)
+
+  return {
+    minX: Math.min(...nodes.map((node) => node.x)),
+    maxRight: Math.max(...nodes.map((node) => node.x + node.width)),
+  }
 }
 
 function shouldSeparateSameRowCousinBlocks(
@@ -1212,9 +1294,8 @@ function applyProjectedPartnerRowClearance(
   positionedNodes: Map<UUID, PositionedNode>,
   marriagePartnerIdsByPerson: Map<UUID, UUID[]>,
 ): void {
-  const reservations = families
+  const familyReservations = families
     .filter((family) => family.parentIds.length === 2)
-    .filter((family) => shouldUseProjectedChildAxis(family, validation))
     .flatMap((family) => {
       const partnerId = family.parentIds.find((parentId) => parentId !== family.ownerId) ?? null
       if (!partnerId) {
@@ -1227,19 +1308,64 @@ function applyProjectedPartnerRowClearance(
         return []
       }
 
+      if (shouldUseProjectedChildAxis(family, validation)) {
+        const geometry = buildR3BProjectionGeometry({
+          ownerId: partnerId,
+          companionId: family.ownerId,
+          ownerNode: partnerNode,
+          companionNode: ownerNode,
+          partnerIdsByPerson: marriagePartnerIdsByPerson,
+          nodesById: positionedNodes,
+        })
+
+        return geometry.side === 'right'
+          ? [{ family, anchorNode: partnerNode, projectionRight: geometry.x + geometry.width + ROW_DEOVERLAP_MIN_GAP }]
+          : []
+      }
+
+      return []
+    })
+  const singleAnchoredMarriageReservations = validation.validOverlayRelations
+    .filter((relation) => relation.type === 'marriage')
+    .flatMap((relation) => {
+      const fromParentCount = (validation.parentsByChild.get(relation.from) ?? []).length
+      const toParentCount = (validation.parentsByChild.get(relation.to) ?? []).length
+      if ((fromParentCount === 0) === (toParentCount === 0)) {
+        return []
+      }
+
+      const anchorId = fromParentCount > 0 ? relation.from : relation.to
+      const companionId = anchorId === relation.from ? relation.to : relation.from
+      const anchorNode = positionedNodes.get(anchorId)
+      const companionNode = positionedNodes.get(companionId) ?? null
+      if (!anchorNode) {
+        return []
+      }
+
       const geometry = buildR3BProjectionGeometry({
-        ownerId: partnerId,
-        companionId: family.ownerId,
-        ownerNode: partnerNode,
-        companionNode: ownerNode,
+        ownerId: anchorId,
+        companionId,
+        ownerNode: anchorNode,
+        companionNode,
         partnerIdsByPerson: marriagePartnerIdsByPerson,
         nodesById: positionedNodes,
       })
 
       return geometry.side === 'right'
-        ? [{ family, anchorNode: partnerNode, projectionRight: geometry.x + geometry.width + ROW_DEOVERLAP_MIN_GAP }]
+        ? [{
+            family: {
+              key: `marriage:${relation.id}`,
+              parentIds: [relation.from, relation.to],
+              childIds: [],
+              ownerId: anchorId,
+              marriage: relation,
+            },
+            anchorNode,
+            projectionRight: geometry.x + geometry.width + ROW_DEOVERLAP_MIN_GAP,
+          }]
         : []
     })
+  const reservations = [...familyReservations, ...singleAnchoredMarriageReservations]
     .sort((left, right) => left.anchorNode.x - right.anchorNode.x || left.family.key.localeCompare(right.family.key))
 
   for (const reservation of reservations) {

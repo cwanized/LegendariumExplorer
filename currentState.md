@@ -39,6 +39,9 @@ What is already implemented on `fb/r3b-core`:
 	- Elrond / Elros spacing plus Elros -> Vardame vertical alignment
 	- Aragorn / Arwen projection no longer overlapping Vardame
 	- final same-row de-overlap after later horizontal family passes
+	- dense same-row cousin separation for the Finwe / Feanor / Fingolfin / Finarfin descendant class via local subtree compaction + local cousin-gap enforcement
+	- Feanor descendant row now reads as a compact sibling cohort with a larger first-cousin gap instead of interleaving with Fingolfin descendants
+	- parentless partner projections (current verified examples: Celeborn / Galadriel, Eol / Aredhel, Elenwe / Turgon) now stay local to the anchored branch instead of drifting far outward on the same horizontal lane
 
 Current uncommitted work on `fb/r3b-core`:
 
@@ -53,7 +56,7 @@ Current uncommitted work on `fb/r3b-core`:
 Current validation status:
 
 - `npm run build` in `app/` is green on the current local R3B core state.
-- `npx playwright test -c playwright.r3b.config.ts` is green with 9/9 tests on the current local R3B smoke suite.
+- `npx playwright test -c playwright.r3b.config.ts` is green with 11/11 tests on the current local R3B smoke suite.
 - Important workflow note: for manual browser review on `http://127.0.0.1:4173/preview3`, rebuild first; otherwise Vite preview can still serve an older bundle than the last Playwright run.
 
 Important current product/architecture decisions for the next agent:
@@ -62,13 +65,17 @@ Important current product/architecture decisions for the next agent:
 - In R3B, spouse projection is the default for marriage contexts.
 - Projection suppression is allowed only for explicit special cases, notably local clean inline cases such as Silmarien/Elatan.
 - R3B is intended to become a separate implementation, not just a permanent alias of R3.
+- Current architecture assessment: projection as a concept is still considered correct, but its placement is too late in the pipeline. The next larger intended direction is to move from `projection derived after layout` toward `projection-aware family placement`, where visible partner slots are part of early placement rather than mostly repaired later.
 
 Most important current finding about visual quality:
 
-- The current R3B overall appearance is materially improved over the earlier `fb/r3b-core` checkpoint, but one category remains open: dense same-generation cousin/group spacing, especially in the Finwe / Finarfin / Fingolfin / Feanor descendant row.
-- The hard overlap problem in R3B is largely reduced. The remaining issue is mostly visual grouping semantics (`siblings should read as tighter local cohorts than cousins`), not generic collision resolution.
+- The current R3B overall appearance is materially improved over the earlier `fb/r3b-core` checkpoint, and the former dense same-generation Feanor/Fingolfin/Finarfin interleaving problem is now locally controlled.
+- The hard overlap problem in R3B is largely reduced. The current remaining spacing issue has shifted one level upward: some upper-family reservations are still wider than visually ideal, especially the gap before the leftmost Finarfin child block (`Aredhel -> Finrod`) even though both local sibling cohorts are now compact.
 - A broad same-row family-gap pass was tried and explicitly rejected because it reopened already-green Hurin/Rian and Elrond/Celebrian cases.
 - The preferred direction remains: local explicit core rules, not global post-filters.
+- The former major projection-drift class is now improved locally: current verified projection gaps for Turgon/Elenwe, Aredhel/Eol, and Galadriel/Celeborn are back down to a local 28px class instead of large same-row outward drift.
+- New current projection-quality note: the local projection fix trades large horizontal drift for a denser local packing pattern. In visually busy zones (current screenshot class around Fingolfin / Earwen / Luthien / projected Beren and projected Finarfin) projections can now remain semantically local but still feel too tightly stacked.
+- This means the primary open projection issue is no longer `drift too far away`, but `local projection packing is too dense / not distributed intelligently enough`.
 
 What R3B currently already respects versus not yet:
 
@@ -80,11 +87,14 @@ What R3B currently already respects versus not yet:
 	- visible family midpoint from early `visibleParentSlotsByFamily` artifacts in placement
 	- projection-first local spouse corridors for the validated Hurin / Huor and Aragorn / Arwen classes
 	- Elros / Vardame local vertical single-parent alignment
+	- compact same-row sibling cohorts with explicit larger cousin gap in the Feanor descendant row class
+	- local partner-projection locality for the current Celeborn / Eol / Elenwe regression class
 - not yet active in modeR3B:
 	- `applyHouseSubtreeVerticalOffset`
 	- `applyHouseOrderXResolution`
 	- broader disconnected-component or global stabilization passes
-	- a robust generic sibling-cohort / cousin-cohort grouping rule for dense shared generation rows
+	- a broader generic upper-family span tightening rule for visually oversized inter-family reservations
+	- a smarter local projection-packing rule that can spread nearby projections in a small local search area instead of only stacking them tightly in a narrow vertical lane cluster
 
 Recommended next working mode:
 
@@ -94,14 +104,151 @@ Recommended next working mode:
 	- cluster spacing
 	- house-anchor/house-cluster positioning
 	- projection/suppression policy
-- The current primary unresolved category is sibling/cousin cohort spacing on dense shared generation rows.
+- The former primary dense-row sibling/cousin cohort issue is improved locally and should now be treated as green for the Feanor-row regression case.
+- The current primary unresolved categories are:
+	- upper-family / family-span reservation being wider than visually ideal (`Aredhel -> Finrod` class)
+	- overly dense local projection packing in busy branches even when projection locality is correct (`Fingolfin / Earwen / Luthien / projected Beren` screenshot class)
+	- broader architectural mismatch: projection need is known from tree semantics early, but final projection placement is still partly deferred until after main node placement
 
 Recommended next implementation priorities after visual feedback:
 
 1. Keep the current green R3B baseline stable and avoid broad new global end-passes.
 2. Continue using early `visibleParentSlotsByFamily` in the placement core before expanding their direct render-model authority again.
-3. Tackle dense same-generation cohort spacing with a narrower, biologically grouped placement rule instead of a global same-row spacing pass.
-4. Only after that reconsider whether any former R3 stabilization behavior should return as an explicit, local R3B core rule.
+3. Next preferred spacing slice: tighten oversized upper-family reservations in the initial R3B family-span/child-span heuristics rather than adding another broad same-row pass. The current concrete class to follow is the large `Aredhel -> Finrod` gap, which appears to come from upstream family/subtree span reservation, not from the new cousin-gap pass.
+4. Next preferred projection-quality slice: improve local projection packing so nearby projections can choose among several local candidate slots instead of only a narrow vertical lane stack. The current concrete screenshot class to follow is Fingolfin / Earwen / Luthien with projected Finarfin and projected Beren.
+5. Next larger handover-ready architecture adjustment to pursue: move from `projection derived after layout` toward `projection-aware family placement`, where the need for projection and its visible slot are treated as first-class placement artifacts earlier in the R3B pipeline rather than primarily post-placement render heuristics.
+6. If that larger adjustment is pursued, the expected optimization targets in the same conversion are:
+	- shrink or remove most of the current projection-collision clearance logic in `app/src/preview3/r3b/projections.ts`
+	- reduce the need for projected corridor / projected row cleanup passes in `app/src/preview3/r3b/placement.ts`
+	- make `visibleParentSlotsByFamily` the authoritative placement/render contract instead of a partly heuristic intermediate
+	- stabilize child-band centering against the final visible parent geometry so later re-centering passes can become smaller
+	- keep only narrow fallback heuristics for true exceptional collisions instead of using them as the primary slot-finding mechanism
+7. Only after those local slices or the larger projection-aware conversion reconsider whether any former R3 stabilization behavior should return as an explicit, local R3B core rule.
+
+Handover-ready multi-slice migration plan for the projection-aware conversion (the 10-point direction should be treated as intended scope, even if execution is split across more than 3 slices):
+
+1. Slice A - projection requirement model:
+	- introduce an explicit early artifact for `projection requirements` / `visible partner slots` per family or marriage
+	- each requirement should at least encode: owner, companion, preferred side, slot class, policy / reason, and whether the slot is mandatory for visible family geometry
+	- primary covered goals:
+		- visible partner slots as first-class artifacts
+		- projection demand decided early per relationship
+		- special cases moved into explicit policy rather than scattered late heuristics
+
+2. Slice B - authoritative visible parent slot contract:
+	- replace the current partly heuristic `visibleParentSlotsByFamily` role with an authoritative placement/render contract
+	- placement, render-model derivation, and connector preparation should all consume the same slot artifact instead of recomputing similar projection geometry independently
+	- primary covered goals:
+		- placement/render artifact convergence
+		- visible slot contract becomes stable input rather than a derived convenience value
+
+3. Slice C - family-axis and child-band placement on visible slots:
+	- compute family midpoints and child-band anchor decisions directly from the authoritative visible parent slots
+	- use these slots during initial placement instead of relying on later recentering to compensate for post-hoc projection movement
+	- primary covered goals:
+		- family axes derived from final visible parent geometry
+		- child placement becomes projection-aware from the start
+
+4. Slice D - sibling / cousin spacing on projection-aware families:
+	- refit the current local sibling-compaction and cousin-gap rules to operate on families whose visible parent geometry already includes projection slots
+	- verify that compact sibling cohorts and cousin separation still work once projection-aware placement is introduced earlier
+	- primary covered goals:
+		- sibling/cousin rules stay compatible with projection-aware family placement
+		- partner locality no longer fights later spacing passes
+
+5. Slice E - upper-family span tightening:
+	- revisit family-span and child-span reservation once visible partner slots are authoritative
+	- the current concrete class to follow remains the upstream oversized reservation around `Aredhel -> Finrod`
+	- primary covered goals:
+		- reduce oversized upper-family reservation
+		- let visible slot geometry inform subtree span more directly
+
+6. Slice F - local projection packing search:
+	- replace the current narrow vertical-lane local fallback with a small local candidate search / scoring strategy
+	- goal is to keep projections local without creating visually cramped stacks in busy zones
+	- current concrete screenshot class remains Fingolfin / Earwen / Luthien with projected Finarfin and projected Beren
+	- primary covered goals:
+		- local projection packing becomes deliberate, not just first-free vertical stacking
+		- projection density is optimized without reintroducing far drift
+
+7. Slice G - projected corridor / row cleanup reduction:
+	- once authoritative projection-aware placement exists, shrink or remove the current projected corridor / projected row cleanup passes that were mainly compensating for late projection placement
+	- primary covered goals:
+		- reduce placement repair passes
+		- keep only narrow explicit guardrails where still needed
+
+8. Slice H - projection resolver reduction in render stage:
+	- reduce `app/src/preview3/r3b/projections.ts` from a primary slot-finding system to a fallback / finalization layer
+	- any remaining collision handling should be treated as an exception path rather than the normal projection-placement path
+	- primary covered goals:
+		- collapse late projection repair complexity
+		- keep render-time resolution narrow and deterministic
+
+9. Slice I - connector-model simplification:
+	- once visible slots and parent anchors are stable earlier, simplify parent-anchor selection and connector derivation to trust those artifacts directly
+	- primary covered goals:
+		- connector preparation becomes simpler and more deterministic
+		- less duplication between placement-time visible geometry and render-time connector logic
+
+10. Slice J - final cleanup and policy audit:
+	- after the migration, audit which earlier local heuristics are now obsolete, which remain valid as guardrails, and which R3 carryovers should still stay out of R3B
+	- primary covered goals:
+		- retain only intentional narrow fallbacks
+		- prevent the new projection-aware model from accreting legacy repair logic again
+
+Current recommended execution order:
+
+1. Start with slices A-C to establish the early projection-aware data contract and use it in initial family placement.
+2. Follow with slices D-E so sibling/cousin behavior and upper-family reservation are re-tuned against the new slot model.
+3. Use slice F for the current dense local screenshot class once the earlier slot contract is in place.
+4. Only after that perform slices G-I to retire redundant late repair logic and converge placement/render behavior.
+5. Finish with slice J as a policy/cleanup pass.
+
+Concrete handover-ready definition for Slice A (recommended first architecture slice):
+
+- Purpose:
+	- introduce the first early `projection-aware` data contract without yet rewriting the full R3B placement behavior
+	- establish a single early truth for `whether` a projection is needed, `why` it is needed, and `what visible slot intent` it should carry into later placement/render stages
+
+- Scope of Slice A:
+	- add explicit early projection requirement / visible slot plan types under `app/src/preview3/r3b/types.ts`
+	- add a dedicated early builder module (recommended new file: `app/src/preview3/r3b/projectionPlan.ts`)
+	- build these artifacts before or alongside the R3B placement plan instead of letting late render/projection code remain the first real owner of projection semantics
+	- thread the resulting artifact into R3B placement artifacts in a read-only / preparatory role first
+
+- Recommended core data concepts for Slice A:
+	- `projection requirement`:
+		- one entry per relationship / family context that may need a visible projected partner slot
+		- should minimally carry: relation or family key, owner, companion, preferred side, policy reason, slot class, suppression state/reason, and whether the slot must be respected in placement
+	- `visible partner slot plan`:
+		- a placement-oriented semantic plan for the visible projection slot before final pixel geometry is chosen
+		- should minimally carry: anchor family key, owner, companion, preferred side, slot class, reserve-in-placement flag
+
+- Architectural intent of Slice A:
+	- keep projection as a valid core concept
+	- stop treating final projection placement heuristics as the first place where projection semantics become concrete
+	- prepare for later slices where family axis, child-band geometry, sibling/cousin spacing, and connector preparation consume the same early slot contract
+
+- What Slice A should explicitly NOT do yet:
+	- do not fully rewrite child placement
+	- do not remove current projection fallbacks yet
+	- do not attempt the full connector-model simplification yet
+	- do not force a big visual rewrite in the same slice
+
+- Success criteria for Slice A:
+	- for every current R3B projection class, the system can answer early and explicitly:
+		- is a projection required?
+		- who is the owner / anchored partner?
+		- on which side is the intended visible slot?
+		- which policy caused the projection or suppression?
+		- is the slot later required to participate in placement geometry?
+	- these answers exist as explicit R3B artifacts rather than only as late implicit logic in `projections.ts`
+
+- Files most likely involved first:
+	- `app/src/preview3/r3b/types.ts`
+	- `app/src/preview3/r3b/projectionPlan.ts` (recommended new module)
+	- `app/src/preview3/r3b/placement.ts`
+	- later slices will likely touch `app/src/preview3/r3b/projections.ts` and `app/src/preview3/r3b/renderModel.ts` more heavily, but Slice A should keep them mostly behavior-stable where possible
 
 ## Preview3 Cleanup Checkpoint (Deferred, 09. August 2026)
 
