@@ -62,6 +62,7 @@ export type SpouseProjectionNode = {
   width: number
   height: number
   side: 'left' | 'right'
+  isPlannedSlot?: boolean
 }
 
 type ProjectionRect = {

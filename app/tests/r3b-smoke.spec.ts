@@ -50,6 +50,24 @@ function countLabelMatches(texts: string[], fragment: string): number {
   return texts.filter((text) => text.toLowerCase().includes(needle)).length
 }
 
+async function getProjectionSnapshot(page: import('@playwright/test').Page) {
+  return page.locator('svg.preview3-graph').evaluate((svg) => {
+    return Array.from(svg.querySelectorAll('g')).flatMap((group) => {
+      const transform = group.getAttribute('transform') ?? ''
+      const rect = group.querySelector(':scope > rect[rx="16"]')
+      const label = group.querySelector(':scope > text.preview3-svg-name')
+      if (!transform.startsWith('translate(') || !rect || !label) {
+        return []
+      }
+
+      return [{
+        label: (label.textContent || '').trim(),
+        transform,
+      }]
+    }).sort((left, right) => left.label.localeCompare(right.label) || left.transform.localeCompare(right.transform))
+  })
+}
+
 test.describe('Mode R3B smoke', () => {
   test.beforeEach(async ({ page }) => {
     await gotoR3BWithPreferences(page)
@@ -187,6 +205,8 @@ test.describe('Mode R3B smoke', () => {
     expect((positions.hurin as { cx: number }).cx - (positions.morwenProjectionNearHurin as { cx: number }).cx).toBeLessThan(240)
     expect((positions.rianProjectionNearHuor as { cx: number }).cx).toBeLessThan((positions.huor as { cx: number }).cx)
     expect((positions.huor as { cx: number }).cx - (positions.rianProjectionNearHuor as { cx: number }).cx).toBeLessThan(240)
+    expect((positions.morwen as { x: number }).x).toBeGreaterThanOrEqual(40)
+    expect((positions.hurin as { x: number }).x).toBeGreaterThanOrEqual(40)
     const hurinVisibleMidX = ((positions.hurin as { cx: number }).cx + (positions.morwenProjectionNearHurin as { cx: number }).cx) / 2
     const hurinChildBandMidX = ((positions.turin as { cx: number }).cx + (positions.nienor as { cx: number }).cx) / 2
     expect(Math.abs(hurinChildBandMidX - hurinVisibleMidX)).toBeLessThan(90)
@@ -282,6 +302,8 @@ test.describe('Mode R3B smoke', () => {
 
     expect((positions.elros as { cx: number }).cx - (positions.elrond as { cx: number }).cx).toBeGreaterThan(620)
     expect(Math.abs((positions.vardame as { cx: number }).cx - (positions.elros as { cx: number }).cx)).toBeLessThan(90)
+    expect((positions.elrond as { x: number }).x).toBeGreaterThanOrEqual(40)
+    expect((positions.elros as { x: number }).x).toBeGreaterThanOrEqual(40)
 
     const elrondVisibleMidX = ((positions.elrond as { cx: number }).cx + (positions.celebrianProjectionNearElrond as { cx: number }).cx) / 2
     const elrondChildBandMidX = ((positions.elladan as { cx: number }).cx + (positions.arwen as { cx: number }).cx) / 2
@@ -451,7 +473,7 @@ test.describe('Mode R3B smoke', () => {
     )).toBe(false)
   })
 
-  test('keeps parentless partner projections local to their anchored branches', async ({ page }) => {
+  test('uses Eol main node for Aredhel primary marriage without overlapping Argon', async ({ page }) => {
     const positions = await page.locator('svg.preview3-graph').evaluate((svg) => {
       const getMainByLabel = (labelText: string) => {
         const groups = Array.from(svg.querySelectorAll('g[data-person-id]'))
@@ -508,27 +530,41 @@ test.describe('Mode R3B smoke', () => {
         galadriel: getMainByLabel('Galadriel'),
         celebornProjection: getProjection('Celeborn'),
         aredhel: getMainByLabel('Aredhel'),
+        eol: getMainByLabel('Eöl'),
+        eolMainCount: Array.from(svg.querySelectorAll('g[data-person-id]')).filter((group) => (
+          (group.querySelector('text.preview3-svg-name')?.textContent || '').trim() === 'Eöl'
+        )).length,
         eolProjection: getProjection('Eöl'),
-        turgon: getMainByLabel('Turgon'),
-        elenweProjection: getProjection('Elenwë'),
+        argon: getMainByLabel('Argon'),
       }
     })
 
     expect(positions.galadriel).not.toBeNull()
     expect(positions.celebornProjection).not.toBeNull()
     expect(positions.aredhel).not.toBeNull()
-    expect(positions.eolProjection).not.toBeNull()
-    expect(positions.turgon).not.toBeNull()
-    expect(positions.elenweProjection).not.toBeNull()
+    expect(positions.eol).not.toBeNull()
+    expect(positions.eolMainCount).toBe(1)
+    expect(positions.eolProjection).toBeNull()
+    expect(positions.argon).not.toBeNull()
 
     expect((positions.celebornProjection as { cx: number }).cx).toBeGreaterThan((positions.galadriel as { cx: number }).cx)
     expect((positions.celebornProjection as { x: number }).x - ((positions.galadriel as { x: number; width: number }).x + (positions.galadriel as { width: number }).width)).toBeLessThan(180)
 
-    expect((positions.eolProjection as { cx: number }).cx).toBeGreaterThan((positions.aredhel as { cx: number }).cx)
-    expect((positions.eolProjection as { x: number }).x - ((positions.aredhel as { x: number; width: number }).x + (positions.aredhel as { width: number }).width)).toBeLessThan(180)
+    expect((positions.eol as { cx: number }).cx).toBeGreaterThan((positions.aredhel as { cx: number }).cx)
+    expect((positions.eol as { x: number }).x - ((positions.aredhel as { x: number; width: number }).x + (positions.aredhel as { width: number }).width)).toBeLessThan(80)
+    expect((positions.eol as { y: number }).y).toBe((positions.aredhel as { y: number }).y)
 
-    expect((positions.elenweProjection as { cx: number }).cx).toBeGreaterThan((positions.turgon as { cx: number }).cx)
-    expect((positions.elenweProjection as { x: number }).x - ((positions.turgon as { x: number; width: number }).x + (positions.turgon as { width: number }).width)).toBeLessThan(180)
+    const overlaps = (left: { x: number; y: number; width: number; height: number }, right: { x: number; y: number; width: number; height: number }) => {
+      return left.x < right.x + right.width
+        && right.x < left.x + left.width
+        && left.y < right.y + right.height
+        && right.y < left.y + left.height
+    }
+    expect(overlaps(
+      positions.eol as { x: number; y: number; width: number; height: number },
+      positions.argon as { x: number; y: number; width: number; height: number },
+    )).toBe(false)
+
   })
 
   test('keeps projection as the default for cross-line couples', async ({ page }) => {
@@ -542,6 +578,47 @@ test.describe('Mode R3B smoke', () => {
     expect(countLabelMatches(labels, 'arwen')).toBe(2)
     expect(countLabelMatches(labels, 'beren erchamion')).toBe(2)
     expect(countLabelMatches(labels, 'luthien')).toBe(2)
+  })
+
+  test('uses the visible companion projection as the child connector parent anchor', async ({ page }) => {
+    const agreement = await page.locator('svg.preview3-graph').evaluate((svg) => {
+      const projection = Array.from(svg.querySelectorAll('g')).flatMap((group) => {
+        const transform = group.getAttribute('transform') ?? ''
+        const rect = group.querySelector(':scope > rect[rx="16"]') as SVGRectElement | null
+        const label = group.querySelector(':scope > text.preview3-svg-name')
+        if (!transform.startsWith('translate(') || !rect || (label?.textContent || '').trim() !== 'Morwen') {
+          return []
+        }
+
+        const match = /translate\(([-0-9.]+)\s+([-0-9.]+)\)/.exec(transform)
+        const width = Number(rect.getAttribute('width') ?? 'NaN')
+        const height = Number(rect.getAttribute('height') ?? 'NaN')
+        if (!match || !Number.isFinite(width) || !Number.isFinite(height)) {
+          return []
+        }
+
+        const x = Number(match[1])
+        const y = Number(match[2])
+        return [{ centerX: x + width / 2, bottomY: y + height }]
+      }).sort((left, right) => left.centerX - right.centerX)[0] ?? null
+
+      if (!projection) {
+        return null
+      }
+
+      return Array.from(svg.querySelectorAll('line')).some((line) => {
+        const x1 = Number(line.getAttribute('x1') ?? 'NaN')
+        const y1 = Number(line.getAttribute('y1') ?? 'NaN')
+        const x2 = Number(line.getAttribute('x2') ?? 'NaN')
+        const y2 = Number(line.getAttribute('y2') ?? 'NaN')
+        return Math.abs(x1 - projection.centerX) < 0.5
+          && Math.abs(x2 - projection.centerX) < 0.5
+          && Math.abs(y1 - projection.bottomY) < 0.5
+          && y2 > y1
+      })
+    })
+
+    expect(agreement).toBe(true)
   })
 
   test('suppresses projection for the local parentless inline couple case', async ({ page }) => {
@@ -586,5 +663,302 @@ test.describe('Mode R3B smoke', () => {
 
     expect((positions.miriel as number)).toBeLessThan(positions.finwe as number)
     expect((positions.indis as number)).toBeGreaterThan(positions.finwe as number)
+  })
+
+  test('keeps projection-aware upper-family reservations and busy local projections compact', async ({ page }) => {
+    const geometry = await page.locator('svg.preview3-graph').evaluate((svg) => {
+      const getMain = (labelText: string) => {
+        const group = Array.from(svg.querySelectorAll('g[data-person-id]')).find((candidate) => {
+          return (candidate.querySelector('text.preview3-svg-name')?.textContent || '').trim() === labelText
+        })
+        const rect = group?.querySelector('rect[rx="18"]') as SVGRectElement | null
+        if (!rect) {
+          return null
+        }
+
+        const x = Number(rect.getAttribute('x') ?? 'NaN')
+        const y = Number(rect.getAttribute('y') ?? 'NaN')
+        const width = Number(rect.getAttribute('width') ?? 'NaN')
+        const height = Number(rect.getAttribute('height') ?? 'NaN')
+        return Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(width) && Number.isFinite(height)
+          ? { x, y, width, height }
+          : null
+      }
+
+      const getProjection = (labelText: string) => {
+        return Array.from(svg.querySelectorAll('g')).flatMap((group) => {
+          const transform = group.getAttribute('transform') ?? ''
+          const rect = group.querySelector(':scope > rect[rx="16"]') as SVGRectElement | null
+          const label = group.querySelector(':scope > text.preview3-svg-name')
+          if (!transform.startsWith('translate(') || !rect || (label?.textContent || '').trim() !== labelText) {
+            return []
+          }
+
+          const match = /translate\(([-0-9.]+)\s+([-0-9.]+)\)/.exec(transform)
+          const width = Number(rect.getAttribute('width') ?? 'NaN')
+          const height = Number(rect.getAttribute('height') ?? 'NaN')
+          if (!match || !Number.isFinite(width) || !Number.isFinite(height)) {
+            return []
+          }
+
+          return [{ x: Number(match[1]), y: Number(match[2]), width, height }]
+        })
+      }
+
+      const mainNodes = Array.from(svg.querySelectorAll('g[data-person-id]')).flatMap((group) => {
+        const rect = group.querySelector('rect[rx="18"]') as SVGRectElement | null
+        if (!rect) {
+          return []
+        }
+
+        const x = Number(rect.getAttribute('x') ?? 'NaN')
+        const y = Number(rect.getAttribute('y') ?? 'NaN')
+        const width = Number(rect.getAttribute('width') ?? 'NaN')
+        const height = Number(rect.getAttribute('height') ?? 'NaN')
+        return Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(width) && Number.isFinite(height)
+          ? [{ x, y, width, height }]
+          : []
+      })
+
+      return {
+        aredhel: getMain('Aredhel'),
+        finrod: getMain('Finrod Felagund'),
+        earwen: getMain('Eärwen'),
+        luthien: getMain('Luthien'),
+        finarfinProjections: getProjection('Finarfin'),
+        berenProjections: getProjection('Beren Erchamion'),
+        mainNodes,
+      }
+    })
+
+    expect(geometry.aredhel).not.toBeNull()
+    expect(geometry.finrod).not.toBeNull()
+    expect(geometry.earwen).not.toBeNull()
+    expect(geometry.luthien).not.toBeNull()
+    expect(geometry.finarfinProjections).not.toEqual([])
+    expect(geometry.berenProjections).not.toEqual([])
+
+    const aredhel = geometry.aredhel as { x: number; width: number }
+    const finrod = geometry.finrod as { x: number }
+    expect(finrod.x - (aredhel.x + aredhel.width)).toBeLessThan(900)
+
+    const overlaps = (left: { x: number; y: number; width: number; height: number }, right: { x: number; y: number; width: number; height: number }) => {
+      return left.x < right.x + right.width
+        && right.x < left.x + left.width
+        && left.y < right.y + right.height
+        && right.y < left.y + left.height
+    }
+    const busyProjections = [
+      ...(geometry.finarfinProjections as Array<{ x: number; y: number; width: number; height: number }>),
+      ...(geometry.berenProjections as Array<{ x: number; y: number; width: number; height: number }>),
+    ]
+
+    for (const projection of busyProjections) {
+      expect(geometry.mainNodes.some((node) => overlaps(projection, node))).toBe(false)
+    }
+
+    const earwen = geometry.earwen as { x: number; y: number; width: number; height: number }
+    const finarfinProjection = (geometry.finarfinProjections as Array<{ x: number; y: number; width: number; height: number }>)
+      .sort((left, right) => Math.abs(left.y - (geometry.earwen as { y: number }).y) - Math.abs(right.y - (geometry.earwen as { y: number }).y))[0]
+    expect(finarfinProjection).toBeDefined()
+    expect(Math.abs(finarfinProjection.y - earwen.y)).toBeLessThan(earwen.height * 3)
+    expect(overlaps(finarfinProjection, geometry.luthien as { x: number; y: number; width: number; height: number })).toBe(false)
+  })
+
+  test('keeps both final Finarfin and Earwen projection contexts independently addressable', async ({ page }) => {
+    const geometry = await page.locator('svg.preview3-graph').evaluate((svg) => {
+      type Box = { id: string; label: string; x: number; y: number; width: number; height: number }
+      const getNumber = (element: Element, attribute: string) => Number(element.getAttribute(attribute) ?? 'NaN')
+      const getTranslate = (element: Element) => {
+        const match = /translate\(([-0-9.]+)\s+([-0-9.]+)\)/.exec(element.getAttribute('transform') ?? '')
+        return match ? { x: Number(match[1]), y: Number(match[2]) } : null
+      }
+      const mainById = new Map<string, Box>()
+      for (const group of Array.from(svg.querySelectorAll('g[data-person-id]'))) {
+        const rect = group.querySelector(':scope > rect[rx="18"]')
+        const label = group.querySelector(':scope > text.preview3-svg-name')?.textContent?.trim() ?? ''
+        const id = group.getAttribute('data-person-id')
+        if (!rect || !id) {
+          continue
+        }
+
+        const x = getNumber(rect, 'x')
+        const y = getNumber(rect, 'y')
+        const width = getNumber(rect, 'width')
+        const height = getNumber(rect, 'height')
+        if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(width) && Number.isFinite(height)) {
+          mainById.set(id, { id, label, x, y, width, height })
+        }
+      }
+
+      const projections = Array.from(svg.querySelectorAll('g[data-projection-context]')).flatMap((group) => {
+        const rect = group.querySelector(':scope > rect[rx="16"]')
+        const translate = getTranslate(group)
+        const ownerId = group.getAttribute('data-projection-owner-id')
+        const companionId = group.getAttribute('data-projection-companion-id')
+        const context = group.getAttribute('data-projection-context')
+        const planned = group.getAttribute('data-projection-planned')
+        if (!rect || !translate || !ownerId || !companionId || !context) {
+          return []
+        }
+
+        const width = getNumber(rect, 'width')
+        const height = getNumber(rect, 'height')
+        const owner = mainById.get(ownerId)
+        const companion = mainById.get(companionId)
+        return Number.isFinite(width) && Number.isFinite(height) && owner && companion
+          ? [{ context, planned, owner, companion, x: translate.x, y: translate.y, width, height }]
+          : []
+      }).filter((projection) => {
+        return (projection.owner.label === 'Finarfin' && projection.companion.label === 'Eärwen')
+          || (projection.owner.label === 'Eärwen' && projection.companion.label === 'Finarfin')
+      })
+
+      return { projections }
+    })
+
+    expect(geometry.projections).toHaveLength(2)
+    expect(new Set(geometry.projections.map((projection) => projection.context.split(':').slice(1).join(':'))).size).toBe(2)
+    expect(geometry.projections.map((projection) => projection.planned)).toEqual(['true', 'true'])
+
+    for (const projection of geometry.projections) {
+      const ownerRight = projection.owner.x + projection.owner.width
+      const projectionRight = projection.x + projection.width
+      const horizontalGap = projection.x >= ownerRight
+        ? projection.x - ownerRight
+        : projection.owner.x - projectionRight
+      expect(horizontalGap).toBe(28)
+      expect(projection.y - projection.owner.y).toBe(6)
+    }
+
+    const [first, second] = geometry.projections
+    const overlaps = first.x < second.x + second.width
+      && second.x < first.x + first.width
+      && first.y < second.y + second.height
+      && second.y < first.y + first.height
+    expect(overlaps).toBe(false)
+  })
+
+  test('completes final R3B geometry without box collisions and preserves shared start-house roots', async ({ page }) => {
+    const geometry = await page.locator('svg.preview3-graph').evaluate((svg) => {
+      type Box = { id: string; label: string; kind: 'main' | 'projection'; x: number; y: number; width: number; height: number }
+
+      const getNumber = (element: Element, attribute: string) => Number(element.getAttribute(attribute) ?? 'NaN')
+      const getTranslate = (group: Element) => {
+        const match = /translate\(([-0-9.]+)\s+([-0-9.]+)\)/.exec(group.getAttribute('transform') ?? '')
+        return match ? { x: Number(match[1]), y: Number(match[2]) } : null
+      }
+      const getMainBoxes = (): Box[] => Array.from(svg.querySelectorAll('g[data-person-id]')).flatMap((group) => {
+        const rect = group.querySelector(':scope > rect[rx="18"]')
+        const label = group.querySelector(':scope > text.preview3-svg-name')?.textContent?.trim() ?? ''
+        if (!rect) {
+          return []
+        }
+
+        const x = getNumber(rect, 'x')
+        const y = getNumber(rect, 'y')
+        const width = getNumber(rect, 'width')
+        const height = getNumber(rect, 'height')
+        return Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(width) && Number.isFinite(height)
+          ? [{ id: group.getAttribute('data-person-id') ?? label, label, kind: 'main' as const, x, y, width, height }]
+          : []
+      })
+      const getProjectionBoxes = (): Box[] => Array.from(svg.querySelectorAll('g')).flatMap((group) => {
+        const rect = group.querySelector(':scope > rect[rx="16"]')
+        const label = group.querySelector(':scope > text.preview3-svg-name')?.textContent?.trim() ?? ''
+        const translate = getTranslate(group)
+        if (!rect || !label || !translate) {
+          return []
+        }
+
+        const width = getNumber(rect, 'width')
+        const height = getNumber(rect, 'height')
+        return Number.isFinite(width) && Number.isFinite(height)
+          ? [{ id: `${label}:${translate.x}:${translate.y}`, label, kind: 'projection' as const, x: translate.x, y: translate.y, width, height }]
+          : []
+      })
+      const mainBoxes = getMainBoxes()
+      const projectionBoxes = getProjectionBoxes()
+      const boxes = [...mainBoxes, ...projectionBoxes]
+      const overlaps = (left: Box, right: Box) => left.x < right.x + right.width
+        && right.x < left.x + left.width
+        && left.y < right.y + right.height
+        && right.y < left.y + left.height
+      const overlapsByPair = boxes.flatMap((left, index) => boxes.slice(index + 1)
+        .filter((right) => overlaps(left, right))
+        .map((right) => `${left.kind}:${left.label}|${right.kind}:${right.label}`))
+      const mainByLabel = (label: string) => mainBoxes.filter((box) => box.label === label)
+      const enel = mainByLabel('Enel')[0] ?? null
+      const enelye = mainByLabel('Enelyë')[0] ?? null
+      const sharedChildren = ['Elwë (Thingol)', 'Olwë']
+        .map((label) => mainByLabel(label)[0] ?? null)
+        .filter((node): node is Box => node !== null)
+      const parentCenterX = enel && enelye
+        ? ((enel.x + enel.width / 2) + (enelye.x + enelye.width / 2)) / 2
+        : null
+      const sharedChildBandCenterX = sharedChildren.length === 0
+        ? null
+        : (Math.min(...sharedChildren.map((node) => node.x + node.width / 2))
+          + Math.max(...sharedChildren.map((node) => node.x + node.width / 2))) / 2
+      const mainParentLines = enel && enelye
+        ? [enel, enelye].filter((parent) => Array.from(svg.querySelectorAll('line')).some((line) => {
+            const x1 = getNumber(line, 'x1')
+            const y1 = getNumber(line, 'y1')
+            const x2 = getNumber(line, 'x2')
+            const y2 = getNumber(line, 'y2')
+            return Math.abs(x1 - (parent.x + parent.width / 2)) < 0.5
+              && Math.abs(x2 - x1) < 0.5
+              && Math.abs(y1 - (parent.y + parent.height)) < 0.5
+              && y2 > y1
+          })).length
+        : 0
+      const nelyarAnchor = Array.from(svg.querySelectorAll('text')).flatMap((text) => {
+        if (text.textContent?.trim() !== 'Nelyar and Teleri line') {
+          return []
+        }
+
+        const group = text.parentElement
+        const rect = group?.querySelector(':scope > rect')
+        const translate = group ? getTranslate(group) : null
+        if (!group || !rect || !translate) {
+          return []
+        }
+
+        const width = getNumber(rect, 'width')
+        return Number.isFinite(width) ? [{ centerX: translate.x + width / 2 }] : []
+      })[0] ?? null
+
+      return {
+        overlapsByPair,
+        enelMainCount: mainByLabel('Enel').length,
+        enelyeMainCount: mainByLabel('Enelyë').length,
+        enelProjectionCount: projectionBoxes.filter((box) => box.label === 'Enel').length,
+        enelyeProjectionCount: projectionBoxes.filter((box) => box.label === 'Enelyë').length,
+        sharedChildBandCenterX,
+        parentCenterX,
+        mainParentLines,
+        nelyarAnchorCenterX: nelyarAnchor?.centerX ?? null,
+      }
+    })
+
+    expect(geometry.overlapsByPair).toEqual([])
+    expect(geometry.enelMainCount).toBe(1)
+    expect(geometry.enelyeMainCount).toBe(1)
+    expect(geometry.enelProjectionCount).toBe(0)
+    expect(geometry.enelyeProjectionCount).toBe(0)
+    expect(geometry.mainParentLines).toBe(2)
+    expect(geometry.sharedChildBandCenterX).not.toBeNull()
+    expect(geometry.parentCenterX).not.toBeNull()
+    expect(Math.abs((geometry.sharedChildBandCenterX as number) - (geometry.parentCenterX as number))).toBeLessThan(1)
+    expect(geometry.nelyarAnchorCenterX).not.toBeNull()
+    expect(Math.abs((geometry.nelyarAnchorCenterX as number) - (geometry.parentCenterX as number))).toBeLessThan(1)
+  })
+
+  test('keeps projection slots deterministic across a reload', async ({ page }) => {
+    const initialSnapshot = await getProjectionSnapshot(page)
+
+    await page.reload({ waitUntil: 'networkidle' })
+
+    expect(await getProjectionSnapshot(page)).toEqual(initialSnapshot)
   })
 })

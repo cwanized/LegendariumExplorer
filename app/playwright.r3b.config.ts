@@ -10,9 +10,9 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: 'npm run preview -- --host 127.0.0.1 --port 4174 --strictPort',
+    command: 'npm run build && npm run preview -- --host 127.0.0.1 --port 4174 --strictPort',
     port: 4174,
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 })

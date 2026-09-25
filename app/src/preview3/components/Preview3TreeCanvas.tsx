@@ -595,7 +595,15 @@ export function Preview3TreeCanvas({
             return (
               <g key={`${projection.relationId}:${projection.ownerId}:${projection.companionId}`} opacity={isFaded ? 0.28 : 1}>
                 <line x1={linkStartX} y1={linkY} x2={linkEndX} y2={projection.y + projection.height / 2} stroke="var(--preview3-tree-overlay)" strokeDasharray="6 6" strokeOpacity={0.68} />
-                <g transform={`translate(${projection.x} ${projection.y})`} onClick={() => onOpenSpouseContinuation(projection.relationId, projection.companionId)}>
+                <g
+                  transform={`translate(${projection.x} ${projection.y})`}
+                  data-projection-context={`${projection.relationId}:${projection.ownerId}:${projection.companionId}`}
+                  data-projection-relation-id={projection.relationId}
+                  data-projection-owner-id={projection.ownerId}
+                  data-projection-companion-id={projection.companionId}
+                  data-projection-planned={projection.isPlannedSlot ? 'true' : 'false'}
+                  onClick={() => onOpenSpouseContinuation(projection.relationId, projection.companionId)}
+                >
                   <rect width={projection.width} height={projection.height} rx="16" ry="16" fill="color-mix(in srgb, var(--preview3-tree-accent-soft) 42%, var(--preview3-tree-node-fill) 58%)" stroke={isSelected ? 'var(--preview3-tree-accent)' : 'var(--preview3-tree-border)'} strokeWidth={isSelected ? 2.6 : 1.6} />
                   <text x={14} y={22} className="preview3-svg-name">{companionPerson.name}</text>
                   <text x={14} y={40} className="preview3-svg-meta">{companionPerson.species ?? companionPerson.houses?.[0] ?? 'Spouse branch'}</text>

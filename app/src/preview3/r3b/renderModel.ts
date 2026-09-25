@@ -8,6 +8,7 @@ import { sortPersonIdsForR3 } from '../r3/sorting'
 import type { R3FamilyPlacement } from '../r3/types'
 import { getModeR3BLayoutArtifacts } from './placement'
 import { resolveR3BProjectionPlacements } from './projections'
+import type { R3BVisibleParentSlot } from './types'
 
 const R3B_ROW_HEIGHT = 192
 const R3B_NODE_HEIGHT = 64
@@ -119,7 +120,14 @@ export function buildModeR3BBiologicalChildGroups(
   const allowFallback = options?.allowFallback ?? false
   const artifacts = getModeR3BLayoutArtifacts(layout)
   if (artifacts) {
-    return buildChildGroupsFromPlacements(validation, relations, layout, artifacts.familyPlacements, artifacts.normalizationOffsetY)
+    return buildChildGroupsFromPlacements(
+      validation,
+      relations,
+      layout,
+      artifacts.familyPlacements,
+      artifacts.visibleParentSlotsByFamily,
+      artifacts.normalizationOffsetY,
+    )
   }
 
   if (!allowFallback) {
@@ -219,12 +227,18 @@ export function buildModeR3BSpouseProjectionState(
 ): SpouseProjectionState {
   const collapseChildEdges = options?.collapseChildEdges ?? false
   const duplicateBothPartners = options?.duplicateBothPartners ?? false
+  const projectionPlan = getModeR3BLayoutArtifacts(layout)?.projectionPlan
+  const visibleParentSlotsByFamily = getModeR3BLayoutArtifacts(layout)?.visibleParentSlotsByFamily
+  const finalProjectionSlotsByContext = getModeR3BLayoutArtifacts(layout)?.finalProjectionSlotsByContext
   const resolved = resolveR3BProjectionPlacements({
     validation,
     layout,
     spouseOwnerOverrides,
     collapseChildEdges,
     duplicateBothPartners,
+    projectionPlan,
+    visibleParentSlotsByFamily,
+    finalProjectionSlotsByContext,
   })
 
   return {
@@ -249,6 +263,7 @@ export function buildModeR3BParentAnchorsByKey({
   validation: ValidationResult
   spouseOwnerOverrides: Record<string, UUID>
 }): Map<string, R3ConnectorAnchor[]> {
+  const visibleParentSlotsByFamily = getModeR3BLayoutArtifacts(layout)?.visibleParentSlotsByFamily
   const projectionsByCompanionId = new Map<UUID, typeof spouseProjection.nodes>()
   for (const projection of spouseProjection.nodes) {
     const projections = projectionsByCompanionId.get(projection.companionId) ?? []
@@ -271,6 +286,14 @@ export function buildModeR3BParentAnchorsByKey({
   const anchorsByKey = new Map<string, R3ConnectorAnchor[]>()
 
   for (const group of biologicalChildGroups) {
+    const visibleSlotAnchors = overlayEnabled
+      ? buildVisibleSlotAnchors(group, visibleParentSlotsByFamily)
+      : null
+    if (visibleSlotAnchors) {
+      anchorsByKey.set(group.key, visibleSlotAnchors)
+      continue
+    }
+
     const pairKey = group.parentIds.length === 2
       ? buildParentPairKey(group.parentIds[0], group.parentIds[1])
       : null
@@ -332,6 +355,36 @@ function buildMainAnchor(parentId: UUID, layout: LayoutResult): R3ConnectorAncho
   }
 }
 
+function buildVisibleSlotAnchors(
+  group: BiologicalChildGroup,
+  visibleParentSlotsByFamily: Map<string, R3BVisibleParentSlot[]> | undefined,
+): R3ConnectorAnchor[] | null {
+  const slots = visibleParentSlotsByFamily?.get(group.key)
+  if (!slots || slots.length !== group.parentIds.length) {
+    return null
+  }
+
+  const slotsByPersonId = new Map(slots.map((slot) => [slot.personId, slot]))
+  const anchors = group.parentIds.map((parentId) => {
+    const slot = slotsByPersonId.get(parentId)
+    if (!slot) {
+      return null
+    }
+
+    return {
+      key: `${slot.kind}:${slot.key}`,
+      parentId,
+      x: slot.x,
+      y: slot.y,
+      width: slot.width,
+      height: slot.height,
+      isProjection: slot.kind === 'projection',
+    } satisfies R3ConnectorAnchor
+  })
+
+  return anchors.every((anchor): anchor is R3ConnectorAnchor => anchor !== null) ? anchors : null
+}
+
 function selectProjectedCompanionAnchor({
   companionId,
   ownerId,
@@ -383,6 +436,7 @@ function buildChildGroupsFromPlacements(
   relations: Relation[],
   layout: LayoutResult,
   placements: R3FamilyPlacement[],
+  visibleParentSlotsByFamily: Map<string, R3BVisibleParentSlot[]>,
   normalizationOffsetY: number,
 ): BiologicalChildGroup[] {
   const relationIdsByEndpoints = new Map<string, string[]>()
@@ -395,10 +449,11 @@ function buildChildGroupsFromPlacements(
 
   return placements
     .map((placement) => {
-      const parentNodes = placement.parentIds
-        .map((parentId) => layout.nodes.get(parentId))
-        .filter((node): node is PositionedNode => node !== undefined)
-        .sort((left, right) => left.x - right.x || left.id.localeCompare(right.id))
+      const parentNodes = buildVisibleSlotParentNodes(placement, visibleParentSlotsByFamily)
+        ?? placement.parentIds
+          .map((parentId) => layout.nodes.get(parentId))
+          .filter((node): node is PositionedNode => node !== undefined)
+          .sort((left, right) => left.x - right.x || left.id.localeCompare(right.id))
       const orderedChildIds = sortPersonIdsForR3(placement.childIds, validation.personById)
       const childNodes = orderedChildIds
         .map((childId) => layout.nodes.get(childId))
@@ -443,6 +498,36 @@ function buildChildGroupsFromPlacements(
     })
     .filter((group): group is BiologicalChildGroup => group !== null)
     .sort((left, right) => left.junctionY - right.junctionY || left.key.localeCompare(right.key))
+}
+
+function buildVisibleSlotParentNodes(
+  placement: R3FamilyPlacement,
+  visibleParentSlotsByFamily: Map<string, R3BVisibleParentSlot[]>,
+): PositionedNode[] | null {
+  const slots = visibleParentSlotsByFamily.get(placement.key)
+  if (!slots || slots.length !== placement.parentIds.length) {
+    return null
+  }
+
+  const slotsByPersonId = new Map(slots.map((slot) => [slot.personId, slot]))
+  const nodes = placement.parentIds.map((parentId) => {
+    const slot = slotsByPersonId.get(parentId)
+    if (!slot) {
+      return null
+    }
+
+    return {
+      id: `${slot.kind}:${slot.key}`,
+      x: slot.x,
+      y: slot.y,
+      width: slot.width,
+      height: slot.height,
+    } satisfies PositionedNode
+  })
+
+  return nodes.every((node): node is PositionedNode => node !== null)
+    ? nodes.sort((left, right) => left.x - right.x || left.id.localeCompare(right.id))
+    : null
 }
 
 function resolveAnchorConnectorNodeIds({

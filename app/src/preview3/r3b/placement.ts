@@ -11,8 +11,10 @@ import { buildBiologicalFamilies, compareFamilyGroups } from '../r3/families'
 import { buildGenerationRows } from '../r3/generation'
 import { buildClusterAssignments, buildClusters } from '../r3/clusters'
 import type { R3FamilyGroup, R3FamilyPlacement, R3HouseAnchorPlacement, R3PlacementPlan } from '../r3/types'
+import { SPOUSE_PROJECTION_HORIZONTAL_GAP, SPOUSE_PROJECTION_NODE_WIDTH } from '../ruleConstants'
 import { buildR3BMarriagePartnerIdsByPerson, buildR3BProjectionGeometry } from './projections'
-import type { R3BLayoutArtifacts, R3BVisibleParentSlot } from './types'
+import { buildR3BProjectionContextKey, buildR3BProjectionPlan } from './projectionPlan'
+import type { R3BLayoutArtifacts, R3BProjectionPlan, R3BVisibleParentSlot } from './types'
 
 const NODE_WIDTH = 176
 const NODE_HEIGHT = 64
@@ -24,6 +26,7 @@ const ROOT_GAP_COLUMNS = 1.25
 const CLUSTER_GAP_COLUMNS = 1.75
 const CHILD_GAP_COLUMNS = 0.7
 const SPOUSE_STEP_COLUMNS = (NODE_WIDTH + PARTNER_GAP) / COLUMN_WIDTH
+const PROJECTED_VISIBLE_PAIR_SPAN_COLUMNS = (NODE_WIDTH + SPOUSE_PROJECTION_HORIZONTAL_GAP + SPOUSE_PROJECTION_NODE_WIDTH) / COLUMN_WIDTH
 const TWO_CHILD_SPAN_COMPRESSION = 0.28
 const SINGLE_PARENT_TWO_CHILD_SPAN_COMPRESSION = 0.24
 const TWO_CHILD_HEAVY_BRANCH_RATIO_THRESHOLD = 2.6
@@ -32,7 +35,6 @@ const MULTI_SIBLING_SPAN_COMPRESSION = 0.42
 const SINGLE_PARENT_MULTI_SIBLING_SPAN_COMPRESSION = 0.34
 const ROW_DEOVERLAP_MIN_GAP = 20
 const TWO_CHILD_CONTINUATION_MIN_CENTER_DISTANCE = 640
-const PROJECTED_PAIR_MIN_SPAN_COLUMNS = 2.45
 const SIBLING_GROUP_TARGET_GAP = 44
 const COUSIN_GROUP_MIN_GAP = 160
 const r3bArtifactsByNodes = new WeakMap<Map<UUID, PositionedNode>, R3BLayoutArtifacts>()
@@ -56,6 +58,7 @@ export function buildModeR3BLayout(
     biologicalFamilies,
     houseLookup,
   })
+  const projectionPlan = buildR3BProjectionPlan({ validation, families: placementPlan.families })
   const marriagePartnerIdsByPerson = buildR3BMarriagePartnerIdsByPerson(
     validation.validOverlayRelations.filter((relation) => relation.type === 'marriage'),
   )
@@ -66,6 +69,8 @@ export function buildModeR3BLayout(
   const spouseAttachedByOwnerId = new Map<UUID, Set<UUID>>()
   const familyPlacements = new Map<string, R3FamilyPlacement>()
   const visibleParentSlotsByFamily = new Map<string, R3BVisibleParentSlot[]>()
+
+  const finalProjectionSlotsByContext = new Map<string, R3BVisibleParentSlot>()
   const houseAnchorPlacements = new Map<string, R3HouseAnchorPlacement>()
   const sortedClusters = buildClusters({
     validation,
@@ -77,11 +82,11 @@ export function buildModeR3BLayout(
   let clusterCursor = 0
 
   for (const cluster of sortedClusters) {
-    const clusterWidth = getClusterWidth(cluster.rootIds, placementPlan, subtreeSpanCache, validation)
+    const clusterWidth = getClusterWidth(cluster.rootIds, placementPlan, subtreeSpanCache, validation, projectionPlan)
     let rootCursor = clusterCursor
 
     for (const rootId of cluster.rootIds) {
-      const rootWidth = getPersonSubtreeSpan(rootId, placementPlan, subtreeSpanCache, validation)
+      const rootWidth = getPersonSubtreeSpan(rootId, placementPlan, subtreeSpanCache, validation, projectionPlan)
       const rootCenter = rootCursor + rootWidth / 2
       placePersonBranch({
         personId: rootId,
@@ -89,6 +94,7 @@ export function buildModeR3BLayout(
         followRulerLine,
         validation,
         placementPlan,
+        projectionPlan,
         positionedNodes,
         placedPersons,
         spouseAttachedToOwnerLineageIds,
@@ -148,6 +154,12 @@ export function buildModeR3BLayout(
     clusterCursor += ROOT_GAP_COLUMNS
   }
 
+  reserveFinalProjectionSlots(
+    positionedNodes,
+    marriagePartnerIdsByPerson,
+    projectionPlan,
+    finalProjectionSlotsByContext,
+  )
   applySinglePassRowDeoverlap(positionedNodes)
   applyProjectedContinuationCorridorSpacing(
     placementPlan.families,
@@ -161,21 +173,27 @@ export function buildModeR3BLayout(
     validation,
     positionedNodes,
     spouseAttachedByOwnerId,
+    visibleParentSlotsByFamily,
     marriagePartnerIdsByPerson,
+    projectionPlan,
   )
   applySingleChildrenToTwoParentMidpoint(
     placementPlan.families,
     validation,
     positionedNodes,
     spouseAttachedByOwnerId,
+    visibleParentSlotsByFamily,
     marriagePartnerIdsByPerson,
+    projectionPlan,
   )
   applyVisibleTwoParentChildBandRecentering(
     placementPlan.families,
     validation,
     positionedNodes,
     spouseAttachedByOwnerId,
+    visibleParentSlotsByFamily,
     marriagePartnerIdsByPerson,
+    projectionPlan,
   )
   applyTwoChildContinuationSpacing(
     placementPlan.families,
@@ -200,7 +218,9 @@ export function buildModeR3BLayout(
     validation,
     positionedNodes,
     spouseAttachedByOwnerId,
+    visibleParentSlotsByFamily,
     marriagePartnerIdsByPerson,
+    projectionPlan,
   )
   applySameRowCousinBlockSpacing(
     placementPlan.families,
@@ -228,6 +248,15 @@ export function buildModeR3BLayout(
     spouseAttachedByOwnerId,
   )
   applySinglePassRowDeoverlap(positionedNodes)
+  alignCanonicalMainPartners(positionedNodes, projectionPlan)
+  reserveCanonicalMainPartnerRows(positionedNodes, projectionPlan)
+  alignCanonicalMainPartners(positionedNodes, projectionPlan)
+  reserveFinalProjectionSlots(
+    positionedNodes,
+    marriagePartnerIdsByPerson,
+    projectionPlan,
+    finalProjectionSlotsByContext,
+  )
 
   for (const [anchorKey, placement] of houseAnchorPlacements.entries()) {
     houseAnchorPlacements.set(anchorKey, {
@@ -236,15 +265,19 @@ export function buildModeR3BLayout(
     })
   }
 
-  finalizeFamilyPlacementAxes(familyPlacements, visibleParentSlotsByFamily, positionedNodes, marriagePartnerIdsByPerson, validation)
+  finalizeFamilyPlacementAxes(familyPlacements, visibleParentSlotsByFamily, positionedNodes, marriagePartnerIdsByPerson, validation, projectionPlan)
 
   const normalization = normalizeLayout(positionedNodes)
+  normalizeVisibleParentSlots(visibleParentSlotsByFamily, normalization.offsetX, normalization.offsetY)
+  normalizeFinalProjectionSlots(finalProjectionSlotsByContext, normalization.offsetX, normalization.offsetY)
   r3bArtifactsByNodes.set(normalization.layout.nodes, {
     familyPlacements: [...familyPlacements.values()].sort((left, right) => left.parentRow - right.parentRow || left.key.localeCompare(right.key)),
     houseAnchorPlacements: [...houseAnchorPlacements.values()].sort((left, right) => left.key.localeCompare(right.key)),
     rowByPersonId: placementPlan.rowByPersonId,
     clusterByPersonId: placementPlan.clusterByPersonId,
     visibleParentSlotsByFamily,
+    finalProjectionSlotsByContext,
+    projectionPlan,
     normalizationOffsetX: normalization.offsetX,
     normalizationOffsetY: normalization.offsetY,
   })
@@ -269,12 +302,76 @@ export function transferModeR3BLayoutArtifacts(sourceLayout: LayoutResult, targe
   r3bArtifactsByNodes.set(targetLayout.nodes, artifacts)
 }
 
+export function completeModeR3BLayoutAfterHouseSubtreeOffsets(
+  validation: ValidationResult,
+  houseDefinitions: HouseDefinitions,
+  layout: LayoutResult,
+): LayoutResult {
+  const artifacts = getModeR3BLayoutArtifacts(layout)
+  if (!artifacts) {
+    return layout
+  }
+
+  const positionedNodes = new Map<UUID, PositionedNode>()
+  for (const node of layout.nodes.values()) {
+    positionedNodes.set(node.id, { ...node })
+  }
+
+  alignCanonicalMainPartners(positionedNodes, artifacts.projectionPlan)
+  applyCanonicalMainPartnerUnitRowDeoverlap(positionedNodes, artifacts.projectionPlan)
+  alignSharedStartHouseRootChildAxes(
+    validation,
+    houseDefinitions,
+    positionedNodes,
+    artifacts.familyPlacements,
+  )
+
+  const marriagePartnerIdsByPerson = buildR3BMarriagePartnerIdsByPerson(
+    validation.validOverlayRelations.filter((relation) => relation.type === 'marriage'),
+  )
+  const familyPlacements = new Map(artifacts.familyPlacements.map((placement) => [placement.key, placement]))
+  const visibleParentSlotsByFamily = new Map<string, R3BVisibleParentSlot[]>()
+
+  const finalProjectionSlotsByContext = new Map<string, R3BVisibleParentSlot>()
+  reserveFinalProjectionSlots(
+    positionedNodes,
+    marriagePartnerIdsByPerson,
+    artifacts.projectionPlan,
+    finalProjectionSlotsByContext,
+  )
+  finalizeFamilyPlacementAxes(
+    familyPlacements,
+    visibleParentSlotsByFamily,
+    positionedNodes,
+    marriagePartnerIdsByPerson,
+    validation,
+    artifacts.projectionPlan,
+  )
+  buildFinalProjectionSlots(
+    positionedNodes,
+    marriagePartnerIdsByPerson,
+    artifacts.projectionPlan,
+    finalProjectionSlotsByContext,
+  )
+
+  const completedLayout = { nodes: positionedNodes }
+  r3bArtifactsByNodes.set(positionedNodes, {
+    ...artifacts,
+    familyPlacements: [...familyPlacements.values()].sort((left, right) => left.parentRow - right.parentRow || left.key.localeCompare(right.key)),
+    visibleParentSlotsByFamily,
+    finalProjectionSlotsByContext,
+  })
+
+  return completedLayout
+}
+
 function placePersonBranch({
   personId,
   centerColumn,
   followRulerLine,
   validation,
   placementPlan,
+  projectionPlan,
   positionedNodes,
   placedPersons,
   subtreeSpanCache,
@@ -289,6 +386,7 @@ function placePersonBranch({
   followRulerLine: boolean
   validation: ValidationResult
   placementPlan: R3PlacementPlan
+  projectionPlan: R3BProjectionPlan
   positionedNodes: Map<UUID, PositionedNode>
   placedPersons: Set<UUID>
   spouseAttachedToOwnerLineageIds: Set<UUID>
@@ -317,7 +415,7 @@ function placePersonBranch({
     const row = placementPlan.rowByPersonId.get(personId) ?? 1
     const spouseSide = familyOffsets[index] < 0 ? 'left' : 'right'
     const spouseFollowsOwnerLineage = spouseId
-      ? shouldAttachSpouseToOwnerLineage(spouseId, validation)
+      ? shouldAttachSpouseToOwnerLineage(family, spouseId, projectionPlan)
       : false
 
     if (spouseId && spouseFollowsOwnerLineage) {
@@ -338,16 +436,22 @@ function placePersonBranch({
       )
     }
 
+    const visibleParentSlots = refreshVisibleParentSlots({
+      family,
+      visibleParentSlotsByFamily,
+      positionedNodes,
+      marriagePartnerIdsByPerson,
+      validation,
+      projectionPlan,
+    })
     const familyCenter = resolveFamilyAxisColumn({
       family,
       fallbackCenterColumn: ownerFamilyCenter,
       followRulerLine,
-      positionedNodes,
-      marriagePartnerIdsByPerson,
-      validation,
+      visibleParentSlots,
     })
 
-    const childColumns = buildChildColumns(familyCenter, family, family.childIds, placementPlan, subtreeSpanCache, validation)
+    const childColumns = buildChildColumns(familyCenter, family, family.childIds, placementPlan, subtreeSpanCache, validation, projectionPlan)
     family.childIds.forEach((childId, childIndex) => {
       placePersonBranch({
         personId: childId,
@@ -355,6 +459,7 @@ function placePersonBranch({
         followRulerLine,
         validation,
         placementPlan,
+        projectionPlan,
         positionedNodes,
         placedPersons,
         spouseAttachedToOwnerLineageIds,
@@ -375,15 +480,37 @@ function placePersonBranch({
       parentRow: row,
       childRow: childRows.length > 0 ? Math.min(...childRows) : row + 1,
     })
-    visibleParentSlotsByFamily.set(
-      family.key,
-      buildVisibleParentSlots(family, positionedNodes, marriagePartnerIdsByPerson, validation),
-    )
+    refreshVisibleParentSlots({
+      family,
+      visibleParentSlotsByFamily,
+      positionedNodes,
+      marriagePartnerIdsByPerson,
+      validation,
+      projectionPlan,
+    })
 
     if (spouseId && spouseFollowsOwnerLineage && positionedNodes.has(spouseId)) {
       positionCoupleAroundFamilyAxis({ ownerId: personId, spouseId, familyCenter, row, spouseSide, positionedNodes })
     }
   })
+
+  for (const partnerId of projectionPlan.canonicalMainPartnerIdsByOwnerId.get(personId) ?? []) {
+    const attachedSpouseIds = spouseAttachedByOwnerId.get(personId) ?? new Set<UUID>()
+    if (attachedSpouseIds.has(partnerId)) {
+      continue
+    }
+
+    spouseAttachedToOwnerLineageIds.add(partnerId)
+    attachedSpouseIds.add(partnerId)
+    spouseAttachedByOwnerId.set(personId, attachedSpouseIds)
+    const row = placementPlan.rowByPersonId.get(personId) ?? 1
+    const side = projectionPlan.canonicalMainPartnerSidesByOwnerId.get(personId)?.get(partnerId) ?? 'right'
+    positionedNodes.set(partnerId, createNode(
+      partnerId,
+      resolveSpouseColumn(centerColumn, side === 'left' ? -1 : 0),
+      placementPlan.rowByPersonId.get(partnerId) ?? row,
+    ))
+  }
 
   for (const childId of validation.childrenByParent.get(personId) ?? []) {
     if (isChildAssignedToDifferentFamilyOwner(personId, childId, placementPlan.families)) {
@@ -400,6 +527,7 @@ function placePersonBranch({
       followRulerLine,
       validation,
       placementPlan,
+      projectionPlan,
       positionedNodes,
       placedPersons,
       spouseAttachedToOwnerLineageIds,
@@ -478,9 +606,15 @@ function resolveAnchoredFamilyOwnerId({
   return family.ownerId
 }
 
-function getClusterWidth(rootIds: UUID[], placementPlan: R3PlacementPlan, subtreeSpanCache: Map<UUID, number>, validation: ValidationResult): number {
+function getClusterWidth(
+  rootIds: UUID[],
+  placementPlan: R3PlacementPlan,
+  subtreeSpanCache: Map<UUID, number>,
+  validation: ValidationResult,
+  projectionPlan: R3BProjectionPlan,
+): number {
   return rootIds.reduce((sum, rootId, index) => {
-    const rootWidth = getPersonSubtreeSpan(rootId, placementPlan, subtreeSpanCache, validation)
+    const rootWidth = getPersonSubtreeSpan(rootId, placementPlan, subtreeSpanCache, validation, projectionPlan)
     return sum + rootWidth + (index === rootIds.length - 1 ? 0 : ROOT_GAP_COLUMNS)
   }, 0)
 }
@@ -490,6 +624,7 @@ function getPersonSubtreeSpan(
   placementPlan: R3PlacementPlan,
   subtreeSpanCache: Map<UUID, number>,
   validation?: ValidationResult,
+  projectionPlan?: R3BProjectionPlan,
 ): number {
   const cached = subtreeSpanCache.get(personId)
   if (cached !== undefined) {
@@ -508,12 +643,11 @@ function getPersonSubtreeSpan(
     : []
 
   const relevantFamilies = [...ownedFamilies, ...companionFamilies]
-  if (relevantFamilies.length === 0) {
-    subtreeSpanCache.set(personId, 1)
-    return 1
-  }
-
-  const span = Math.max(...relevantFamilies.map((family) => getFamilySpan(family, placementPlan, subtreeSpanCache, validation)))
+    const familySpan = relevantFamilies.length > 0
+      ? Math.max(...relevantFamilies.map((family) => getFamilySpan(family, placementPlan, subtreeSpanCache, validation, projectionPlan)))
+      : 1
+    const canonicalPartnerCount = projectionPlan?.canonicalMainPartnerIdsByOwnerId.get(personId)?.length ?? 0
+    const span = Math.max(familySpan, canonicalPartnerCount + 1)
   subtreeSpanCache.set(personId, span)
   return span
 }
@@ -523,24 +657,31 @@ function getFamilySpan(
   placementPlan: R3PlacementPlan,
   subtreeSpanCache: Map<UUID, number>,
   validation?: ValidationResult,
+  projectionPlan?: R3BProjectionPlan,
 ): number {
   const childSpan = family.childIds.reduce((sum, childId, index) => {
-    const subtreeSpan = getPersonSubtreeSpan(childId, placementPlan, subtreeSpanCache, validation)
+    const subtreeSpan = getPersonSubtreeSpan(childId, placementPlan, subtreeSpanCache, validation, projectionPlan)
     const next = sum + resolveChildPlacementSpan(subtreeSpan, family)
     return next + (index === family.childIds.length - 1 ? 0 : CHILD_GAP_COLUMNS)
   }, 0)
   const pairSpan = family.parentIds.length === 2
-    ? Math.max(
-        shouldReserveProjectedPairSpan(family, placementPlan.families)
-          ? PROJECTED_PAIR_MIN_SPAN_COLUMNS
-          : 2,
-        SPOUSE_STEP_COLUMNS + 1,
-      )
+    ? shouldReserveProjectedPairSpan(family, placementPlan.families, projectionPlan)
+      ? PROJECTED_VISIBLE_PAIR_SPAN_COLUMNS
+      : Math.max(2, SPOUSE_STEP_COLUMNS + 1)
     : 1
   return Math.max(pairSpan, childSpan || 1)
 }
 
-function shouldReserveProjectedPairSpan(family: R3FamilyGroup, families: R3FamilyGroup[]): boolean {
+function shouldReserveProjectedPairSpan(
+  family: R3FamilyGroup,
+  families: R3FamilyGroup[],
+  projectionPlan: R3BProjectionPlan | undefined,
+): boolean {
+  const plannedSlot = projectionPlan?.visiblePartnerSlotsByFamily.get(family.key)
+  if (plannedSlot) {
+    return plannedSlot.companionKind === 'projection'
+  }
+
   if (family.parentIds.length !== 2) {
     return false
   }
@@ -560,9 +701,10 @@ function buildChildColumns(
   placementPlan: R3PlacementPlan,
   subtreeSpanCache: Map<UUID, number>,
   validation: ValidationResult,
+  projectionPlan: R3BProjectionPlan,
 ): number[] {
   if (family.parentIds.length === 2 && childIds.length === 2) {
-    const rawSpans = childIds.map((childId) => getPersonSubtreeSpan(childId, placementPlan, subtreeSpanCache, validation))
+    const rawSpans = childIds.map((childId) => getPersonSubtreeSpan(childId, placementPlan, subtreeSpanCache, validation, projectionPlan))
     const effectiveSpans = rawSpans.map((rawSpan) => resolveChildPlacementSpan(rawSpan, family))
     const continuationCompanionFlags = childIds.map((childId) => isNonOwnerMarriageParentWithChildren(childId, placementPlan.families))
     const continuationCompanionCount = continuationCompanionFlags.filter(Boolean).length
@@ -599,7 +741,7 @@ function buildChildColumns(
     }
   }
 
-  const profiles = childIds.map((childId) => resolveChildPlacementProfile(childId, family, placementPlan, subtreeSpanCache, validation))
+  const profiles = childIds.map((childId) => resolveChildPlacementProfile(childId, family, placementPlan, subtreeSpanCache, validation, projectionPlan))
   const totalWidth = profiles.reduce((sum, profile, index) => {
     const next = sum + profile.leftExtent + profile.rightExtent
     return next + (index === profiles.length - 1 ? 0 : CHILD_GAP_COLUMNS + profile.trailingGap)
@@ -621,8 +763,9 @@ function resolveChildPlacementProfile(
   placementPlan: R3PlacementPlan,
   subtreeSpanCache: Map<UUID, number>,
   validation: ValidationResult,
+  projectionPlan: R3BProjectionPlan,
 ): { childId: UUID; leftExtent: number; rightExtent: number; trailingGap: number } {
-  const subtreeSpan = getPersonSubtreeSpan(childId, placementPlan, subtreeSpanCache, validation)
+  const subtreeSpan = getPersonSubtreeSpan(childId, placementPlan, subtreeSpanCache, validation, projectionPlan)
   const width = resolveChildPlacementSpan(subtreeSpan, family)
 
   if (hasProjectedCompanionFamilyInSubtree(childId, placementPlan.families, validation) && width > 1) {
@@ -786,24 +929,30 @@ function applySingleChildrenToTwoParentMidpoint(
   validation: ValidationResult,
   positionedNodes: Map<UUID, PositionedNode>,
   spouseAttachedByOwnerId: Map<UUID, Set<UUID>>,
+  visibleParentSlotsByFamily: Map<string, R3BVisibleParentSlot[]>,
   marriagePartnerIdsByPerson: Map<UUID, UUID[]>,
+  projectionPlan: R3BProjectionPlan,
 ): void {
   for (const family of families) {
     if (family.parentIds.length !== 2 || family.childIds.length !== 1) {
       continue
     }
 
-    const [firstParentId, secondParentId] = family.parentIds
     const childId = family.childIds[0]
-    const firstParent = positionedNodes.get(firstParentId)
-    const secondParent = positionedNodes.get(secondParentId)
     const childNode = positionedNodes.get(childId)
 
-    if (!firstParent || !secondParent || !childNode) {
+    if (!childNode) {
       continue
     }
 
-    const parentMidX = resolveVisibleFamilyMidX(family, positionedNodes, marriagePartnerIdsByPerson, validation)
+    const parentMidX = resolveVisibleFamilyMidX(refreshVisibleParentSlots({
+      family,
+      visibleParentSlotsByFamily,
+      positionedNodes,
+      marriagePartnerIdsByPerson,
+      validation,
+      projectionPlan,
+    }))
 
     const childCenterX = childNode.x + childNode.width / 2
     const shiftX = parentMidX - childCenterX
@@ -885,7 +1034,9 @@ function applyVisibleTwoParentChildBandRecentering(
   validation: ValidationResult,
   positionedNodes: Map<UUID, PositionedNode>,
   spouseAttachedByOwnerId: Map<UUID, Set<UUID>>,
+  visibleParentSlotsByFamily: Map<string, R3BVisibleParentSlot[]>,
   marriagePartnerIdsByPerson: Map<UUID, UUID[]>,
+  projectionPlan: R3BProjectionPlan,
 ): void {
   for (const family of families) {
     if (family.parentIds.length !== 2 || family.childIds.length < 2) {
@@ -899,7 +1050,14 @@ function applyVisibleTwoParentChildBandRecentering(
       continue
     }
 
-    const targetMidX = resolveVisibleFamilyMidX(family, positionedNodes, marriagePartnerIdsByPerson, validation)
+    const targetMidX = resolveVisibleFamilyMidX(refreshVisibleParentSlots({
+      family,
+      visibleParentSlotsByFamily,
+      positionedNodes,
+      marriagePartnerIdsByPerson,
+      validation,
+      projectionPlan,
+    }))
     const childCenters = childNodes.map((node) => node.x + node.width / 2)
     const currentMidX = childCenters.length === 1
       ? childCenters[0]
@@ -1450,6 +1608,350 @@ function applySinglePassRowDeoverlap(positionedNodes: Map<UUID, PositionedNode>)
   }
 }
 
+function applyCanonicalMainPartnerUnitRowDeoverlap(
+  positionedNodes: Map<UUID, PositionedNode>,
+  projectionPlan: R3BProjectionPlan,
+): void {
+  const canonicalOwnerIdByMemberId = new Map<UUID, UUID>()
+  for (const [ownerId, partnerIds] of projectionPlan.canonicalMainPartnerIdsByOwnerId) {
+    canonicalOwnerIdByMemberId.set(ownerId, ownerId)
+    for (const partnerId of partnerIds) {
+      canonicalOwnerIdByMemberId.set(partnerId, ownerId)
+    }
+  }
+
+  const rowBuckets = new Map<number, PositionedNode[]>()
+  for (const node of positionedNodes.values()) {
+    const bucket = rowBuckets.get(node.y) ?? []
+    bucket.push(node)
+    rowBuckets.set(node.y, bucket)
+  }
+
+  for (const rowNodes of rowBuckets.values()) {
+    const unitNodesById = new Map<string, PositionedNode[]>()
+    for (const node of rowNodes) {
+      const canonicalOwnerId = canonicalOwnerIdByMemberId.get(node.id)
+      const unitId = canonicalOwnerId && positionedNodes.get(canonicalOwnerId)?.y === node.y
+        ? `partner:${canonicalOwnerId}`
+        : `node:${node.id}`
+      const unitNodes = unitNodesById.get(unitId) ?? []
+      unitNodes.push(node)
+      unitNodesById.set(unitId, unitNodes)
+    }
+
+    const units = [...unitNodesById.entries()]
+      .map(([id, nodes]) => ({
+        id,
+        nodes,
+        minX: Math.min(...nodes.map((node) => node.x)),
+        maxX: Math.max(...nodes.map((node) => node.x + node.width)),
+      }))
+      .sort((left, right) => left.minX - right.minX || left.id.localeCompare(right.id))
+
+    let nextMinX = Number.NEGATIVE_INFINITY
+    for (const unit of units) {
+      const shiftX = Number.isFinite(nextMinX) ? Math.max(0, nextMinX - unit.minX) : 0
+      if (shiftX > 0) {
+        for (const node of unit.nodes) {
+          node.x += shiftX
+          positionedNodes.set(node.id, node)
+        }
+      }
+
+      nextMinX = unit.maxX + shiftX + ROW_DEOVERLAP_MIN_GAP
+    }
+  }
+}
+
+function alignSharedStartHouseRootChildAxes(
+  validation: ValidationResult,
+  houseDefinitions: HouseDefinitions,
+  positionedNodes: Map<UUID, PositionedNode>,
+  familyPlacements: R3FamilyPlacement[],
+): void {
+  const houseLookup = createHouseLookup(houseDefinitions, validation.personById)
+
+  for (const family of familyPlacements) {
+    if (family.parentIds.length !== 2 || family.childIds.length === 0) {
+      continue
+    }
+
+    const [firstParentId, secondParentId] = family.parentIds
+    if ((validation.parentsByChild.get(firstParentId) ?? []).length !== 0
+      || (validation.parentsByChild.get(secondParentId) ?? []).length !== 0) {
+      continue
+    }
+
+    const firstStartHouse = houseLookup.getPrimaryStartHouse(firstParentId)
+    const secondStartHouse = houseLookup.getPrimaryStartHouse(secondParentId)
+    if (!firstStartHouse || firstStartHouse.id !== secondStartHouse?.id) {
+      continue
+    }
+
+    const parentNodes = family.parentIds
+      .map((parentId) => positionedNodes.get(parentId))
+      .filter((node): node is PositionedNode => node !== undefined)
+    const childNodes = family.childIds
+      .map((childId) => positionedNodes.get(childId))
+      .filter((node): node is PositionedNode => node !== undefined)
+    if (parentNodes.length !== 2 || childNodes.length === 0) {
+      continue
+    }
+
+    const parentAxisX = (Math.min(...parentNodes.map((node) => node.x + node.width / 2))
+      + Math.max(...parentNodes.map((node) => node.x + node.width / 2))) / 2
+    const childAxisX = (Math.min(...childNodes.map((node) => node.x + node.width / 2))
+      + Math.max(...childNodes.map((node) => node.x + node.width / 2))) / 2
+    const shiftX = parentAxisX - childAxisX
+    if (Math.abs(shiftX) < 0.01) {
+      continue
+    }
+
+    const descendantIds = collectDescendantIds(family.childIds, validation.childrenByParent)
+    for (const descendantId of descendantIds) {
+      const descendantNode = positionedNodes.get(descendantId)
+      if (!descendantNode) {
+        continue
+      }
+
+      positionedNodes.set(descendantId, {
+        ...descendantNode,
+        x: descendantNode.x + shiftX,
+      })
+    }
+  }
+}
+
+function collectDescendantIds(
+  rootIds: UUID[],
+  childrenByParent: Map<UUID, UUID[]>,
+): Set<UUID> {
+  const descendants = new Set<UUID>()
+  const pendingIds = [...rootIds]
+
+  while (pendingIds.length > 0) {
+    const personId = pendingIds.pop()
+    if (!personId || descendants.has(personId)) {
+      continue
+    }
+
+    descendants.add(personId)
+    pendingIds.push(...(childrenByParent.get(personId) ?? []))
+  }
+
+  return descendants
+}
+
+function alignCanonicalMainPartners(
+  positionedNodes: Map<UUID, PositionedNode>,
+  projectionPlan: R3BProjectionPlan,
+): void {
+  for (const [ownerId, partnerIds] of projectionPlan.canonicalMainPartnerIdsByOwnerId) {
+    const ownerNode = positionedNodes.get(ownerId)
+    if (!ownerNode) {
+      continue
+    }
+
+    partnerIds.forEach((partnerId, index) => {
+      const partnerNode = positionedNodes.get(partnerId)
+      if (!partnerNode) {
+        return
+      }
+
+      const side = projectionPlan.canonicalMainPartnerSidesByOwnerId.get(ownerId)?.get(partnerId) ?? 'right'
+
+      positionedNodes.set(partnerId, {
+        ...partnerNode,
+        x: side === 'left'
+          ? ownerNode.x - PARTNER_GAP - partnerNode.width - index * (NODE_WIDTH + PARTNER_GAP)
+          : ownerNode.x + ownerNode.width + PARTNER_GAP + index * (NODE_WIDTH + PARTNER_GAP),
+        y: ownerNode.y,
+      })
+    })
+  }
+}
+
+function reserveCanonicalMainPartnerRows(
+  positionedNodes: Map<UUID, PositionedNode>,
+  projectionPlan: R3BProjectionPlan,
+): void {
+  for (const [ownerId, partnerIds] of projectionPlan.canonicalMainPartnerIdsByOwnerId) {
+    const ownerNode = positionedNodes.get(ownerId)
+    const finalPartnerId = partnerIds[partnerIds.length - 1]
+    const finalPartnerNode = finalPartnerId ? positionedNodes.get(finalPartnerId) : undefined
+    if (!ownerNode || !finalPartnerNode) {
+      continue
+    }
+
+    for (const node of positionedNodes.values()) {
+      if (node.id === ownerId || partnerIds.includes(node.id) || node.y !== ownerNode.y) {
+        continue
+      }
+
+      const overlapsPairReservation = node.x < finalPartnerNode.x + finalPartnerNode.width + PARTNER_GAP
+        && node.x + node.width > ownerNode.x
+      if (overlapsPairReservation) {
+        node.x = finalPartnerNode.x + finalPartnerNode.width + PARTNER_GAP
+        positionedNodes.set(node.id, node)
+      }
+    }
+  }
+}
+
+function reserveFinalProjectionSlots(
+  positionedNodes: Map<UUID, PositionedNode>,
+  marriagePartnerIdsByPerson: Map<UUID, UUID[]>,
+  projectionPlan: R3BProjectionPlan,
+  finalProjectionSlotsByContext: Map<string, R3BVisibleParentSlot>,
+): void {
+  buildFinalProjectionSlots(positionedNodes, marriagePartnerIdsByPerson, projectionPlan, finalProjectionSlotsByContext)
+  const reservationKeys = [...finalProjectionSlotsByContext.keys()].sort((left, right) => {
+    const leftSlot = finalProjectionSlotsByContext.get(left)
+    const rightSlot = finalProjectionSlotsByContext.get(right)
+    return (leftSlot?.y ?? 0) - (rightSlot?.y ?? 0)
+      || (leftSlot?.x ?? 0) - (rightSlot?.x ?? 0)
+      || left.localeCompare(right)
+  })
+  const reservedContextKeys = new Set<string>()
+  const reservedPersonIds = new Set<UUID>()
+
+  for (let pass = 0; pass < 2; pass += 1) {
+    let changed = false
+
+    for (const contextKey of reservationKeys) {
+    const slot = finalProjectionSlotsByContext.get(contextKey)
+    if (!slot) {
+      continue
+    }
+    const direction = slot.x + slot.width / 2 >= (positionedNodes.get(slot.ownerId ?? '')?.x ?? slot.x) + NODE_WIDTH / 2
+      ? 1
+      : -1
+    const blockers = [...positionedNodes.values()]
+      .filter((node) => node.id !== slot.ownerId && node.id !== slot.companionId)
+      .filter((node) => rectsOverlap(node, slot))
+      .sort((left, right) => left.x - right.x || left.id.localeCompare(right.id))
+
+    for (const blocker of blockers) {
+      const shiftTargetId = reservedPersonIds.has(blocker.id) ? slot.ownerId ?? blocker.id : blocker.id
+      const shiftNodeIds = new Set<UUID>([shiftTargetId])
+      const currentBlocker = positionedNodes.get(blocker.id)
+      if (!currentBlocker) {
+        continue
+      }
+
+      if (blocker.id === slot.ownerId || blocker.id === slot.companionId) {
+        continue
+      }
+
+      const shiftX = shiftTargetId === blocker.id
+        ? direction === 1
+          ? slot.x + slot.width + ROW_DEOVERLAP_MIN_GAP - currentBlocker.x
+          : slot.x - ROW_DEOVERLAP_MIN_GAP - (currentBlocker.x + currentBlocker.width)
+        : slot.x + slot.width / 2 >= currentBlocker.x + currentBlocker.width / 2
+          ? currentBlocker.x + currentBlocker.width + ROW_DEOVERLAP_MIN_GAP - slot.x
+          : currentBlocker.x - ROW_DEOVERLAP_MIN_GAP - (slot.x + slot.width)
+      if (shiftTargetId === blocker.id && ((direction === 1 && shiftX <= 0) || (direction === -1 && shiftX >= 0))) {
+        continue
+      }
+
+      for (const shiftNodeId of shiftNodeIds) {
+        const node = positionedNodes.get(shiftNodeId)
+        if (node) {
+          positionedNodes.set(shiftNodeId, { ...node, x: node.x + shiftX })
+          preserveLocalRowSpacing(positionedNodes, shiftNodeId, shiftX)
+        }
+      }
+
+      buildFinalProjectionSlots(positionedNodes, marriagePartnerIdsByPerson, projectionPlan, finalProjectionSlotsByContext)
+      changed = true
+    }
+
+    const refreshedSlot = finalProjectionSlotsByContext.get(contextKey)
+    if (refreshedSlot) {
+      for (const reservedContextKey of reservedContextKeys) {
+        const reservedSlot = finalProjectionSlotsByContext.get(reservedContextKey)
+        if (!reservedSlot || !rectsOverlap(refreshedSlot, reservedSlot)) {
+          continue
+        }
+
+        const ownerRootId = refreshedSlot.ownerId ?? ''
+        const shiftNodeIds = new Set<UUID>([ownerRootId])
+        shiftNodeIds.delete(reservedSlot.ownerId ?? '')
+        shiftNodeIds.delete(reservedSlot.companionId ?? '')
+        const shiftX = refreshedSlot.x + refreshedSlot.width / 2 >= reservedSlot.x + reservedSlot.width / 2
+          ? reservedSlot.x + reservedSlot.width + ROW_DEOVERLAP_MIN_GAP - refreshedSlot.x
+          : reservedSlot.x - ROW_DEOVERLAP_MIN_GAP - (refreshedSlot.x + refreshedSlot.width)
+        for (const shiftNodeId of shiftNodeIds) {
+          const node = positionedNodes.get(shiftNodeId)
+          if (node) {
+            positionedNodes.set(shiftNodeId, { ...node, x: node.x + shiftX })
+            preserveLocalRowSpacing(positionedNodes, shiftNodeId, shiftX)
+          }
+        }
+        buildFinalProjectionSlots(positionedNodes, marriagePartnerIdsByPerson, projectionPlan, finalProjectionSlotsByContext)
+        changed = true
+      }
+    }
+
+    reservedContextKeys.add(contextKey)
+    if (slot.ownerId) {
+      reservedPersonIds.add(slot.ownerId)
+    }
+      if (slot.companionId) {
+        reservedPersonIds.add(slot.companionId)
+      }
+    }
+
+    if (!changed) {
+      break
+    }
+  }
+
+  buildFinalProjectionSlots(positionedNodes, marriagePartnerIdsByPerson, projectionPlan, finalProjectionSlotsByContext)
+}
+
+function preserveLocalRowSpacing(
+  positionedNodes: Map<UUID, PositionedNode>,
+  shiftedNodeId: UUID,
+  shiftX: number,
+): void {
+  const shiftedNode = positionedNodes.get(shiftedNodeId)
+  if (!shiftedNode || shiftX === 0) {
+    return
+  }
+
+  const rowNodes = [...positionedNodes.values()]
+    .filter((node) => node.y === shiftedNode.y)
+    .sort((left, right) => left.x - right.x || left.id.localeCompare(right.id))
+  const shiftedNodeIndex = rowNodes.findIndex((node) => node.id === shiftedNodeId)
+  if (shiftedNodeIndex < 0) {
+    return
+  }
+
+  if (shiftX > 0) {
+    for (let index = shiftedNodeIndex + 1; index < rowNodes.length; index += 1) {
+      const previous = rowNodes[index - 1]
+      const node = rowNodes[index]
+      const minX = previous.x + previous.width + ROW_DEOVERLAP_MIN_GAP
+      if (node.x < minX) {
+        node.x = minX
+        positionedNodes.set(node.id, node)
+      }
+    }
+    return
+  }
+
+  for (let index = shiftedNodeIndex - 1; index >= 0; index -= 1) {
+    const node = rowNodes[index]
+    const next = rowNodes[index + 1]
+    const maxRight = next.x - ROW_DEOVERLAP_MIN_GAP
+    if (node.x + node.width > maxRight) {
+      node.x = maxRight - node.width
+      positionedNodes.set(node.id, node)
+    }
+  }
+}
+
 
 function finalizeFamilyPlacementAxes(
   familyPlacements: Map<string, R3FamilyPlacement>,
@@ -1457,36 +1959,45 @@ function finalizeFamilyPlacementAxes(
   positionedNodes: Map<UUID, PositionedNode>,
   marriagePartnerIdsByPerson: Map<UUID, UUID[]>,
   validation: ValidationResult,
+  projectionPlan: R3BProjectionPlan,
 ): void {
   for (const [key, placement] of familyPlacements.entries()) {
-    const visibleParentSlots = buildVisibleParentSlots(
-      {
+    const visibleParentSlots = refreshVisibleParentSlots({
+      family: {
         key: placement.key,
         parentIds: placement.parentIds,
         childIds: placement.childIds,
         ownerId: resolvePlacementOwnerId(placement.parentIds, validation),
-        marriage: null,
+        marriage: resolveFamilyMarriage(placement.parentIds, validation),
       },
+      visibleParentSlotsByFamily,
       positionedNodes,
       marriagePartnerIdsByPerson,
       validation,
-    )
-    visibleParentSlotsByFamily.set(key, visibleParentSlots)
-    const parentCenters = visibleParentSlots.map((slot) => slot.x + slot.width / 2)
-
-    if (parentCenters.length === 0) {
+      projectionPlan,
+    })
+    const axisX = resolveVisibleFamilyMidX(visibleParentSlots)
+    if (!Number.isFinite(axisX)) {
       continue
     }
-
-    const axisX = parentCenters.length === 1
-      ? parentCenters[0]
-      : (Math.min(...parentCenters) + Math.max(...parentCenters)) / 2
 
     familyPlacements.set(key, {
       ...placement,
       axisColumn: axisX / COLUMN_WIDTH,
     })
   }
+}
+
+function resolveFamilyMarriage(parentIds: UUID[], validation: ValidationResult) {
+  if (parentIds.length !== 2) {
+    return null
+  }
+
+  return validation.validOverlayRelations.find((relation) => (
+    relation.type === 'marriage'
+    && ((relation.from === parentIds[0] && relation.to === parentIds[1])
+      || (relation.from === parentIds[1] && relation.to === parentIds[0]))
+  )) ?? null
 }
 
 function buildR3BFamilyOffsets(familyCount: number): number[] {
@@ -1513,46 +2024,82 @@ function resolveFamilyAxisColumn({
   family,
   fallbackCenterColumn,
   followRulerLine,
-  positionedNodes,
-  marriagePartnerIdsByPerson,
-  validation,
+  visibleParentSlots,
 }: {
   family: R3FamilyGroup
   fallbackCenterColumn: number
   followRulerLine: boolean
-  positionedNodes: Map<UUID, PositionedNode>
-  marriagePartnerIdsByPerson: Map<UUID, UUID[]>
-  validation: ValidationResult
+  visibleParentSlots: R3BVisibleParentSlot[]
 }): number {
-  if (followRulerLine || family.parentIds.length !== 2) {
+  if (followRulerLine || family.parentIds.length !== 2 || visibleParentSlots.length !== 2) {
     return fallbackCenterColumn
   }
 
-  const [leftParentId, rightParentId] = family.parentIds
-  const leftParent = positionedNodes.get(leftParentId)
-  const rightParent = positionedNodes.get(rightParentId)
-
-  if (!leftParent || !rightParent) {
-    return fallbackCenterColumn
-  }
-
-  return resolveVisibleFamilyMidX(family, positionedNodes, marriagePartnerIdsByPerson, validation) / COLUMN_WIDTH
+  return resolveVisibleFamilyMidX(visibleParentSlots) / COLUMN_WIDTH
 }
 
-function resolveVisibleFamilyMidX(
-  family: R3FamilyGroup,
-  positionedNodes: Map<UUID, PositionedNode>,
-  marriagePartnerIdsByPerson: Map<UUID, UUID[]>,
-  validation: ValidationResult,
-): number {
-  const visibleParentSlots = buildVisibleParentSlots(family, positionedNodes, marriagePartnerIdsByPerson, validation)
+function resolveVisibleFamilyMidX(visibleParentSlots: R3BVisibleParentSlot[]): number {
   if (visibleParentSlots.length === 0) {
-    return 0
+    return Number.NaN
   }
   const centers = visibleParentSlots.map((slot) => slot.x + slot.width / 2)
   return centers.length === 1
     ? centers[0]
     : (Math.min(...centers) + Math.max(...centers)) / 2
+}
+
+function refreshVisibleParentSlots({
+  family,
+  visibleParentSlotsByFamily,
+  positionedNodes,
+  marriagePartnerIdsByPerson,
+  validation,
+  projectionPlan,
+}: {
+  family: Pick<R3FamilyGroup, 'key' | 'parentIds' | 'ownerId' | 'childIds' | 'marriage'>
+  visibleParentSlotsByFamily: Map<string, R3BVisibleParentSlot[]>
+  positionedNodes: Map<UUID, PositionedNode>
+  marriagePartnerIdsByPerson: Map<UUID, UUID[]>
+  validation: ValidationResult
+  projectionPlan: R3BProjectionPlan
+}): R3BVisibleParentSlot[] {
+  const visibleParentSlots = buildVisibleParentSlots(
+    family,
+    positionedNodes,
+    marriagePartnerIdsByPerson,
+    validation,
+    projectionPlan,
+  )
+  visibleParentSlotsByFamily.set(family.key, visibleParentSlots)
+  return visibleParentSlots
+}
+
+function normalizeVisibleParentSlots(
+  visibleParentSlotsByFamily: Map<string, R3BVisibleParentSlot[]>,
+  offsetX: number,
+  offsetY: number,
+): void {
+  for (const [familyKey, slots] of visibleParentSlotsByFamily.entries()) {
+    visibleParentSlotsByFamily.set(familyKey, slots.map((slot) => ({
+      ...slot,
+      x: slot.x - offsetX,
+      y: slot.y - offsetY,
+    })))
+  }
+}
+
+function normalizeFinalProjectionSlots(
+  finalProjectionSlotsByContext: Map<string, R3BVisibleParentSlot>,
+  offsetX: number,
+  offsetY: number,
+): void {
+  for (const [contextKey, slot] of finalProjectionSlotsByContext.entries()) {
+    finalProjectionSlotsByContext.set(contextKey, {
+      ...slot,
+      x: slot.x - offsetX,
+      y: slot.y - offsetY,
+    })
+  }
 }
 
 function shouldUseProjectedChildAxis(family: R3FamilyGroup, validation: ValidationResult): boolean {
@@ -1566,9 +2113,15 @@ function shouldUseProjectedChildAxis(family: R3FamilyGroup, validation: Validati
   return firstParentCount > 0 && secondParentCount > 0
 }
 
-function shouldAttachSpouseToOwnerLineage(spouseId: UUID, validation: ValidationResult): boolean {
-  const parentCount = (validation.parentsByChild.get(spouseId) ?? []).length
-  return parentCount === 0
+function shouldAttachSpouseToOwnerLineage(
+  family: R3FamilyGroup,
+  spouseId: UUID,
+  projectionPlan: R3BProjectionPlan,
+): boolean {
+  const slotPlan = projectionPlan.visiblePartnerSlotsByFamily.get(family.key)
+  return slotPlan?.ownerId === family.ownerId
+    && slotPlan.companionId === spouseId
+    && slotPlan.companionKind === 'real'
 }
 
 function positionCoupleAroundFamilyAxis({
@@ -1661,6 +2214,7 @@ function buildVisibleParentSlots(
   positionedNodes: Map<UUID, PositionedNode>,
   marriagePartnerIdsByPerson: Map<UUID, UUID[]>,
   validation: ValidationResult,
+  projectionPlan: R3BProjectionPlan,
 ): R3BVisibleParentSlot[] {
   if (family.parentIds.length === 0) {
     return []
@@ -1675,6 +2229,9 @@ function buildVisibleParentSlots(
     return [{
       key: `${family.key}:owner:${node.id}`,
       familyKey: family.key,
+	  relationId: family.marriage?.id,
+	  ownerId: family.ownerId,
+	  companionId: family.parentIds.find((parentId) => parentId !== family.ownerId),
       personId: node.id,
       role: 'owner',
       kind: 'real',
@@ -1690,28 +2247,28 @@ function buildVisibleParentSlots(
   const companionNode = companionId ? positionedNodes.get(companionId) ?? null : null
 
   if (!ownerNode || !companionId) {
-    return family.parentIds
-      .map((parentId) => positionedNodes.get(parentId))
-      .filter((node): node is PositionedNode => node !== undefined)
-      .map((node) => ({
-        key: `${family.key}:real:${node.id}`,
-        familyKey: family.key,
-        personId: node.id,
-        role: node.id === family.ownerId ? 'owner' : 'companion',
-        kind: 'real' as const,
-        x: node.x,
-        y: node.y,
-        width: node.width,
-        height: node.height,
-      }))
+    return buildRealVisibleParentSlots(family, positionedNodes)
   }
 
-  if (!shouldUseProjectedChildAxis(family as R3FamilyGroup, validation)) {
+  const slotPlan = projectionPlan.visiblePartnerSlotsByFamily.get(family.key)
+  const usesProjectedCompanion = slotPlan?.ownerId === family.ownerId
+    && slotPlan.companionId === companionId
+    ? slotPlan.companionKind === 'projection'
+    : shouldUseProjectedChildAxis(family as R3FamilyGroup, validation)
+
+  if (!usesProjectedCompanion) {
+    if (!companionNode) {
+      return buildRealVisibleParentSlots(family, positionedNodes)
+    }
+
     return [ownerNode, companionNode]
       .filter((node): node is PositionedNode => node !== null)
       .map((node) => ({
         key: `${family.key}:real:${node.id}`,
         familyKey: family.key,
+	    relationId: family.marriage?.id,
+	    ownerId: family.ownerId,
+	    companionId,
         personId: node.id,
         role: node.id === family.ownerId ? 'owner' : 'companion',
         kind: 'real' as const,
@@ -1735,6 +2292,9 @@ function buildVisibleParentSlots(
     {
       key: `${family.key}:owner:${family.ownerId}`,
       familyKey: family.key,
+	  relationId: family.marriage?.id,
+	  ownerId: family.ownerId,
+	  companionId,
       personId: family.ownerId,
       role: 'owner',
       kind: 'real',
@@ -1746,6 +2306,9 @@ function buildVisibleParentSlots(
     {
       key: `${family.key}:projection:${companionId}`,
       familyKey: family.key,
+	  relationId: family.marriage?.id,
+	  ownerId: family.ownerId,
+	  companionId,
       personId: companionId,
       role: 'companion',
       kind: 'projection',
@@ -1755,6 +2318,85 @@ function buildVisibleParentSlots(
       height: projection.height,
     },
   ]
+}
+
+function buildFinalProjectionSlots(
+  positionedNodes: Map<UUID, PositionedNode>,
+  marriagePartnerIdsByPerson: Map<UUID, UUID[]>,
+  projectionPlan: R3BProjectionPlan,
+  finalProjectionSlotsByContext: Map<string, R3BVisibleParentSlot>,
+): void {
+  finalProjectionSlotsByContext.clear()
+
+  for (const context of projectionPlan.projectionContextsByKey.values()) {
+    if (projectionPlan.canonicalMainMarriageIds.has(context.relationId)) {
+      continue
+    }
+
+    const ownerNode = positionedNodes.get(context.ownerId)
+    const companionNode = positionedNodes.get(context.companionId) ?? null
+    if (!ownerNode) {
+      continue
+    }
+    const projection = buildR3BProjectionGeometry({
+      ownerId: context.ownerId,
+      companionId: context.companionId,
+      ownerNode,
+      companionNode,
+      partnerIdsByPerson: marriagePartnerIdsByPerson,
+      nodesById: positionedNodes,
+    })
+    const key = buildR3BProjectionContextKey(context.relationId, context.ownerId, context.companionId)
+    finalProjectionSlotsByContext.set(key, {
+      key,
+      familyKey: context.familyKey,
+      relationId: context.relationId,
+      ownerId: context.ownerId,
+      companionId: context.companionId,
+      personId: context.companionId,
+      role: 'companion',
+      kind: 'projection',
+      x: projection.x,
+      y: projection.y,
+      width: projection.width,
+      height: projection.height,
+    })
+  }
+}
+
+function rectsOverlap(
+  first: Pick<PositionedNode, 'x' | 'y' | 'width' | 'height'>,
+  second: Pick<R3BVisibleParentSlot, 'x' | 'y' | 'width' | 'height'>,
+): boolean {
+  return !(
+    first.x + first.width <= second.x
+    || second.x + second.width <= first.x
+    || first.y + first.height <= second.y
+    || second.y + second.height <= first.y
+  )
+}
+
+function buildRealVisibleParentSlots(
+  family: Pick<R3FamilyGroup, 'key' | 'parentIds' | 'ownerId' | 'marriage'>,
+  positionedNodes: Map<UUID, PositionedNode>,
+): R3BVisibleParentSlot[] {
+  return family.parentIds
+    .map((parentId) => positionedNodes.get(parentId))
+    .filter((node): node is PositionedNode => node !== undefined)
+    .map((node) => ({
+      key: `${family.key}:real:${node.id}`,
+      familyKey: family.key,
+	  relationId: family.marriage?.id,
+	  ownerId: family.ownerId,
+	  companionId: family.parentIds.find((parentId) => parentId !== family.ownerId),
+      personId: node.id,
+      role: node.id === family.ownerId ? 'owner' : 'companion',
+      kind: 'real' as const,
+      x: node.x,
+      y: node.y,
+      width: node.width,
+      height: node.height,
+    }))
 }
 
 function resolvePlacementOwnerId(parentIds: UUID[], validation: ValidationResult): UUID {

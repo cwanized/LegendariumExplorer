@@ -4,11 +4,11 @@ import {
   SPOUSE_PROJECTION_NODE_HEIGHT,
   SPOUSE_PROJECTION_NODE_WIDTH,
   SPOUSE_PROJECTION_VERTICAL_ANCHOR_OFFSET,
-  SPOUSE_PROJECTION_VERTICAL_STEP_GAP,
 } from '../ruleConstants'
 import { resolveContinuationOwner } from '../continuation'
 import { canRenderInlineMarriage, type SpouseProjectionNode } from '../treeCore'
-import type { R3BProjectionPlacementDecision, R3BProjectionShiftEligibility } from './types'
+import type { R3BProjectionPlacementDecision, R3BProjectionPlan, R3BProjectionShiftEligibility, R3BVisibleParentSlot } from './types'
+import { buildR3BProjectionContextKey } from './projectionPlan'
 
 type NodeBox = Pick<PositionedNode, 'x' | 'y' | 'width' | 'height'>
 
@@ -49,6 +49,7 @@ export function buildR3BProjectionGeometry({
   partnerIdsByPerson,
   nodesById,
   fallbackSide,
+  forcedSide,
 }: {
   ownerId: UUID
   companionId: UUID
@@ -57,6 +58,7 @@ export function buildR3BProjectionGeometry({
   partnerIdsByPerson: Map<UUID, UUID[]>
   nodesById: Map<UUID, NodeBox>
   fallbackSide?: 'left' | 'right'
+  forcedSide?: 'left' | 'right'
 }): R3BProjectionGeometry {
   const side = resolveR3BProjectionSide({
     anchorId: ownerId,
@@ -66,6 +68,7 @@ export function buildR3BProjectionGeometry({
     partnerIdsByPerson,
     nodesById,
     fallbackSide,
+    forcedSide,
   })
 
   return {
@@ -99,6 +102,7 @@ function resolveR3BProjectionSide({
   partnerIdsByPerson,
   nodesById,
   fallbackSide,
+  forcedSide,
 }: {
   anchorId: UUID
   companionId: UUID
@@ -107,7 +111,11 @@ function resolveR3BProjectionSide({
   partnerIdsByPerson: Map<UUID, UUID[]>
   nodesById: Map<UUID, NodeBox>
   fallbackSide?: 'left' | 'right'
+  forcedSide?: 'left' | 'right'
 }): 'left' | 'right' {
+  if (forcedSide) {
+    return forcedSide
+  }
   const partnerIds = partnerIdsByPerson.get(anchorId) ?? []
   if (partnerIds.length < 2) {
     if (partnerNode) {
@@ -152,12 +160,18 @@ export function resolveR3BProjectionPlacements({
   spouseOwnerOverrides,
   collapseChildEdges,
   duplicateBothPartners,
+  projectionPlan,
+  visibleParentSlotsByFamily,
+  finalProjectionSlotsByContext,
 }: {
   validation: ValidationResult
   layout: LayoutResult
   spouseOwnerOverrides: Record<string, UUID>
   collapseChildEdges: boolean
   duplicateBothPartners: boolean
+  projectionPlan?: R3BProjectionPlan
+  visibleParentSlotsByFamily?: Map<string, R3BVisibleParentSlot[]>
+  finalProjectionSlotsByContext?: Map<string, R3BVisibleParentSlot>
 }): {
   decisions: R3BProjectionPlacementDecision[]
   nodes: SpouseProjectionNode[]
@@ -172,16 +186,33 @@ export function resolveR3BProjectionPlacements({
   const hiddenChildEdgeKeys = new Set<string>()
 
   const rawDecisions = marriages.flatMap((relation) => {
-    if (shouldSuppressProjectionForMarriage(relation, validation, layout)) {
+    if (projectionPlan?.canonicalMainMarriageIds.has(relation.id)) {
+      return []
+    }
+
+    const requirement = projectionPlan?.requirementsByMarriageId.get(relation.id)
+    const isAdditionalParentlessMarriage = requirement?.anchoredPartnerId !== undefined
+    if (!isAdditionalParentlessMarriage && shouldSuppressProjectionForMarriage(relation, validation, layout)) {
       return []
     }
 
     const fromParentCount = (validation.parentsByChild.get(relation.from) ?? []).length
     const toParentCount = (validation.parentsByChild.get(relation.to) ?? []).length
-    const hasSingleAnchoredSpouse = (fromParentCount === 0) !== (toParentCount === 0)
-    const sharedChildren = getSharedChildren(relation.from, relation.to, validation)
-    const ownerId = resolveContinuationOwner({ relation, validation, spouseOwnerOverrides })
-    const companionId = ownerId === relation.from ? relation.to : relation.from
+    const hasSingleAnchoredSpouse = requirement
+      ? requirement.anchoredPartnerId !== undefined
+      : (fromParentCount === 0) !== (toParentCount === 0)
+    const sharedChildren = requirement?.sharedChildren ?? getSharedChildren(relation.from, relation.to, validation)
+    const plannedContext = findProjectionContext(relation, projectionPlan)
+    const visibleSlotFamily = findVisibleSlotFamily(relation, plannedContext, visibleParentSlotsByFamily)
+    const ownerSlot = visibleSlotFamily?.find((slot) => slot.role === 'owner')
+    const companionSlot = visibleSlotFamily?.find((slot) => slot.role === 'companion')
+    const hasRealVisibleParentPair = visibleSlotFamily?.length === 2
+      && visibleSlotFamily.every((slot) => slot.kind === 'real')
+    if (!isAdditionalParentlessMarriage && hasRealVisibleParentPair) {
+      return []
+    }
+    const ownerId = plannedContext?.ownerId ?? ownerSlot?.personId ?? resolveContinuationOwner({ relation, validation, spouseOwnerOverrides })
+    const companionId = companionSlot?.personId ?? (ownerId === relation.from ? relation.to : relation.from)
 
     projectedMarriageIds.add(relation.id)
     if (collapseChildEdges) {
@@ -192,7 +223,7 @@ export function resolveR3BProjectionPlacements({
 
     const placements = hasSingleAnchoredSpouse
       ? (() => {
-          const anchorId = fromParentCount > 0 ? relation.from : relation.to
+          const anchorId = requirement?.anchoredPartnerId ?? (fromParentCount > 0 ? relation.from : relation.to)
           const projectedCompanionId = anchorId === relation.from ? relation.to : relation.from
           return [{ anchorId, projectedCompanionId }]
         })()
@@ -211,7 +242,10 @@ export function resolveR3BProjectionPlacements({
           return null
         }
 
-        const geometry = buildR3BProjectionGeometry({
+        const slotGeometry = finalProjectionSlotsByContext?.get(
+          buildR3BProjectionContextKey(relation.id, anchorId, projectedCompanionId),
+        ) ?? null
+        const fallbackGeometry = buildR3BProjectionGeometry({
           ownerId: anchorId,
           companionId: projectedCompanionId,
           ownerNode: anchorNode,
@@ -219,14 +253,19 @@ export function resolveR3BProjectionPlacements({
           partnerIdsByPerson,
           nodesById: layout.nodes,
         })
+        const geometry = slotGeometry ?? fallbackGeometry
+        const resolvedSide = slotGeometry
+          ? resolveSlotSide(anchorNode, slotGeometry)
+          : fallbackGeometry.side
 
         return {
           relationId: relation.id,
           ownerId: anchorId,
           companionId: projectedCompanionId,
           sharedChildren,
-          preferredSide: geometry.side,
-          resolvedSide: geometry.side,
+          isFamilyRelevant: slotGeometry !== null,
+          preferredSide: resolvedSide,
+          resolvedSide,
           resolutionMode: 'primary-slot' as const,
           x: geometry.x,
           y: geometry.y,
@@ -248,6 +287,7 @@ export function resolveR3BProjectionPlacements({
     width: decision.width,
     height: decision.height,
     side: decision.resolvedSide,
+    isPlannedSlot: decision.isFamilyRelevant,
   }))
 
   return {
@@ -256,6 +296,48 @@ export function resolveR3BProjectionPlacements({
     projectedMarriageIds,
     hiddenChildEdgeKeys,
   }
+}
+
+function findProjectionContext(
+  relation: Relation,
+  projectionPlan: R3BProjectionPlan | undefined,
+): { relationId: UUID; ownerId: UUID; companionId: UUID; familyKey: string } | null {
+  if (!projectionPlan) {
+    return null
+  }
+
+  return projectionPlan.projectionContextsByKey.get(
+    buildR3BProjectionContextKey(relation.id, relation.from, relation.to),
+  ) ?? projectionPlan.projectionContextsByKey.get(
+    buildR3BProjectionContextKey(relation.id, relation.to, relation.from),
+  ) ?? null
+}
+
+function findVisibleSlotFamily(
+  relation: Relation,
+  context: { relationId: UUID; ownerId: UUID; companionId: UUID; familyKey: string } | null,
+  visibleParentSlotsByFamily: Map<string, R3BVisibleParentSlot[]> | undefined,
+): R3BVisibleParentSlot[] | null {
+  if (!context || !visibleParentSlotsByFamily) {
+    return null
+  }
+
+  const slots = visibleParentSlotsByFamily.get(context.familyKey)
+  if (!slots || slots.length !== 2) {
+    return null
+  }
+
+  const hasExactContext = slots.some((slot) => (
+    slot.relationId === relation.id
+    && slot.ownerId === context.ownerId
+    && slot.companionId === context.companionId
+  ))
+
+  return hasExactContext ? slots : null
+}
+
+function resolveSlotSide(anchorNode: NodeBox, slot: R3BVisibleParentSlot): 'left' | 'right' {
+  return slot.x + slot.width / 2 >= anchorNode.x + anchorNode.width / 2 ? 'right' : 'left'
 }
 
 function shouldSuppressProjectionForMarriage(
@@ -302,73 +384,41 @@ function applyProjectionCollisionClearance(
 
   for (const decision of sorted) {
     let x = decision.x
-    let y = decision.y
     let resolutionMode = decision.resolutionMode
     let blockingNodeId: UUID | undefined
     let shiftEligibility: R3BProjectionShiftEligibility | undefined
     const direction = decision.resolvedSide === 'right' ? 1 : -1
 
     for (let iteration = 0; iteration < 8; iteration += 1) {
-      const rect = { x, y, width: decision.width, height: decision.height }
+      const rect = { x, y: decision.y, width: decision.width, height: decision.height }
       const overlappingLayoutNode = occupied.find((candidate) => rectsOverlap(rect, candidate))
       if (!overlappingLayoutNode) {
         const hasProjectionOverlap = adjusted.some((entry) => rectsOverlap(rect, entry))
         if (!hasProjectionOverlap) {
           break
         }
-
-        const localVerticalShift = findAvailableLocalProjectionPlacement({
-          x: decision.x,
-          y: decision.y,
-          width: decision.width,
-          height: decision.height,
-          occupied,
-          adjusted,
-        })
-        if (localVerticalShift) {
-          x = localVerticalShift.x
-          y = localVerticalShift.y
-          resolutionMode = 'shifted-local-branch'
-          break
-        }
-
         x += direction * (decision.width + 20)
-        resolutionMode = 'outward-same-side-fallback'
+        resolutionMode = 'shifted-local-branch'
         continue
       }
 
       blockingNodeId = overlappingLayoutNode.id
       shiftEligibility = classifyShiftEligibility(overlappingLayoutNode.id, layout)
 
-      const localVerticalShift = findAvailableLocalProjectionPlacement({
-        x: decision.x,
-        y: decision.y,
-        width: decision.width,
-        height: decision.height,
-        occupied,
-        adjusted,
-      })
-      if (localVerticalShift) {
-        x = localVerticalShift.x
-        y = localVerticalShift.y
+      if (shiftEligibility === 'ineligible') {
+        x += direction * (decision.width + 20)
         resolutionMode = 'shifted-local-branch'
         break
       }
 
-      if (shiftEligibility === 'ineligible') {
-        x += direction * (decision.width + 20)
-        resolutionMode = 'outward-same-side-fallback'
-        break
-      }
-
       x += direction * (decision.width + 20)
-      resolutionMode = 'outward-same-side-fallback'
+      resolutionMode = 'shifted-local-branch'
     }
 
     adjusted.push({
       ...decision,
       x,
-      y,
+      y: decision.y,
       resolutionMode,
       blockingNodeId,
       shiftEligibility,
@@ -388,45 +438,6 @@ function classifyShiftEligibility(
   }
 
   return 'single-child-continuation'
-}
-
-function findAvailableLocalProjectionPlacement({
-  x,
-  y,
-  width,
-  height,
-  occupied,
-  adjusted,
-}: {
-  x: number
-  y: number
-  width: number
-  height: number
-  occupied: Array<{ id: UUID; x: number; y: number; width: number; height: number }>
-  adjusted: R3BProjectionPlacementDecision[]
-}): { x: number; y: number } | null {
-  for (let lane = 1; lane <= 3; lane += 1) {
-    const candidate = {
-      x,
-      y: y + lane * (height + SPOUSE_PROJECTION_VERTICAL_STEP_GAP),
-      width,
-      height,
-    }
-
-    const overlapsLayout = occupied.some((entry) => rectsOverlap(candidate, entry))
-    if (overlapsLayout) {
-      continue
-    }
-
-    const overlapsProjection = adjusted.some((entry) => rectsOverlap(candidate, entry))
-    if (overlapsProjection) {
-      continue
-    }
-
-    return { x: candidate.x, y: candidate.y }
-  }
-
-  return null
 }
 
 function rectsOverlap(
