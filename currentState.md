@@ -1,8 +1,50 @@
 # Current State
 
-**Last Updated: 19. September 2026**
+**Last Updated: 25. September 2026**
 
-## R3B Handover Status (19. September 2026)
+## Current R3B Status (Authoritative, 25 September 2026)
+
+Current branch and committed baseline:
+
+- Active branch: `fb/r3b-core`
+- Current HEAD: `50693d6` `rework projection, during inital placement`
+- The branch is synchronized with `origin/fb/r3b-core` and the working tree is clean.
+
+Implemented projection-aware R3B architecture:
+
+- R3B now has an early projection plan in `app/src/preview3/r3b/projectionPlan.ts`.
+- Biological visible-parent slots remain keyed by family and drive biological child axes.
+- Final projection slots are additionally keyed by `relationId:ownerId:companionId` so double-sided marriage contexts can be addressed independently.
+- The projection plan, R3B placement artifacts, render model, and connector preparation now share explicit slot metadata instead of independently selecting an owner/companion pair.
+- Parentless partner handling is generic and data-driven. A parentless partner is rendered once as a canonical main node beside the deterministic primary spouse; no person-specific exceptions are used.
+- A pair of parentless shared start-house roots with shared biological children is rendered as `real + real`, without duplicate projections. House-anchor and child-axis behavior remain tied to the two canonical roots.
+- R3B Playwright uses a fresh build and an isolated preview server before each run; it no longer reuses a potentially stale preview bundle.
+
+Current validation status (verified on this HEAD):
+
+- `npm run build` in `app/`: passed.
+- `npx playwright test -c playwright.r3b.config.ts`: 15 passed, 1 failed, 16 total.
+- The remaining failing regression is `keeps both final Finarfin and Earwen projection contexts independently addressable` in `app/tests/r3b-smoke.spec.ts`.
+- The test expects the mirrored Eärwen -> Finarfin context to remain at the local 28px horizontal gap, but receives 888px. This is a real contract failure, not a tolerated visual variance.
+- Vite reports an existing bundle-size warning: the minified main chunk is approximately 2.1 MB (637 kB gzip), above the 500 kB warning threshold.
+
+Current blocker and required next work:
+
+- Do not add another targeted clearance or person-specific placement rule.
+- The directional-slot migration is only partially complete: the reverse double-sided projection context is addressable but its final reserved geometry is not yet guaranteed through placement to rendering.
+- First perform a single contract-level diagnosis of the mirrored context across projection plan, placement reservation, final layout artifacts, render geometry, and connector anchors.
+- The repair must make both visible contexts of a double-sided marriage real placement reservations before final geometry. A collision must move the generic conflicting local layout block, never detach a reserved context tile from its owner.
+- Keep late collision clearance only for explicitly unplanned supplemental projections.
+- The repair is accepted only when all 16 R3B tests pass and the two directions of a double-sided marriage both retain their local slot geometry with no overlaps.
+
+Locked R3B policy decisions:
+
+- R3B projections are a normal marriage-context mechanism, not person-specific render hacks.
+- Double-sided marriages keep both visible contexts; each context needs its own deterministic reservation.
+- No code may special-case names, UUIDs, or curated people. Regression examples are tests only.
+- The R3B FRS remains the binding specification; `genealogytree.pdf` is technical reference material only.
+
+## Historical R3B Handover Snapshot (19 September 2026)
 
 Current active branch:
 
